@@ -93,33 +93,41 @@ func brace(l string) string {
 // Handler serves /metrics in Prometheus text format.
 func (r *Registry) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		r.mu.Lock()
-		keys := make([]string, 0, len(r.counters))
-		for k := range r.counters {
+		r.mu.Lock() // snapshot under the lock, write after releasing it (a slow scraper must not block request handling)
+		counters := make(map[string]float64, len(r.counters))
+		for k, v := range r.counters {
+			counters[k] = v
+		}
+		hists := make(map[string]hist, len(r.hists))
+		for k, h := range r.hists {
+			hists[k] = hist{counts: append([]float64(nil), h.counts...), sum: h.sum, total: h.total}
+		}
+		gs := append([]gauge(nil), r.gauges...)
+		r.mu.Unlock()
+		keys := make([]string, 0, len(counters))
+		for k := range counters {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
 		bw := bufio.NewWriter(w)
 		for _, k := range keys {
 			p := strings.SplitN(k, "\x00", 2)
-			fmt.Fprintf(bw, "%s%s %g\n", p[0], brace(p[1]), r.counters[k])
+			fmt.Fprintf(bw, "%s%s %g\n", p[0], brace(p[1]), counters[k])
 		}
-		hk := make([]string, 0, len(r.hists))
-		for k := range r.hists {
+		hk := make([]string, 0, len(hists))
+		for k := range hists {
 			hk = append(hk, k)
 		}
 		sort.Strings(hk)
 		for _, k := range hk {
 			p := strings.SplitN(k, "\x00", 2)
-			h := r.hists[k]
+			h := hists[k]
 			for i, b := range buckets {
 				fmt.Fprintf(bw, "%s_bucket{%s} %g\n", p[0], join(p[1], "le=\""+strconv.FormatFloat(b, 'g', -1, 64)+"\""), h.counts[i])
 			}
 			fmt.Fprintf(bw, "%s_bucket{%s} %g\n", p[0], join(p[1], "le=\"+Inf\""), h.total)
 			fmt.Fprintf(bw, "%s_sum%s %g\n%s_count%s %g\n", p[0], brace(p[1]), h.sum, p[0], brace(p[1]), h.total)
 		}
-		gs := append([]gauge(nil), r.gauges...)
-		r.mu.Unlock()
 		for _, g := range gs {
 			fmt.Fprintf(bw, "%s%s %g\n", g.name, brace(g.labels), g.fn())
 		}

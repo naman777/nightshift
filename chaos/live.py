@@ -39,7 +39,7 @@ class LiveChaos:
 
     def kill(self, container: str, **_: Any) -> dict:
         name = f"nightshift-{container}"
-        subprocess.run(["docker", "kill", name], check=True, capture_output=True)
+        subprocess.run(["docker", "stop", "-t", "0", name], check=True, capture_output=True)  # `stop`, not `kill`: a killed container is revived by restart: unless-stopped
         return {"undo": "start", "container": name}
 
     def deploy(self, service: str, bug: str = "", sha: str = "", message: str = "", **_: Any) -> dict:

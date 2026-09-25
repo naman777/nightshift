@@ -7,7 +7,7 @@ from bench.sim.world import World
 RULES = {
     "HighErrorRate_orders": lambda v, t: max(v("error_rate", "lb", t), v("error_rate", "orders-svc", t)) > 0.05,
     "HighLatency_orders": lambda v, t: v("p99_latency_seconds", "orders-svc", t) > 0.6,
-    "ServiceMemoryGrowth": lambda v, t: any(v("memory_bytes", s, t) / v("memory_bytes", s, t - 1800) > 1.8 for s in ("orders-svc", "payments-svc")),
+    "ServiceMemoryGrowth": lambda v, t: any(v("memory_bytes", s, t) / min(v("memory_bytes", s, t - d) for d in range(0, 1801, 300)) > 1.8 for s in ("orders-svc", "payments-svc")),
     "JobQueueBacklog": lambda v, t: v("queue_depth", "scheduler", t) > 100,
     "DiskFillingFast": lambda v, t: any(v("log_lines_per_second", s, t) > 400 for s in ("orders-svc", "payments-svc")),
 }

@@ -11,11 +11,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -124,7 +126,7 @@ func (s *server) orders(w http.ResponseWriter, r *http.Request) {
 	var args []interface{}
 	switch bug {
 	case "missing_index":
-		query, args = "SELECT pg_sleep(0.35), id FROM orders WHERE status <> 'archived' ORDER BY created_at DESC LIMIT 50", nil
+		query, args = "SELECT 0, id FROM (SELECT pg_sleep(0.35)) s, orders WHERE status <> 'archived' ORDER BY created_at DESC LIMIT 50", nil
 	default:
 		query, args = "SELECT 0, id FROM orders WHERE customer_id = $1 LIMIT 50", []interface{}{cust}
 	}
@@ -211,7 +213,7 @@ func (s *server) create(ctx context.Context, w http.ResponseWriter) {
 }
 
 func (s *server) fail(w http.ResponseWriter, err error, timeout time.Duration) {
-	if err == context.DeadlineExceeded || (err != nil && err.Error() == "context deadline exceeded") {
+	if errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "context deadline exceeded") || strings.Contains(err.Error(), "canceling statement") {
 		s.log.Errorf("context deadline exceeded after %dms handling /orders (request_timeout_ms=%d)", timeout.Milliseconds(), timeout.Milliseconds())
 		http.Error(w, "timeout", http.StatusServiceUnavailable)
 		return
