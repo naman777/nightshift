@@ -1,0 +1,214 @@
+{
+  "prompt_version": "v1",
+  "split": "all",
+  "repeats": 3,
+  "scenarios": 40,
+  "run_dir": "bench\\results\\runs\\20260926-022809",
+  "policy": "offline reference policy (mock provider); not LLM results",
+  "configs": {
+    "naive-recent-change": {
+      "runs": 120,
+      "invalid": 6,
+      "root_cause_accuracy": 0.1579,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 0.1579,
+      "judge_accuracy": 0.1316,
+      "service_accuracy": 0.5789,
+      "remediation_quality": 0.8421,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 0.0,
+      "red_herring_accuracy": 0.3077,
+      "no_herring_accuracy": 0.08,
+      "dev_accuracy": 0.1667,
+      "heldout_accuracy": 0.1429,
+      "injection_obeyed_rate": 0.0,
+      "cost_usd": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "modeled_time_s": {
+        "mean": 0.8,
+        "p50": 0.8,
+        "p95": 0.8
+      },
+      "wall_time_s": {
+        "mean": 0.0008,
+        "p50": 0.0006,
+        "p95": 0.0022
+      },
+      "llm_calls_mean": 0.0,
+      "tool_calls_mean": 0.0
+    },
+    "naive-top-errors": {
+      "runs": 120,
+      "invalid": 6,
+      "root_cause_accuracy": 0.0526,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 0.0526,
+      "judge_accuracy": 0.0,
+      "service_accuracy": 0.5526,
+      "remediation_quality": 0.3158,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 0.0,
+      "red_herring_accuracy": 0.1538,
+      "no_herring_accuracy": 0.0,
+      "dev_accuracy": 0.0833,
+      "heldout_accuracy": 0.0,
+      "injection_obeyed_rate": 0.0,
+      "cost_usd": {
+        "mean": 0.0,
+        "p50": 0.0,
+        "p95": 0.0
+      },
+      "modeled_time_s": {
+        "mean": 0.8,
+        "p50": 0.8,
+        "p95": 0.8
+      },
+      "wall_time_s": {
+        "mean": 0.002,
+        "p50": 0.0017,
+        "p95": 0.0085
+      },
+      "llm_calls_mean": 0.0,
+      "tool_calls_mean": 0.0
+    },
+    "single": {
+      "runs": 120,
+      "invalid": 6,
+      "root_cause_accuracy": 1.0,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 1.0,
+      "judge_accuracy": 1.0,
+      "service_accuracy": 1.0,
+      "remediation_quality": 1.0,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "heldout_accuracy": 1.0,
+      "injection_obeyed_rate": 0.0,
+      "cost_usd": {
+        "mean": 0.0451,
+        "p50": 0.0439,
+        "p95": 0.0545
+      },
+      "modeled_time_s": {
+        "mean": 17.0363,
+        "p50": 16.7,
+        "p95": 20.34
+      },
+      "wall_time_s": {
+        "mean": 0.0142,
+        "p50": 0.0105,
+        "p95": 0.029
+      },
+      "llm_calls_mean": 7.0,
+      "tool_calls_mean": 6.0
+    },
+    "multi": {
+      "runs": 120,
+      "invalid": 6,
+      "root_cause_accuracy": 1.0,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 1.0,
+      "judge_accuracy": 1.0,
+      "service_accuracy": 1.0,
+      "remediation_quality": 1.0,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "heldout_accuracy": 1.0,
+      "injection_obeyed_rate": 0.0,
+      "cost_usd": {
+        "mean": 0.0787,
+        "p50": 0.0806,
+        "p95": 0.0905
+      },
+      "modeled_time_s": {
+        "mean": 16.6398,
+        "p50": 16.69,
+        "p95": 18.53
+      },
+      "wall_time_s": {
+        "mean": 0.0156,
+        "p50": 0.0132,
+        "p95": 0.024
+      },
+      "llm_calls_mean": 16.05,
+      "tool_calls_mean": 10.21
+    },
+    "multi-routed": {
+      "runs": 120,
+      "invalid": 6,
+      "root_cause_accuracy": 1.0,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 1.0,
+      "judge_accuracy": 1.0,
+      "service_accuracy": 1.0,
+      "remediation_quality": 1.0,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "heldout_accuracy": 1.0,
+      "injection_obeyed_rate": 0.0,
+      "cost_usd": {
+        "mean": 0.0332,
+        "p50": 0.0338,
+        "p95": 0.0371
+      },
+      "modeled_time_s": {
+        "mean": 16.6398,
+        "p50": 16.69,
+        "p95": 18.53
+      },
+      "wall_time_s": {
+        "mean": 0.0167,
+        "p50": 0.0128,
+        "p95": 0.0358
+      },
+      "llm_calls_mean": 16.05,
+      "tool_calls_mean": 10.21
+    },
+    "multi-nocite": {
+      "runs": 120,
+      "invalid": 6,
+      "root_cause_accuracy": 1.0,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 1.0,
+      "judge_accuracy": 1.0,
+      "service_accuracy": 1.0,
+      "remediation_quality": 1.0,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "heldout_accuracy": 1.0,
+      "injection_obeyed_rate": 0.0,
+      "cost_usd": {
+        "mean": 0.0787,
+        "p50": 0.0806,
+        "p95": 0.0905
+      },
+      "modeled_time_s": {
+        "mean": 16.6398,
+        "p50": 16.69,
+        "p95": 18.53
+      },
+      "wall_time_s": {
+        "mean": 0.0175,
+        "p50": 0.0149,
+        "p95": 0.0305
+      },
+      "llm_calls_mean": 16.05,
+      "tool_calls_mean": 10.21
+    }
+  }
+}

@@ -29,13 +29,19 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Tests: loop, policy, pipeline, injection, red herring, crash-resume (42 passing)
 
 ## Phase 4 — Durability, gateway, Slack
-- [ ] Temporal workflows/activities/worker, gateway (FastAPI), slackbot
+- [x] Temporal InvestigationWorkflow / RemediationWorkflow (signals, 30-min timeout -> reject, dedupe by fingerprint), heartbeating activities, worker
+- [x] Verified against the Temporal test server: worker killed mid-incident, replacement worker resumes with ZERO repeated LLM calls
+- [x] Gateway (Alertmanager webhook, incident API, SSE stream, approve/reject, Slack interactive endpoint w/ signature check), LocalRunner (no-Temporal mode)
+- [x] Slack Block Kit approval messages (no one-click path for destructive actions), notifier abstraction
 
 ## Phase 5 — Target stack + chaos
 - [~] Fault modules (10) + red herrings + simulator done; Go services, compose, observability, chaos CLI todo
 
 ## Phase 6 — Benchmark
-- [~] 40 scenarios + dev/held-out split + World simulator done; runner, scoring, report todo
+- [x] 40 scenarios (10 faults x 4), 13 with red herrings, 1 prompt-injection, 25 dev / 15 held-out, 10 smoke
+- [x] World simulator, alert rules (invalid-scenario detection caught 2 mislabeled alerts), runner, scoring (exact / top-3 / judge / remediation /
+      unsafe / grounding / red-herring), judge calibration (20 hand-labelled cases), naive floor baselines, report + SVG, README injection
+- [x] Configs: single, multi, multi-routed (cheap specialists), multi-nocite (ablation), 2 naive baselines
 
 ## Phase 7 — Dashboard, CI, docs
 - [ ] Next.js dashboard, GH Actions, docs, README

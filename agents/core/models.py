@@ -156,6 +156,7 @@ class Step(BaseModel):
     """One observable unit inside an agent run (for tracing and the dashboard)."""
 
     agent: str
+    incident_id: str = ""
     kind: str  # llm | tool | finding
     name: str = ""
     detail: str = ""

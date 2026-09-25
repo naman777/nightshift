@@ -127,7 +127,7 @@ class AgentLoop:
         self.steps: list[Step] = []
 
     async def _emit(self, kind: str, name: str = "", detail: str = "", ms: int = 0) -> None:
-        step = Step(agent=self.name, kind=kind, name=name, detail=detail, duration_ms=ms)
+        step = Step(agent=self.name, incident_id=self.incident_id, kind=kind, name=name, detail=detail, duration_ms=ms)
         self.steps.append(step)
         if self.on_step:
             r = self.on_step(step)

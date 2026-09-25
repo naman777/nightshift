@@ -49,14 +49,23 @@ class Server:
         from mcp.server.mcpserver import MCPServer
 
         srv = MCPServer(self.name)
+        py = {"string": str, "number": float, "integer": int, "boolean": bool, "array": list, "object": dict}
         for t in self.tools.values():
             def make(tool: Tool):
                 async def fn(**kwargs: Any) -> str:
-                    out = await self.call(tool, kwargs)
+                    out = await self.call(tool, positional_ok(tool.handler, {k: v for k, v in kwargs.items() if v is not None}))
                     return out if isinstance(out, str) else json.dumps(out, default=str)
+
+                props = tool.input_schema.get("properties", {})
+                req = set(tool.input_schema.get("required", []))
+                params = [inspect.Parameter(k, inspect.Parameter.KEYWORD_ONLY,
+                                            default=inspect.Parameter.empty if k in req else None,
+                                            annotation=py.get(v.get("type", "string"), str) if k in req else py.get(v.get("type", "string"), str) | None)
+                          for k, v in props.items()]
+                fn.__signature__ = inspect.Signature(params, return_annotation=str)  # type: ignore[attr-defined]
+                fn.__annotations__ = {p.name: p.annotation for p in params} | {"return": str}
                 return fn
-            fn = make(t)
-            srv.add_tool(fn, name=t.name, description=t.description)
+            srv.add_tool(make(t), name=t.name, description=t.description)
         asyncio.run(srv.run_stdio_async())
 
 

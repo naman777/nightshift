@@ -3,7 +3,7 @@ fault: bad_deploy
 params:
   bug: nil_deref
 red_herring: null
-expected_alert: HighLatency_orders
+expected_alert: HighErrorRate_orders
 ground_truth:
   root_cause: orders-svc deploy {sha} introduced {bug}
   root_cause_service: orders-svc

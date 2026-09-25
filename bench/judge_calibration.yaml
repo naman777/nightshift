@@ -1,0 +1,21 @@
+# 20 hand-labelled (ground truth, candidate explanation, correct?) cases used to calibrate the root-cause judge.
+- {id: c01, ground_truth: "lb upstream_timeout_ms changed from 2000 to 50 in commit e37cd672", candidate: "lb upstream_timeout_ms changed from 2000 to 50 in commit e37cd672", correct: true}
+- {id: c02, ground_truth: "lb upstream_timeout_ms changed from 2000 to 50 in commit e37cd672", candidate: "The load balancer's upstream timeout was lowered to 50ms by commit e37cd672, so upstream requests time out", correct: true}
+- {id: c03, ground_truth: "lb upstream_timeout_ms changed from 2000 to 50 in commit e37cd672", candidate: "orders-svc is returning errors because payments-svc deployed a new build", correct: false}
+- {id: c04, ground_truth: "lb upstream_timeout_ms changed from 2000 to 50 in commit e37cd672", candidate: "High error rate on the orders service", correct: false}
+- {id: c05, ground_truth: "orders-svc deploy 9f3a1c22 introduced n_plus_one", candidate: "The orders-svc deploy 9f3a1c22 introduced an N+1 query (n_plus_one) in ListOrders", correct: true}
+- {id: c06, ground_truth: "orders-svc deploy 9f3a1c22 introduced n_plus_one", candidate: "orders-svc latency is high, likely a slow database", correct: false}
+- {id: c07, ground_truth: "orders-svc deploy 9f3a1c22 introduced nil_deref", candidate: "deploy 9f3a1c22 on orders-svc introduced a nil_deref panic when the order list is empty", correct: true}
+- {id: c08, ground_truth: "orders-svc deploy 9f3a1c22 introduced nil_deref", candidate: "payments-svc deploy a2481fcf bumped dependencies", correct: false}
+- {id: c09, ground_truth: "payments-svc is responding slowly (~2000ms of added latency); orders-svc latency and errors are symptoms", candidate: "payments-svc is slow (about 2s latency); orders-svc latency and errors are only symptoms", correct: true}
+- {id: c10, ground_truth: "payments-svc is responding slowly (~2000ms of added latency); orders-svc latency and errors are symptoms", candidate: "orders-svc has a bug causing high latency", correct: false}
+- {id: c11, ground_truth: "payments-svc is unreachable (refused); orders-svc and lb errors are symptoms", candidate: "payments-svc is unreachable (connection refused), causing orders-svc and lb errors", correct: true}
+- {id: c12, ground_truth: "payments-svc is unreachable (refused); orders-svc and lb errors are symptoms", candidate: "The database ran out of connections", correct: false}
+- {id: c13, ground_truth: "feature flag enable_unbounded_cache enabled in commit 8058e384 causes unbounded memory growth in orders-svc", candidate: "Commit 8058e384 turned on the enable_unbounded_cache flag, so orders-svc memory grows without bound", correct: true}
+- {id: c14, ground_truth: "feature flag enable_unbounded_cache enabled in commit 8058e384 causes unbounded memory growth in orders-svc", candidate: "orders-svc was OOM killed", correct: false}
+- {id: c15, ground_truth: "scheduler job nightly-settlement is holding 10 database connections, exhausting the orders-svc pool", candidate: "The nightly-settlement job in the scheduler holds database connections and exhausts the orders-svc pool", correct: true}
+- {id: c16, ground_truth: "scheduler job nightly-settlement is holding 10 database connections, exhausting the orders-svc pool", candidate: "orders-svc db pool size was reduced", correct: false}
+- {id: c17, ground_truth: "orders-svc-2 is down but the lb health check (health_check_interval_ms=600000, commit c9bdad0b) keeps routing to it", candidate: "orders-svc-2 crashed and the lb health check interval (commit c9bdad0b, 600000ms) keeps sending it traffic", correct: true}
+- {id: c18, ground_truth: "scheduler worker_count reduced from 8 to 1 in commit 41d0aa10", candidate: "The scheduler worker_count was cut from 8 to 1 in commit 41d0aa10, so the queue backs up", correct: true}
+- {id: c19, ground_truth: "log_level set to debug in commit 5c77e1b0, flooding orders-svc logs and filling disk", candidate: "orders-svc debug logging enabled by commit 5c77e1b0 is flooding logs and disk", correct: true}
+- {id: c20, ground_truth: "log_level set to debug in commit 5c77e1b0, flooding orders-svc logs and filling disk", candidate: "The disk is nearly full", correct: false}

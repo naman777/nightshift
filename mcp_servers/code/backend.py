@@ -54,10 +54,13 @@ class FsCodeBackend:
         return out
 
     async def run_tests(self, target):
-        cmd = ALLOWED_TEST_CMDS.get(target) or ALLOWED_TEST_CMDS.get(self.test_cmd)
+        cmd = ALLOWED_TEST_CMDS.get(target)
         if not cmd:
             return {"error": f"test command not allow-listed: {target}"}
-        proc = await asyncio.create_subprocess_exec(*cmd, cwd=self.root, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        try:
+            proc = await asyncio.create_subprocess_exec(*cmd, cwd=self.root, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        except FileNotFoundError:
+            return {"passed": False, "output": f"{cmd[0]} is not installed in this sandbox"}
         try:
             out, _ = await asyncio.wait_for(proc.communicate(), 120)
         except asyncio.TimeoutError:

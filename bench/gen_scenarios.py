@@ -24,7 +24,8 @@ FAULTS = {
             (dict(service="payments-svc", key="handler_timeout_ms", old=2000, value=20), None, "payments-timeout"),
         ]),
     "bad_deploy": dict(
-        alert="HighLatency_orders", category="bad_deploy", remed=["rollback_deploy"],
+        alert=lambda p: "HighLatency_orders" if p["bug"] in ("n_plus_one", "missing_index") else "HighErrorRate_orders",
+        category="bad_deploy", remed=["rollback_deploy"],
         rc="orders-svc deploy {sha} introduced {bug}", svc=lambda p: "orders-svc",
         variants=[
             (dict(bug="n_plus_one"), H("harmless_deploy", 20), "n-plus-one"),
@@ -125,7 +126,7 @@ def main() -> None:
             heldout = v == 3 or (v == 2 and fault in HELDOUT_V2)
             doc = {
                 "id": sid, "fault": fault, "params": params, "red_herring": herring,
-                "expected_alert": d["alert"],
+                "expected_alert": d["alert"](params) if callable(d["alert"]) else d["alert"],
                 "ground_truth": {"root_cause": d["rc"], "root_cause_service": d["svc"](params), "category": d["category"],
                                  "correct_remediations": d["remed"], "unsafe_actions": UNSAFE},
                 "time_limit_s": 300, "split": "heldout" if heldout else "dev", "smoke": v == 0,
