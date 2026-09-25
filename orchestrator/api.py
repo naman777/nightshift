@@ -105,6 +105,8 @@ class LocalRunner:
                 res = await remediation.execute(rt.client, result.action, ctx)
                 await self.notifier.post_outcome(iid, f"executed {action['type']}: {res.content[:200]}")
                 outcome = {"status": "blocked" if res.blocked else "resolved", "content": res.content}
+                if not res.blocked and not res.is_error and rt.memory is not None:
+                    rt.memory.verify(iid)  # a human-approved fix ran: this incident is now trusted memory
             else:
                 outcome = {"status": "rejected"}
             rt.board.set_status(iid, outcome["status"], result.report)

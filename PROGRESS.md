@@ -51,7 +51,13 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] GitHub Actions: tests, 10-scenario eval gate vs committed baseline (max 10-pt drop), Go build/vet, dashboard build, compose validation, nightly bench
 - [x] docs/architecture.md, docs/benchmark.md, README with generated results tables + honest status section, LICENSE, terminal CLI, no-docker demo
 - [x] Hard stress set (10 scenarios: decoys, concurrent faults, telemetry outages) — reference policy scores 30%
-- [ ] docs/writeup.md, demo script, live benchmark runner against the docker stack
+- [x] docs/writeup.md, docs/demo-script.md, live benchmark runner (bench/live.py, not exercised: no docker here)
+- [x] Cost-ceiling degrade to single-agent (local + Temporal), OTel -> Jaeger exporter, Slack Bolt (Socket Mode) app, `--prompt-version`
+- [x] Stretch: incident memory (verified recall, leave-one-out eval, poisoned-memory test); hard set 30% -> 90% with memory
+
+## Remaining ideas
+- [ ] Real-LLM benchmark run (needs API key) -> replace README table headline; fill resume bullets
+- [ ] Proactive mode (change agent on every deploy), voice paging, kubectl MCP server (stretch, not started)
 
 ## Deferred (user will provide)
 - Foreman (Go scheduler), C++ load balancer (sim uses generic `scheduler` / `lb` names)

@@ -3,7 +3,7 @@
   "split": "dev",
   "repeats": 3,
   "scenarios": 25,
-  "run_dir": "C:\\Users\\naman\\OneDrive\\Desktop\\main-projects\\nightshift\\bench\\results\\runs\\20260926-025725",
+  "run_dir": "C:\\Users\\naman\\OneDrive\\Desktop\\main-projects\\nightshift\\bench\\results\\runs\\20260926-031350",
   "policy": "offline reference policy (mock provider); not LLM results",
   "configs": {
     "naive-recent-change": {
@@ -33,9 +33,9 @@
         "p95": 0.8
       },
       "wall_time_s": {
-        "mean": 0.0009,
+        "mean": 0.0007,
         "p50": 0.0006,
-        "p95": 0.0024
+        "p95": 0.0013
       },
       "llm_calls_mean": 0.0,
       "tool_calls_mean": 0.0
@@ -67,9 +67,9 @@
         "p95": 0.8
       },
       "wall_time_s": {
-        "mean": 0.0031,
-        "p50": 0.002,
-        "p95": 0.0082
+        "mean": 0.0035,
+        "p50": 0.0021,
+        "p95": 0.0089
       },
       "llm_calls_mean": 0.0,
       "tool_calls_mean": 0.0
@@ -91,22 +91,22 @@
       "heldout_accuracy": null,
       "injection_obeyed_rate": 0.0,
       "cost_usd": {
-        "mean": 0.0452,
-        "p50": 0.0448,
-        "p95": 0.0546
+        "mean": 0.0525,
+        "p50": 0.0518,
+        "p95": 0.0625
       },
       "modeled_time_s": {
-        "mean": 17.0971,
-        "p50": 17.14,
-        "p95": 20.36
+        "mean": 18.6339,
+        "p50": 18.67,
+        "p95": 21.89
       },
       "wall_time_s": {
-        "mean": 0.0123,
-        "p50": 0.0098,
-        "p95": 0.0276
+        "mean": 0.0125,
+        "p50": 0.0109,
+        "p95": 0.021
       },
-      "llm_calls_mean": 7.0,
-      "tool_calls_mean": 6.0
+      "llm_calls_mean": 8.0,
+      "tool_calls_mean": 7.0
     },
     "multi": {
       "runs": 75,
@@ -125,9 +125,9 @@
       "heldout_accuracy": null,
       "injection_obeyed_rate": 0.0,
       "cost_usd": {
-        "mean": 0.0791,
-        "p50": 0.0811,
-        "p95": 0.0906
+        "mean": 0.0795,
+        "p50": 0.0815,
+        "p95": 0.091
       },
       "modeled_time_s": {
         "mean": 16.6428,
@@ -135,9 +135,9 @@
         "p95": 18.54
       },
       "wall_time_s": {
-        "mean": 0.0159,
-        "p50": 0.014,
-        "p95": 0.026
+        "mean": 0.0147,
+        "p50": 0.0132,
+        "p95": 0.0277
       },
       "llm_calls_mean": 16.16,
       "tool_calls_mean": 10.32
@@ -159,9 +159,9 @@
       "heldout_accuracy": null,
       "injection_obeyed_rate": 0.0,
       "cost_usd": {
-        "mean": 0.0334,
-        "p50": 0.0338,
-        "p95": 0.0372
+        "mean": 0.0336,
+        "p50": 0.034,
+        "p95": 0.0374
       },
       "modeled_time_s": {
         "mean": 16.6428,
@@ -169,9 +169,9 @@
         "p95": 18.54
       },
       "wall_time_s": {
-        "mean": 0.0136,
-        "p50": 0.012,
-        "p95": 0.0269
+        "mean": 0.0137,
+        "p50": 0.0124,
+        "p95": 0.0246
       },
       "llm_calls_mean": 16.16,
       "tool_calls_mean": 10.32
@@ -193,9 +193,9 @@
       "heldout_accuracy": null,
       "injection_obeyed_rate": 0.0,
       "cost_usd": {
-        "mean": 0.0791,
-        "p50": 0.0811,
-        "p95": 0.0906
+        "mean": 0.0795,
+        "p50": 0.0815,
+        "p95": 0.091
       },
       "modeled_time_s": {
         "mean": 16.6428,
@@ -203,9 +203,43 @@
         "p95": 18.54
       },
       "wall_time_s": {
-        "mean": 0.0131,
+        "mean": 0.0151,
         "p50": 0.0128,
-        "p95": 0.0202
+        "p95": 0.0269
+      },
+      "llm_calls_mean": 16.16,
+      "tool_calls_mean": 10.32
+    },
+    "multi-memory": {
+      "runs": 75,
+      "invalid": 0,
+      "root_cause_accuracy": 1.0,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 1.0,
+      "judge_accuracy": 1.0,
+      "service_accuracy": 1.0,
+      "remediation_quality": 1.0,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 1.0,
+      "dev_accuracy": 1.0,
+      "heldout_accuracy": null,
+      "injection_obeyed_rate": 0.0,
+      "cost_usd": {
+        "mean": 0.0811,
+        "p50": 0.0836,
+        "p95": 0.0934
+      },
+      "modeled_time_s": {
+        "mean": 17.192,
+        "p50": 17.23,
+        "p95": 19.34
+      },
+      "wall_time_s": {
+        "mean": 0.0136,
+        "p50": 0.0126,
+        "p95": 0.0233
       },
       "llm_calls_mean": 16.16,
       "tool_calls_mean": 10.32

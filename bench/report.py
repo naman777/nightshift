@@ -8,7 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 README = ROOT / "README.md"
 LABELS = {"naive-recent-change": "Naive: blame last change", "naive-top-errors": "Naive: blame noisiest service", "single": "Single agent (all tools)",
-          "multi": "Multi-agent", "multi-routed": "Multi-agent + model routing", "multi-nocite": "Multi-agent, no citation rule (ablation)"}
+          "multi": "Multi-agent", "multi-routed": "Multi-agent + model routing", "multi-nocite": "Multi-agent, no citation rule (ablation)",
+          "multi-memory": "Multi-agent + incident memory"}
 
 
 def pct(x) -> str:
@@ -57,12 +58,26 @@ def inject_readme(table: str) -> bool:
     return True
 
 
+SECTIONS = (("heldout", "Held-out scenarios (final numbers)"), ("dev", "Development scenarios"),
+            ("hard", "Hard stress set (not part of the headline 40): decoys, concurrent faults, telemetry outages"))
+
+
 def main() -> None:
-    summary = json.loads((ROOT / "bench" / "results" / "summary.json").read_text(encoding="utf8"))
-    table = render_markdown(summary)
-    (ROOT / "bench" / "results" / "results.md").write_text(table + "\n", encoding="utf8")
+    res = ROOT / "bench" / "results"
+    parts, primary = [], None
+    for split, title in SECTIONS:
+        f = res / f"summary-{split}.json"
+        if f.exists():
+            summary = json.loads(f.read_text(encoding="utf8"))
+            primary = primary or summary
+            parts.append(f"#### {title}\n\n{render_markdown(summary)}")
+    if primary is None:
+        primary = json.loads((res / "summary.json").read_text(encoding="utf8"))
+        parts.append(render_markdown(primary))
+    table = "\n\n".join(parts)
+    (res / "results.md").write_text(table + "\n", encoding="utf8")
     (ROOT / "docs").mkdir(exist_ok=True)
-    (ROOT / "docs" / "results.svg").write_text(render_svg(summary), encoding="utf8")
+    (ROOT / "docs" / "results.svg").write_text(render_svg(primary), encoding="utf8")
     print(table)
     print("README updated" if inject_readme(table) else "README markers not found; wrote bench/results/results.md")
 

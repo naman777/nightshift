@@ -58,7 +58,7 @@ Per scenario: fresh simulated world (a clean snapshot) -> baseline history is im
 -> run the agents in **benchmark mode** (write tools are recorded as proposals and never executed) -> score -> save JSON under `bench/results/runs/`.
 
 Configurations compared: `single` (one agent, all tools, shared 10-call budget), `multi` (commander + 4 specialists), `multi-routed` (strong commander, cheap specialists),
-`multi-nocite` (ablation: citation rule off), plus two no-LLM floors, `naive-recent-change` and `naive-top-errors`. Each is run 3 times by default.
+`multi-nocite` (ablation: citation rule off), `multi-memory` (commander also sees verified similar past incidents), plus two no-LLM floors, `naive-recent-change` and `naive-top-errors`. Each is run 3 times by default.
 
 ```bash
 make bench-smoke      # 10 scenarios, the CI gate
@@ -84,6 +84,17 @@ python -m agents.cli investigate bad-deploy-n-plus-one-00 --provider anthropic \
 **2. Time to diagnosis is modelled, not measured.** With a mock provider wall-clock is milliseconds. The runner estimates the critical path as
 `llm_calls x 0.6 s + output_tokens / 70 tok/s + tool_calls x 0.4 s`, taking the slowest specialist chain for multi-agent (specialists run in parallel) and the sum for single-agent.
 With a real provider, wall-clock (`wall_time_s`) is also recorded and is the number to quote.
+
+## Incident memory (stretch goal, measured)
+
+`agents/core/memory.py` stores each diagnosed incident with a signature (which metric/service pairs were anomalous). A new incident's signature is matched by Jaccard similarity and the closest
+**verified** matches (a human approved the fix and it ran) are shown to the commander as a prior, not proof. In the benchmark, memory is seeded from the 25 dev scenarios, kept only where the diagnosis
+was right (standing in for human verification), with leave-one-out on dev, and never seeded from held-out or hard scenarios.
+
+Result with the offline policy: **the hard set goes from 30% to 90%** (six scenarios are repeat faults with a decoy or a missing telemetry source, which memory resolves from the metric signature alone),
+and the standard splits stay at 100% with unchanged unsafe-action rate. Read this as a best case: the hard scenarios are variants of fault families already in memory, which is exactly the regime memory targets.
+Memory cannot help a novel fault, and a wrong-but-verified lookalike could mislead, so it is bounded: a memory-derived candidate is capped below direct-evidence strength, never wins a tie, and never supplies a write-action
+target (its proposed action is `escalate`). `tests/test_memory.py::test_poisoned_memory_does_not_override_strong_evidence` pins that behaviour.
 
 ## Judge and calibration
 

@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from agents import commander, remediation, single_agent, specialists
+from agents.core.memory import signature_from_evidence
 from agents.core.models import Alert, Assignment, Finding, ProposedAction, RootCauseReport, Usage
 from agents.runtime import AgentRuntime
 
@@ -131,4 +132,6 @@ class LocalOrchestrator:
             action = ProposedAction(**act)
         rep = rep.model_copy(update={"usage": usage, "rounds": rounds})
         rt.board.set_status(iid, "diagnosed", rep)
+        if rt.memory is not None and rt.memory_write:
+            rt.memory.add(iid, alert.name, rep, signature_from_evidence(rt.board.list(iid)), action.type if action else "")
         return InvestigationResult(iid, rep, action, usage, findings, time.perf_counter() - t0, mode, rounds)

@@ -15,7 +15,9 @@ from collections import defaultdict
 from pathlib import Path
 
 from agents import pipeline
+from agents.core.db import Database
 from agents.core.evidence import EvidenceBoard
+from agents.core.memory import IncidentMemory, signature_from_evidence
 from agents.core.models import Alert, ProposedAction, RootCauseReport, Usage
 from agents.prompts import LATEST
 from bench.alert_rules import alert_fires
@@ -25,7 +27,7 @@ from bench.scenario import Scenario, build_world, load_all, select
 from bench.scoring import HeuristicJudge, Judge, RunScore, action_is_unsafe, grounding_ratio
 
 RESULTS = Path(__file__).parent / "results"
-ALL_CONFIGS = ["naive-recent-change", "naive-top-errors", "single", "multi", "multi-routed", "multi-nocite"]
+ALL_CONFIGS = ["naive-recent-change", "naive-top-errors", "single", "multi", "multi-routed", "multi-nocite", "multi-memory"]
 
 LLM_S, TOOL_S, TOK_PER_S = 0.6, 0.4, 70.0  # modelled latency constants for time-to-diagnosis (documented in docs/benchmark.md)
 
@@ -48,7 +50,8 @@ def modeled_time(result: pipeline.InvestigationResult) -> float:
     return _modeled(commander_u) + max(per_agent.values(), default=0.0)
 
 
-async def run_one(s: Scenario, config: str, repeat: int, judge: Judge, prompt_version: str | None = None) -> tuple[RunScore, dict]:
+async def run_one(s: Scenario, config: str, repeat: int, judge: Judge, prompt_version: str | None = None,
+                  memory: IncidentMemory | None = None) -> tuple[RunScore, dict]:
     sc = s.model_copy(update={"seed": int.from_bytes(s.id.encode()[:4], "big") % 9000 + 1 + repeat})
     world, alert, gt = build_world(sc)
     score = RunScore(s.id, config, repeat, has_herring=bool(s.red_herring), injection=bool(s.red_herring and s.red_herring["type"] == "log_injection"),
@@ -63,7 +66,7 @@ async def run_one(s: Scenario, config: str, repeat: int, judge: Judge, prompt_ve
         action, usage, findings, board, iid = report.proposed_action, Usage(), [], rt.board, f"inc-{alert.fingerprint}"
         modeled = 2 * TOOL_S
     else:
-        rt, policy = make_runtime(world, CONFIGS[config], prompt_version=prompt_version)
+        rt, policy = make_runtime(world, CONFIGS[config], prompt_version=prompt_version, memory=memory, memory_exclude=f"seed-{s.id}")
         res = await pipeline.LocalOrchestrator(rt).investigate(alert, CONFIGS[config].mode)
         report, action, usage, board, iid = res.report, res.action, res.usage, rt.board, res.incident_id
         modeled = modeled_time(res)
@@ -130,6 +133,20 @@ def aggregate(scores: list[RunScore]) -> dict:
     return out
 
 
+async def seed_memory(repeat: int) -> IncidentMemory:
+    """Past incidents = the DEV scenarios, investigated once. An incident is stored as verified only if its diagnosis was right, simulating
+    the human confirmation (approved fix resolved it) that gates real memory. Held-out and hard scenarios are never seeded."""
+    mem = IncidentMemory(Database.memory())
+    for s in select(load_all(), "dev"):
+        sc = s.model_copy(update={"seed": int.from_bytes(s.id.encode()[:4], "big") % 9000 + 500 + repeat})
+        world, alert, gt = build_world(sc)
+        rt, _ = make_runtime(world, CONFIGS["multi"])
+        res = await pipeline.LocalOrchestrator(rt).investigate(alert, "multi")
+        ok = res.report.service == gt.root_cause_service and res.report.category.value == gt.category.value
+        mem.add(f"seed-{s.id}", alert.name, res.report, signature_from_evidence(rt.board.list(res.incident_id)), res.action.type if res.action else "", verified=ok)
+    return mem
+
+
 async def run_all(split: str, configs: list[str], repeats: int, limit: int | None, out_dir: Path, judge: Judge | None = None,
                   prompt_version: str | None = None) -> dict:
     scenarios = select(load_all(), split)[: limit or None]
@@ -137,10 +154,14 @@ async def run_all(split: str, configs: list[str], repeats: int, limit: int | Non
     run_dir = out_dir / "runs" / time.strftime("%Y%m%d-%H%M%S")
     run_dir.mkdir(parents=True, exist_ok=True)
     scores: list[RunScore] = []
+    seeded: dict[int, IncidentMemory] = {}
     for cfg in configs:
         for rep in range(repeats):
+            mem = None
+            if cfg in CONFIGS and CONFIGS[cfg].memory:
+                mem = seeded.setdefault(rep, await seed_memory(rep))
             for s in scenarios:
-                score, detail = await run_one(s, cfg, rep, judge, prompt_version)
+                score, detail = await run_one(s, cfg, rep, judge, prompt_version, mem)
                 scores.append(score)
                 (run_dir / f"{cfg}__{s.id}__{rep}.json").write_text(json.dumps({"score": score.as_dict(), **detail}, indent=1), encoding="utf8")
     summary = {"prompt_version": prompt_version or LATEST, "split": split, "repeats": repeats, "scenarios": len(scenarios), "run_dir": str(run_dir),

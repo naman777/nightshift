@@ -21,6 +21,9 @@ SCHEMA = [
         tier TEXT, arguments TEXT, decision TEXT, reason TEXT, evidence_ids TEXT, dry_run INTEGER)""",
     """CREATE TABLE IF NOT EXISTS checkpoints (
         key TEXT PRIMARY KEY, incident_id TEXT, value TEXT, created_at REAL)""",
+    """CREATE TABLE IF NOT EXISTS incident_memory (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT, incident_id TEXT, alert_name TEXT, service TEXT, category TEXT,
+        root_cause TEXT, action_type TEXT, tokens TEXT, verified INTEGER, created_at REAL)""",
     """CREATE TABLE IF NOT EXISTS steps (
         seq INTEGER PRIMARY KEY AUTOINCREMENT, incident_id TEXT, agent TEXT, kind TEXT,
         name TEXT, detail TEXT, duration_ms INTEGER, ts REAL)""",

@@ -107,6 +107,8 @@ async def execute_action_activity(alert: dict, incident_id: str, action: dict, a
     ctx = CallContext(incident_id=incident_id, agent="remediation", approved_by=approved_by, confirmation=confirmation,
                       reason=reason, evidence_ids=evidence_ids)
     res = await remediation.execute(rt.client, ProposedAction(**action), ctx)
+    if not res.blocked and not res.is_error and rt.memory is not None:
+        rt.memory.verify(incident_id)  # a human-approved fix ran: this incident is now trusted memory
     text = f"{'Blocked' if res.blocked else 'Executed'} `{action['type']}` for {incident_id}: {res.content[:300]}"
     await _notifier.post_outcome(incident_id, text)
     return {"blocked": res.blocked, "dry_run": res.dry_run, "error": res.is_error, "content": res.content}

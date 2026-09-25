@@ -8,6 +8,7 @@ from agents.core.evidence import EvidenceBoard
 from agents.core.llm import LLM
 from agents.core.loop import Budget, StepSink
 from agents.core.mcp_client import MCPClient
+from agents.core.memory import IncidentMemory
 from agents.prompts import LATEST
 
 
@@ -24,4 +25,7 @@ class AgentRuntime:
     budget_usd: float = 1.0
     max_rounds: int = 3
     single_agent_tool_budget: int = 10
+    memory: IncidentMemory | None = None      # incident memory (commander sees verified similar past incidents)
+    memory_exclude: str | None = None         # leave-one-out during evaluation
+    memory_write: bool = False                # remember each diagnosed incident (verified later by a human-approved fix)
     extras: dict[str, Any] = field(default_factory=dict)

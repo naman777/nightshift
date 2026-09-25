@@ -7,6 +7,7 @@ produced with it measure the harness and the reference policy; they are not LLM 
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -168,7 +169,7 @@ def _f(x: Any, d: float = 0.0) -> float:
         return d
 
 
-def diagnose(items: list[tuple[str, str, dict[str, str]]]) -> tuple[list[Cand], dict[str, Any]]:
+def diagnose(items: list[tuple[str, str, dict[str, str]]], memory: list[dict[str, str]] | None = None) -> tuple[list[Cand], dict[str, Any]]:
     """items: (evidence ref, kind, attrs). Returns candidates sorted by score and side info (for ruled_out)."""
     M: dict[tuple[str, str], tuple[float, float, str]] = {}
     L, C, K = [], [], []
@@ -361,13 +362,28 @@ def diagnose(items: list[tuple[str, str, dict[str, str]]]) -> tuple[list[Cand], 
                           f"settlement job schedule changed to '{sc[0][1]['new'] if sc else '?'}' in commit {sc[0][1]['sha'] if sc else '?'}, burning CPU shared with orders-svc at peak", ev,
                           {"type": "revert_commit", "target": sc[0][1]["sha"]} if sc else {"type": "escalate", "target": "scheduler-owners"}))
 
+    # K. incident memory: a verified past incident with a similar anomaly signature is a prior, never a proof
+    top_mem = next((m for m in (memory or []) if m.get("verified") == "yes"), None)
+    if top_mem:
+        sim = float(top_mem["sim"])
+        same = [c for c in cands if c.service == top_mem["service"] and c.category == top_mem["category"]]
+        if same:
+            for c in same:
+                c.score += 0.15 * sim
+                c.text += f" (also matches past incident {top_mem['inc']})"
+        elif sim >= 0.6 and max((c.score for c in cands), default=0.0) < 0.8:  # never outrank direct evidence
+            refs = [ref for _, (_, _, ref) in sorted(M.items(), key=lambda kv: -abs(math.log(max(kv[1][0], 1e-3))))[:3]]
+            cands.append(Cand(top_mem["category"], top_mem["service"], min(0.75, 0.4 + 0.5 * sim),
+                              f"{top_mem['text']} (recurring incident: matches past incident {top_mem['inc']}; suggested action from memory: {top_mem['action']})", refs,
+                              {"type": "escalate", "target": "on-call"}))  # memory never supplies a write-action target on its own
     cands.sort(key=lambda c: -c.score)
     side = {"changes": C, "logs": L, "used": set(cands[0].ev) if cands else set(), "t0": t0, "M": M}
     return cands, side
 
 
-def build_report(items: list[tuple[str, str, dict[str, str]]], alert_service: str, cite: bool = True) -> dict[str, Any]:
-    cands, side = diagnose(items)
+def build_report(items: list[tuple[str, str, dict[str, str]]], alert_service: str, cite: bool = True,
+                 memory: list[dict[str, str]] | None = None) -> dict[str, Any]:
+    cands, side = diagnose(items, memory)
     if not cands or cands[0].score < 0.5:
         first = next(iter(side["M"].values()), None)
         return {"root_cause": "Inconclusive: no hypothesis is supported by the evidence", "service": alert_service, "category": "unknown",
@@ -465,6 +481,13 @@ def items_from_evidence(text: str) -> tuple[list[tuple[str, str, dict[str, str]]
     return items, {}
 
 
+_MEM = re.compile(r"MEMORY inc=(\S+) sim=([\d.]+) service=(\S+) category=(\S+) action=(\S*) verified=(\w+) :: (.*)")
+
+
+def parse_memory(text: str) -> list[dict[str, str]]:
+    return [dict(zip(("inc", "sim", "service", "category", "action", "verified", "text"), m)) for m in _MEM.findall(text)]
+
+
 def commander_plan_brain(messages: list[Message]) -> LLMResponse:
     q = user_text(messages)
     svc = (re.search(r"service=(\S+)", q) or [None, "orders-svc"])[1]
@@ -491,7 +514,7 @@ def commander_converge_brain(messages: list[Message]) -> LLMResponse:
     svc = (re.search(r"service=(\S+)", q) or [None, "orders-svc"])[1]
     rnd = int((re.search(r"round (\d+)/", q) or [None, "1"])[1])
     allow = "Follow-ups allowed: True" in q
-    report = build_report(items, svc)
+    report = build_report(items, svc, memory=parse_memory(q))
     if report["confidence"] < 0.5 and rnd == 1 and allow:
         return _call("submit_decision", 0, action="followup", summary="Low confidence; ask for focused follow-ups.", assignments=[
             {"agent": "logs", "question": f"FOLLOW-UP focus={svc}: search recent errors for {svc}.", "hypothesis_ids": []},

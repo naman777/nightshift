@@ -12,16 +12,51 @@ Temporal workflow, so killing the worker mid-incident just resumes it, with no r
 ## Results
 
 <!-- BENCH:START -->
+#### Held-out scenarios (final numbers)
+
+Split: `heldout` · 15 scenarios x 3 repeat(s) · prompts `v1` · offline reference policy (mock provider); not LLM results
+
+| Configuration | Root-cause acc. | Top-3 | Judge | Remediation | Unsafe-action rate | Grounding | Red-herring acc. | Cost / incident | Time to dx (modelled p50 / p95) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Naive: blame last change | 20% ± 0 | 20% | 20% | 93% | 0% | 0% | 33% | $0.000 | 0.8s / 0.8s |
+| Naive: blame noisiest service | 7% ± 0 | 7% | 0% | 27% | 0% | 0% | 0% | $0.000 | 0.8s / 0.8s |
+| Single agent (all tools) | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.051 | 18.1s / 20.3s |
+| Multi-agent | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.078 | 16.4s / 18.1s |
+| Multi-agent + model routing | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.033 | 16.4s / 18.1s |
+| Multi-agent, no citation rule (ablation) | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.078 | 16.4s / 18.1s |
+| Multi-agent + incident memory | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.080 | 17.0s / 18.9s |
+
+Invalid scenarios (expected alert never fired): 0.
+
+#### Development scenarios
+
+Split: `dev` · 25 scenarios x 3 repeat(s) · prompts `v1` · offline reference policy (mock provider); not LLM results
+
+| Configuration | Root-cause acc. | Top-3 | Judge | Remediation | Unsafe-action rate | Grounding | Red-herring acc. | Cost / incident | Time to dx (modelled p50 / p95) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Naive: blame last change | 20% ± 0 | 20% | 16% | 80% | 0% | 0% | 30% | $0.000 | 0.8s / 0.8s |
+| Naive: blame noisiest service | 12% ± 0 | 12% | 0% | 32% | 0% | 0% | 20% | $0.000 | 0.8s / 0.8s |
+| Single agent (all tools) | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.052 | 18.7s / 21.9s |
+| Multi-agent | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.080 | 16.7s / 18.5s |
+| Multi-agent + model routing | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.034 | 16.7s / 18.5s |
+| Multi-agent, no citation rule (ablation) | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.080 | 16.7s / 18.5s |
+| Multi-agent + incident memory | 100% ± 0 | 100% | 100% | 100% | 0% | 100% | 100% | $0.081 | 17.2s / 19.3s |
+
+Invalid scenarios (expected alert never fired): 0.
+
+#### Hard stress set (not part of the headline 40): decoys, concurrent faults, telemetry outages
+
 Split: `hard` · 10 scenarios x 3 repeat(s) · prompts `v1` · offline reference policy (mock provider); not LLM results
 
 | Configuration | Root-cause acc. | Top-3 | Judge | Remediation | Unsafe-action rate | Grounding | Red-herring acc. | Cost / incident | Time to dx (modelled p50 / p95) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Naive: blame last change | 0% ± 0 | 0% | 0% | 50% | 0% | 0% | 0% | $0.000 | 0.8s / 0.8s |
 | Naive: blame noisiest service | 20% ± 0 | 20% | 0% | 30% | 0% | 0% | 0% | $0.000 | 0.8s / 0.8s |
-| Single agent (all tools) | 30% ± 0 | 40% | 30% | 40% | 0% | 100% | 0% | $0.046 | 16.4s / 26.1s |
-| Multi-agent | 30% ± 0 | 40% | 30% | 40% | 0% | 100% | 0% | $0.089 | 18.6s / 22.9s |
+| Single agent (all tools) | 30% ± 0 | 40% | 30% | 40% | 0% | 100% | 0% | $0.053 | 17.9s / 27.6s |
+| Multi-agent | 30% ± 0 | 40% | 30% | 40% | 0% | 100% | 0% | $0.090 | 18.6s / 22.9s |
 | Multi-agent + model routing | 30% ± 0 | 40% | 30% | 40% | 0% | 100% | 0% | $0.039 | 18.6s / 22.9s |
-| Multi-agent, no citation rule (ablation) | 30% ± 0 | 40% | 30% | 40% | 0% | 90% | 0% | $0.088 | 18.6s / 21.0s |
+| Multi-agent, no citation rule (ablation) | 30% ± 0 | 40% | 30% | 40% | 0% | 90% | 0% | $0.089 | 18.6s / 21.0s |
+| Multi-agent + incident memory | 90% ± 0 | 90% | 90% | 60% | 0% | 100% | 100% | $0.085 | 18.8s / 22.9s |
 
 Invalid scenarios (expected alert never fired): 0.
 <!-- BENCH:END -->
@@ -29,7 +64,7 @@ Invalid scenarios (expected alert never fired): 0.
 **Read this before quoting the table.** These rows were produced by the *offline reference policy* (a hand-written investigator behind the mock provider so the whole system runs with no
 API keys), not by a language model. It scores near 100% on the simulated world because it was written by someone who knows that world. What the table demonstrates is that the harness works,
 that the benchmark separates a real investigation from a rule of thumb (the two naive baselines land at 5-20%), and that the safety properties hold: 0% unsafe actions, 100% evidence grounding,
-and a planted prompt injection is ignored. A 10-scenario **hard stress set** (decoy changes, concurrent faults, telemetry outages) is included precisely because the reference policy does not ace it (30%). The single-vs-multi-agent comparison only becomes meaningful with real models: run `make bench` with `NIGHTSHIFT_LLM_PROVIDER=anthropic` and
+and a planted prompt injection is ignored. A 10-scenario **hard stress set** (decoy changes, concurrent faults, telemetry outages) is included precisely because the reference policy does not ace it (30%); the stretch-goal **incident memory** lifts it to 90% on repeat-style faults (see the benchmark doc for why that is a best case). The single-vs-multi-agent comparison only becomes meaningful with real models: run `make bench` with `NIGHTSHIFT_LLM_PROVIDER=anthropic` and
 report that table instead. Full methodology, splits, judge calibration and limitations: [docs/benchmark.md](docs/benchmark.md). Time to diagnosis is *modelled* (see the doc).
 
 ## Try it in 60 seconds (no docker, no API keys)
