@@ -1,0 +1,29 @@
+id: hard-09-config-repo-unreachable
+fault: bad_config_push
+params:
+  service: lb
+  key: upstream_timeout_ms
+  old: 2000
+  value: 50
+red_herring: null
+also_faults: []
+telemetry_outage:
+- configs
+expected_alert: HighErrorRate_orders
+ground_truth:
+  root_cause: '{cfg_service} {key} changed from {old} to {value} in commit {sha}'
+  root_cause_service: lb
+  category: config_change
+  correct_remediations:
+  - revert_commit
+  - set_config
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: hard
+smoke: false
+alert_delay_s: 300
+why_hard: 'The config repo is unreachable: infer the LB timeout from the ''upstream
+  timed out (50ms)'' log lines.'

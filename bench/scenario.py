@@ -14,6 +14,7 @@ from chaos.faults import get_fault
 from chaos.herrings import apply_herring
 
 SCENARIO_DIR = Path(__file__).parent / "scenarios"
+HARD_DIR = Path(__file__).parent / "scenarios_hard"
 
 
 class GroundTruth(BaseModel):
@@ -36,6 +37,9 @@ class Scenario(BaseModel):
     smoke: bool = False
     alert_delay_s: int = 300
     seed: int = 0
+    also_faults: list[dict[str, Any]] = Field(default_factory=list)  # concurrent, unrelated faults that do not explain the alert
+    telemetry_outage: list[str] = Field(default_factory=list)  # metrics | logs | deploys | configs
+    why_hard: str = ""
 
 
 class _Safe(dict):
@@ -51,7 +55,13 @@ def load_all(directory: Path = SCENARIO_DIR) -> list[Scenario]:
     return [load_scenario(p) for p in sorted(directory.glob("*.yaml"))]
 
 
+def load_hard() -> list[Scenario]:
+    return load_all(HARD_DIR)
+
+
 def select(scenarios: list[Scenario], split: str = "all") -> list[Scenario]:
+    if split == "hard":
+        return load_hard()
     if split == "all":
         return scenarios
     if split == "smoke":
@@ -62,6 +72,9 @@ def select(scenarios: list[Scenario], split: str = "all") -> list[Scenario]:
 def build_world(s: Scenario) -> tuple[World, Alert, GroundTruth]:
     w = World(seed=s.seed or int(hashlib.md5(s.id.encode()).hexdigest()[:6], 16) % 10_000)
     t_f = w.t_alert - s.alert_delay_s
+    for extra in s.also_faults:  # applied first so the primary fault owns the alert name and the shared facts
+        get_fault(extra["fault"]).apply_sim(w, extra.get("params", {}), t_f + extra.get("offset_s", 0))
+    w.outages = set(s.telemetry_outage)
     fault = get_fault(s.fault)
     fault.apply_sim(w, s.params, t_f)
     if s.red_herring:

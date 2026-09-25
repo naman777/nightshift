@@ -35,7 +35,10 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Slack Block Kit approval messages (no one-click path for destructive actions), notifier abstraction
 
 ## Phase 5 — Target stack + chaos
-- [~] Fault modules (10) + red herrings + simulator done; Go services, compose, observability, chaos CLI todo
+- [x] 10 fault modules (simulated form + declarative live steps), 6 red-herring types, config git repo (external git dir), deploy log, chaos CLI
+- [x] Go services: orders-svc, payments-svc (real fault hooks: hot-reloaded config, flags, bad-deploy build arg), stand-ins for LB + Foreman (same contract)
+- [x] docker-compose (target + Prometheus/Alertmanager/Loki/Promtail/Grafana/Jaeger + Temporal + gateway + worker + dashboard), recording + alert rules
+- [ ] NOT executed here (no Go toolchain, docker daemon off): compile/vet in CI (`make go-check`), first `make demo` will likely need small fixes
 
 ## Phase 6 — Benchmark
 - [x] 40 scenarios (10 faults x 4), 13 with red herrings, 1 prompt-injection, 25 dev / 15 held-out, 10 smoke
@@ -44,7 +47,11 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Configs: single, multi, multi-routed (cheap specialists), multi-nocite (ablation), 2 naive baselines
 
 ## Phase 7 — Dashboard, CI, docs
-- [ ] Next.js dashboard, GH Actions, docs, README
+- [x] Next.js dashboard (builds; browser-tested: alert -> live lanes -> approve -> resolved -> audit row), benchmark page
+- [x] GitHub Actions: tests, 10-scenario eval gate vs committed baseline (max 10-pt drop), Go build/vet, dashboard build, compose validation, nightly bench
+- [x] docs/architecture.md, docs/benchmark.md, README with generated results tables + honest status section, LICENSE, terminal CLI, no-docker demo
+- [x] Hard stress set (10 scenarios: decoys, concurrent faults, telemetry outages) — reference policy scores 30%
+- [ ] docs/writeup.md, demo script, live benchmark runner against the docker stack
 
 ## Deferred (user will provide)
 - Foreman (Go scheduler), C++ load balancer (sim uses generic `scheduler` / `lb` names)

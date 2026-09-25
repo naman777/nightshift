@@ -133,6 +133,7 @@ class World:
         self.code = dict(BASE_CODE)
         self.test_result: dict[str, Any] = {"passed": True, "output": "ok  \torders-svc/...\t0.412s"}
         self.actions: list[dict[str, Any]] = []
+        self.outages: set[str] = set()  # telemetry sources that are down: metrics | logs | deploys | configs
         self.facts: dict[str, Any] = {}
         self.alert_name = ""
         self.alert_service = ""

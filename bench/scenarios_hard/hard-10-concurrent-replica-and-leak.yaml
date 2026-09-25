@@ -1,0 +1,31 @@
+id: hard-10-concurrent-replica-and-leak
+fault: crashed_replica
+params: {}
+red_herring: null
+also_faults:
+- fault: memory_leak
+  params:
+    service: payments-svc
+    flag: retain_receipts
+    message: 'flags: retain receipts in memory'
+telemetry_outage: []
+expected_alert: HighErrorRate_orders
+ground_truth:
+  root_cause: '{replica} is down but the lb health check (health_check_interval_ms={interval},
+    commit {sha}) keeps routing to it'
+  root_cause_service: lb
+  category: healthcheck_misconfig
+  correct_remediations:
+  - revert_commit
+  - set_config
+  - restart_replica
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: hard
+smoke: false
+alert_delay_s: 300
+why_hard: A crashed orders replica behind a lax health check, plus an unrelated real
+  leak on payments.

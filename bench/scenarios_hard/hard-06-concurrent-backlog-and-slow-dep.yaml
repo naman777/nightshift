@@ -1,0 +1,28 @@
+id: hard-06-concurrent-backlog-and-slow-dep
+fault: scheduler_backlog
+params: {}
+red_herring: null
+also_faults:
+- fault: slow_dependency
+  params:
+    latency_ms: 1200
+telemetry_outage: []
+expected_alert: JobQueueBacklog
+ground_truth:
+  root_cause: scheduler worker_count reduced from {old} to {workers} in commit {sha}
+  root_cause_service: scheduler
+  category: capacity
+  correct_remediations:
+  - revert_commit
+  - set_config
+  - scale
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: hard
+smoke: false
+alert_delay_s: 300
+why_hard: The alert is the scheduler backlog; a concurrent payments slowdown is real
+  but does not explain it.

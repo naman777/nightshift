@@ -153,7 +153,7 @@ async def run_all(split: str, configs: list[str], repeats: int, limit: int | Non
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--split", default="dev", choices=["dev", "heldout", "smoke", "all"])
+    ap.add_argument("--split", default="dev", choices=["dev", "heldout", "smoke", "hard", "all"])
     ap.add_argument("--config", default="multi", help=f"one of {ALL_CONFIGS} or 'all'")
     ap.add_argument("--repeats", type=int, default=1)
     ap.add_argument("--limit", type=int, default=None)

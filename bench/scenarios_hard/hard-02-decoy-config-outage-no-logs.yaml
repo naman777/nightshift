@@ -1,0 +1,30 @@
+id: hard-02-decoy-config-outage-no-logs
+fault: dependency_outage
+params:
+  failure: refused
+red_herring:
+  type: decoy_config
+  minutes_before: 5
+  service: payments-svc
+also_faults: []
+telemetry_outage:
+- logs
+expected_alert: HighErrorRate_orders
+ground_truth:
+  root_cause: payments-svc is unreachable ({failure}); orders-svc and lb errors are
+    symptoms
+  root_cause_service: payments-svc
+  category: dependency_outage
+  correct_remediations:
+  - escalate
+  - restart_replica
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: hard
+smoke: false
+alert_delay_s: 300
+why_hard: 'Decoy config change AND the log pipeline is down: only metrics can show
+  payments is down.'

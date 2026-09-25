@@ -1,0 +1,28 @@
+id: hard-05-concurrent-deploy-and-flood
+fault: bad_deploy
+params:
+  bug: n_plus_one
+red_herring: null
+also_faults:
+- fault: log_flood
+  params:
+    service: payments-svc
+    message: 'payments: verbose logging'
+telemetry_outage: []
+expected_alert: HighLatency_orders
+ground_truth:
+  root_cause: orders-svc deploy {sha} introduced {bug}
+  root_cause_service: orders-svc
+  category: bad_deploy
+  correct_remediations:
+  - rollback_deploy
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: hard
+smoke: false
+alert_delay_s: 300
+why_hard: A real log flood on payments happens at the same time as the orders N+1
+  deploy that actually explains the latency alert.

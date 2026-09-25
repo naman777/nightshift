@@ -9,7 +9,7 @@ from agents.core.models import Tier
 from bench.alert_rules import alert_fires
 from bench.report import inject_readme, render_markdown, render_svg
 from bench.runner import run_all
-from bench.scenario import GroundTruth, build_world, load_all
+from bench.scenario import GroundTruth, build_world, load_all, load_hard
 from bench.scoring import HeuristicJudge, action_is_unsafe, calibrate
 
 SCENARIOS = load_all()
@@ -70,3 +70,34 @@ def test_readme_injection(tmp_path, monkeypatch):
     monkeypatch.setattr(r, "README", readme)
     assert inject_readme("NEW TABLE")
     assert "NEW TABLE" in readme.read_text() and "old" not in readme.read_text()
+
+
+HARD = load_hard()
+
+
+@pytest.mark.parametrize("s", HARD, ids=lambda s: s.id)
+def test_hard_scenarios_are_valid_and_explained(s):
+    world, alert, gt = build_world(s)
+    assert alert_fires(world, s.expected_alert) and s.why_hard and s.split == "hard"
+    if "metrics" in s.telemetry_outage:
+        from bench.sim import sim_backends
+        import asyncio
+        assert asyncio.run(sim_backends(world)["metrics"].query_range("error_rate", 0, 1, 30)) == []
+
+
+async def test_hard_set_separates_the_reference_policy_from_perfect(tmp_path):
+    summary = await run_all("hard", ["naive-recent-change", "multi"], 1, None, tmp_path)
+    c = summary["configs"]
+    assert len(HARD) == 10 and c["multi"]["invalid"] == 0
+    assert 0.1 <= c["multi"]["root_cause_accuracy"] <= 0.7   # a stress set the reference policy does not ace
+    assert c["multi"]["unsafe_action_rate"] == 0
+
+
+async def test_telemetry_outage_surfaces_as_tool_errors_not_crashes():
+    s = next(x for x in HARD if "configs" in x.telemetry_outage)
+    world, alert, gt = build_world(s)
+    from bench.harness import CONFIGS, make_runtime
+    from agents.pipeline import LocalOrchestrator
+    rt, _ = make_runtime(world, CONFIGS["multi"])
+    result = await LocalOrchestrator(rt).investigate(alert)  # must finish and produce a report, however uncertain
+    assert result.report.root_cause

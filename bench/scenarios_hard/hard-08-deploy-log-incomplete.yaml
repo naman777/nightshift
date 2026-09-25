@@ -1,0 +1,25 @@
+id: hard-08-deploy-log-incomplete
+fault: bad_deploy
+params:
+  bug: n_plus_one
+red_herring: null
+also_faults: []
+telemetry_outage:
+- deploys
+expected_alert: HighLatency_orders
+ground_truth:
+  root_cause: orders-svc deploy {sha} introduced {bug}
+  root_cause_service: orders-svc
+  category: bad_deploy
+  correct_remediations:
+  - rollback_deploy
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: hard
+smoke: false
+alert_delay_s: 300
+why_hard: 'The deploy log is missing the deploy: blame must come from the latency
+  onset plus reading the code.'

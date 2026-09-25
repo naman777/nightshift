@@ -1,0 +1,29 @@
+id: hard-01-decoy-config-slow-dep
+fault: slow_dependency
+params:
+  latency_ms: 2000
+red_herring:
+  type: decoy_config
+  minutes_before: 5
+  service: payments-svc
+also_faults: []
+telemetry_outage: []
+expected_alert: HighLatency_orders
+ground_truth:
+  root_cause: payments-svc is responding slowly (~{latency_ms}ms of added latency);
+    orders-svc latency and errors are symptoms
+  root_cause_service: payments-svc
+  category: dependency_latency
+  correct_remediations:
+  - escalate
+  - set_config
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: hard
+smoke: false
+alert_delay_s: 300
+why_hard: A benign payments timeout increase lands 5 minutes before a real payments
+  slowdown.

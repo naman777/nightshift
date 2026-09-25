@@ -20,6 +20,8 @@ class SimMetrics:
         return CATALOGUE
 
     async def query_range(self, query, start, end, step):
+        if "metrics" in self.w.outages:
+            return []  # Prometheus is down / scrape failing: empty results
         return self.w.query_range(query, start, end, step)
 
 
@@ -31,6 +33,8 @@ class SimLogs:
         return self.w.now()
 
     async def search(self, service, contains, level, start, end, limit):
+        if "logs" in self.w.outages:
+            return []  # log pipeline is down
         return self.w.search_logs(service, contains, level, start, end, limit)
 
 
@@ -42,10 +46,14 @@ class SimChanges:
         return self.w.now()
 
     async def deploys(self, since, service):
+        if "deploys" in self.w.outages:
+            return []  # deploy log is incomplete
         return [{"ts": int(c.ts), "service": c.service, "sha": c.sha, "author": c.author, "message": c.message}
                 for c in self.w.commits if c.kind == "deploy" and c.ts >= since and (not service or c.service == service)]
 
     async def config_commits(self, since, path):
+        if "configs" in self.w.outages:
+            raise RuntimeError("config repository unreachable: connection timed out")
         return [{"sha": c.sha, "ts": int(c.ts), "author": c.author, "message": c.message, "files": c.files}
                 for c in self.w.commits if c.kind in ("config", "flag") and c.ts >= since
                 and (not path or any(path in f for f in c.files))]

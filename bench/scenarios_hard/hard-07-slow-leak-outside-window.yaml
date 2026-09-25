@@ -1,0 +1,27 @@
+id: hard-07-slow-leak-outside-window
+fault: memory_leak
+params:
+  growth: 8.0
+  ramp_s: 3600
+red_herring: null
+also_faults: []
+telemetry_outage: []
+expected_alert: ServiceMemoryGrowth
+ground_truth:
+  root_cause: feature flag {flag} enabled in commit {sha} causes unbounded memory
+    growth in {flag_service}
+  root_cause_service: orders-svc
+  category: resource_leak
+  correct_remediations:
+  - set_flag
+  - revert_commit
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: hard
+smoke: false
+alert_delay_s: 3000
+why_hard: 'The flag flipped 50 minutes ago and memory has been climbing slowly since:
+  the change is outside the default 15-minute correlation window.'
