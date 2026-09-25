@@ -48,7 +48,7 @@ def modeled_time(result: pipeline.InvestigationResult) -> float:
     return _modeled(commander_u) + max(per_agent.values(), default=0.0)
 
 
-async def run_one(s: Scenario, config: str, repeat: int, judge: Judge) -> tuple[RunScore, dict]:
+async def run_one(s: Scenario, config: str, repeat: int, judge: Judge, prompt_version: str | None = None) -> tuple[RunScore, dict]:
     sc = s.model_copy(update={"seed": int.from_bytes(s.id.encode()[:4], "big") % 9000 + 1 + repeat})
     world, alert, gt = build_world(sc)
     score = RunScore(s.id, config, repeat, has_herring=bool(s.red_herring), injection=bool(s.red_herring and s.red_herring["type"] == "log_injection"),
@@ -63,7 +63,7 @@ async def run_one(s: Scenario, config: str, repeat: int, judge: Judge) -> tuple[
         action, usage, findings, board, iid = report.proposed_action, Usage(), [], rt.board, f"inc-{alert.fingerprint}"
         modeled = 2 * TOOL_S
     else:
-        rt, policy = make_runtime(world, CONFIGS[config], prompt_version=None)
+        rt, policy = make_runtime(world, CONFIGS[config], prompt_version=prompt_version)
         res = await pipeline.LocalOrchestrator(rt).investigate(alert, CONFIGS[config].mode)
         report, action, usage, board, iid = res.report, res.action, res.usage, rt.board, res.incident_id
         modeled = modeled_time(res)
@@ -130,7 +130,8 @@ def aggregate(scores: list[RunScore]) -> dict:
     return out
 
 
-async def run_all(split: str, configs: list[str], repeats: int, limit: int | None, out_dir: Path, judge: Judge | None = None) -> dict:
+async def run_all(split: str, configs: list[str], repeats: int, limit: int | None, out_dir: Path, judge: Judge | None = None,
+                  prompt_version: str | None = None) -> dict:
     scenarios = select(load_all(), split)[: limit or None]
     judge = judge or HeuristicJudge()
     run_dir = out_dir / "runs" / time.strftime("%Y%m%d-%H%M%S")
@@ -139,10 +140,10 @@ async def run_all(split: str, configs: list[str], repeats: int, limit: int | Non
     for cfg in configs:
         for rep in range(repeats):
             for s in scenarios:
-                score, detail = await run_one(s, cfg, rep, judge)
+                score, detail = await run_one(s, cfg, rep, judge, prompt_version)
                 scores.append(score)
                 (run_dir / f"{cfg}__{s.id}__{rep}.json").write_text(json.dumps({"score": score.as_dict(), **detail}, indent=1), encoding="utf8")
-    summary = {"prompt_version": LATEST, "split": split, "repeats": repeats, "scenarios": len(scenarios), "run_dir": str(run_dir),
+    summary = {"prompt_version": prompt_version or LATEST, "split": split, "repeats": repeats, "scenarios": len(scenarios), "run_dir": str(run_dir),
                "policy": "offline reference policy (mock provider); not LLM results", "configs": aggregate(scores)}
     out_dir.mkdir(parents=True, exist_ok=True)
     text = json.dumps(summary, indent=2)
@@ -157,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", default="multi", help=f"one of {ALL_CONFIGS} or 'all'")
     ap.add_argument("--repeats", type=int, default=1)
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--prompt-version", default=None, help="agents/prompts/<version> to evaluate (recorded in the summary)")
     ap.add_argument("--out", default=str(RESULTS))
     ap.add_argument("--fail-below", type=float, default=None, help="exit 1 if exact-match accuracy is below this (CI gate)")
     ap.add_argument("--baseline", default=None, help="JSON {config: accuracy}; exit 1 if any config drops more than --max-drop below it")
@@ -164,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--write-baseline", default=None, help="write the accuracies of this run to a baseline file")
     a = ap.parse_args(argv)
     configs = ALL_CONFIGS if a.config == "all" else a.config.split(",")
-    summary = asyncio.run(run_all(a.split, configs, a.repeats, a.limit, Path(a.out)))
+    summary = asyncio.run(run_all(a.split, configs, a.repeats, a.limit, Path(a.out), prompt_version=a.prompt_version))
     from bench.report import render_markdown
 
     print(render_markdown(summary))

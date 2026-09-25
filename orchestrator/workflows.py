@@ -90,26 +90,38 @@ class InvestigationWorkflow:
         return self._stage
 
     @workflow.run
-    async def run(self, alert: dict, mode: str = "multi") -> dict:
+    async def run(self, alert: dict, mode: str = "multi", budget_usd: float = 1.0) -> dict:
         iid = f"inc-{alert['fingerprint']}"
         await _quick(A.open_incident, alert, iid)
+        degraded = False
         if mode == "single":
             self._stage = "single-agent"
             report = await _run(A.single_agent_activity, alert, iid)
         else:
             self._stage = "planning"
             plan = await _run(A.plan_activity, alert, iid)
+            spent = plan["usage"]["cost_usd"]
             assignments, report = plan["assignments"], None
+            if spent >= budget_usd:  # cost ceiling hit by planning alone: degrade to the cheaper single-agent mode
+                self._stage, degraded = "single-agent (cost ceiling)", True
+                report = await _run(A.single_agent_activity, alert, iid)
             for rnd in range(1, MAX_ROUNDS + 1):
+                if report is not None:
+                    break
                 self._stage = f"round-{rnd}"
                 findings = await asyncio.gather(*[_run(A.specialist_activity, alert, iid, a) for a in assignments])
-                decision = await _run(A.converge_activity, alert, iid, plan, rnd, list(findings))
+                spent += sum(f["usage"]["cost_usd"] for f in findings)
+                force = spent >= budget_usd and rnd < MAX_ROUNDS  # ceiling hit mid-investigation: no more follow-up rounds
+                degraded = degraded or force
+                decision = await _run(A.converge_activity, alert, iid, plan, MAX_ROUNDS if force else rnd, list(findings))
+                spent += decision["usage"]["cost_usd"]
                 if decision["action"] == "report" and decision.get("report"):
                     report = decision["report"]
                     break
                 assignments = decision["assignments"]
             if report is None:
                 raise RuntimeError("commander never produced a report")
+        report = {**report, "degraded": bool(report.get("degraded")) or degraded}
         action = await _run(A.propose_activity, alert, iid, report)
         await _quick(A.record_report_activity, alert, iid, report, "diagnosed")
         await _quick(A.notify_report_activity, iid, report, action)

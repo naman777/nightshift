@@ -10,5 +10,5 @@ COPY gateway ./gateway
 COPY slackbot ./slackbot
 COPY bench ./bench
 COPY chaos ./chaos
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e ".[otel]"
 ENV PYTHONUNBUFFERED=1

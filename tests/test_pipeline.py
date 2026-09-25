@@ -78,11 +78,22 @@ async def test_benchmark_mode_never_executes_writes():
     assert w.actions == []
 
 
-async def test_cost_ceiling_forces_a_report():
+async def test_cost_ceiling_degrades_to_single_agent_when_planning_alone_exceeds_it():
     w, alert, gt = build_world(SCENARIOS["bad-config-push-lb-timeout-00"])
     rt, _ = make_runtime(w, CONFIGS["multi"])
     rt.budget_usd = 0.0001
+    orch = LocalOrchestrator(rt)
+    r = await orch.investigate(alert)
+    assert r.report.degraded and "single" in orch.executed and not r.findings   # no specialists were run
+    assert r.report.category.value == "config_change"
+
+
+async def test_cost_ceiling_stops_follow_up_rounds_mid_investigation():
+    w, alert, gt = build_world(SCENARIOS["bad-config-push-lb-timeout-00"])
+    rt, _ = make_runtime(w, CONFIGS["multi"])
+    rt.budget_usd = 0.03  # planning (~$0.011) fits under it; the specialists push past it
     r = await LocalOrchestrator(rt).investigate(alert)
+    assert r.report.degraded and {f.agent for f in r.findings} == {"metrics", "logs", "changes", "code"}
     assert r.report.category.value == "config_change"
 
 

@@ -122,20 +122,26 @@ def change_claims(deploys: dict | None, configs: dict | None, ids: tuple[str, st
     return out
 
 
+def detect_smell(src: str) -> str:
+    if re.search(r"loadItems\(o\.ID\)|for _, o := range orders|slowItems\(", src):
+        return "n_plus_one"
+    if re.search(r"orders\[0\]|first\.ID", src):
+        return "nil_deref_on_empty"
+    if re.search(r"items\[0\]|ids\[0\]", src):
+        return "index_out_of_range"
+    if re.search(r"status <> 'archived'|pg_sleep", src):
+        return "unindexed_full_scan"
+    return "none"
+
+
 def code_claims(read: dict | None, tests: dict | None, ids: tuple[str, str]) -> list[dict]:
-    src = (read or {}).get("content", "")
-    smell = "none"
-    if re.search(r"loadItems\(o\.ID\)|for _, o := range orders", src):
-        smell = "n_plus_one"
-    elif re.search(r"orders\[0\]", src):
-        smell = "nil_deref_on_empty"
-    elif re.search(r"items\[0\]", src):
-        smell = "index_out_of_range"
-    elif re.search(r"status <> 'archived'", src):
-        smell = "unindexed_full_scan"
+    path = (read or {}).get("path", "handlers/orders.go")
+    smell = detect_smell((read or {}).get("content", ""))
     passed = bool((tests or {}).get("passed", True))
-    return [{"claim": f"handlers/orders.go smell={smell}; test suite {'passes' if passed else 'FAILS'} "
-                      f"[code file=handlers/orders.go smell={smell} tests={'pass' if passed else 'fail'}]",
+    unavailable = "not installed" in str((tests or {}).get("output", ""))
+    status = "unknown" if unavailable else ("pass" if passed else "fail")
+    return [{"claim": f"{path} smell={smell}; test suite {status} "
+                      f"[code file={path} smell={smell} tests={status}]",
              "tool_call_ref": ids[0], "confidence": 0.7 if smell != "none" else 0.5}]
 
 
@@ -396,6 +402,11 @@ def _last_ts_change(res: list[dict]) -> str | None:
     return best[1] if best else None
 
 
+def _first_match_path(grep_result: dict | None) -> str:
+    matches = (grep_result or {}).get("matches") or []
+    return matches[0]["path"] if matches else "handlers/orders.go"
+
+
 def specialist_brain(role: str, messages: list[Message]) -> LLMResponse:
     res = tool_results(messages)
     n = len(res)
@@ -433,9 +444,9 @@ def specialist_brain(role: str, messages: list[Message]) -> LLMResponse:
         return _submit(f"{len(claims)} recent changes found.", claims)
     if role == "code":
         if n == 0:
-            return _call("code__grep", n, pattern=r"ListOrders|orders\[0\]|items\[0\]|loadItems", limit=10)
+            return _call("code__grep", n, pattern=r"ListOrders|orders\[0\]|items\[0\]|loadItems|slowItems|first\.ID|ids\[0\]|pg_sleep", limit=10)
         if n == 1:
-            return _call("code__read_file", n, path="handlers/orders.go", start=1, end=80)
+            return _call("code__read_file", n, path=_first_match_path(res[0]["obj"]), start=1, end=200)
         if n == 2:
             return _call("code__run_tests", n, target="go test ./...")
         claims = code_claims(res[1]["obj"], res[2]["obj"] if n > 2 else None, (res[1]["id"], res[-1]["id"]))
@@ -506,9 +517,13 @@ def single_brain(messages: list[Message]) -> LLMResponse:
     n = len(res)
     script = [("metrics__top_anomalies", dict(window_minutes=30)), ("logs__cluster_errors", dict(start="-30m")),
               ("changes__recent_deploys", dict(since_minutes=360)), ("changes__config_diff", dict(since_minutes=360)),
-              ("code__read_file", dict(path="handlers/orders.go", start=1, end=80)), ("code__run_tests", dict(target="go test ./..."))]
+              ("code__grep", dict(pattern=r"ListOrders|orders\[0\]|items\[0\]|loadItems|slowItems|first\.ID|ids\[0\]|pg_sleep", limit=10))]
     if n < len(script):
         return _call(script[n][0], n, **script[n][1])
+    if n == len(script):
+        return _call("code__read_file", n, path=_first_match_path(res[-1]["obj"]), start=1, end=200)
+    if n == len(script) + 1:
+        return _call("code__run_tests", n, target="go test ./...")
     by = {r["tool"]: r for r in res}
     claims = metric_claims(by["metrics__top_anomalies"]["obj"] or {}, by["metrics__top_anomalies"]["id"])
     claims += log_claims(by["logs__cluster_errors"]["obj"] or {}, by["logs__cluster_errors"]["id"])

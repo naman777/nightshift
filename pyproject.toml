@@ -11,6 +11,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 slack = ["slack-bolt>=1.18"]
+otel = ["opentelemetry-sdk>=1.25", "opentelemetry-exporter-otlp-proto-grpc>=1.25"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

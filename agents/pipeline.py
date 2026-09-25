@@ -95,7 +95,14 @@ class LocalOrchestrator:
             report_dict: dict | None = None
             degraded = False
             rounds = 0
+            if usage.cost_usd >= rt.budget_usd:  # ceiling hit by planning alone: degrade to the cheaper single-agent mode
+                rep = RootCauseReport(**await self._step("single", iid, lambda: step_single(rt, a, iid)))
+                usage = usage.add(rep.usage)
+                report_dict, degraded, rounds = rep.model_dump(mode="json"), True, 1
+                assignments = []
             for rnd in range(1, rt.max_rounds + 1):
+                if report_dict is not None:
+                    break
                 rounds = rnd
                 fs = await asyncio.gather(*[
                     self._step(f"r{rnd}:{i}:{x['agent']}", iid, (lambda x=x: step_specialist(rt, iid, x)))
@@ -103,7 +110,7 @@ class LocalOrchestrator:
                 for f in fs:
                     usage = usage.add(Usage(**f["usage"]))
                     findings.append(Finding(**f))
-                if usage.cost_usd >= rt.budget_usd and rnd < rt.max_rounds:  # cost ceiling: stop expanding, force a report
+                if usage.cost_usd >= rt.budget_usd and rnd < rt.max_rounds:  # ceiling hit mid-investigation: no more follow-up rounds
                     degraded = True
                     rnd_force = rt.max_rounds
                 else:

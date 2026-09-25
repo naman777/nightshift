@@ -114,6 +114,7 @@ services:
     environment: &ns-env
       NIGHTSHIFT_BACKEND: live
       NIGHTSHIFT_ORCH: temporal
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       NIGHTSHIFT_DB_URL: postgresql://nightshift:nightshift@postgres:5432/nightshift
       TEMPORAL_ADDRESS: temporal:7233
       PROMETHEUS_URL: http://prometheus:9090
@@ -121,7 +122,7 @@ services:
       CONFIG_REPO: /app/target/config
       CONFIG_GIT_DIR: /app/target/.configrepo
       DEPLOY_LOG: /app/target/deploys.jsonl
-      CODE_ROOT: /app/target/orders-svc
+      CODE_ROOT: /app/target
     volumes: ["./target:/app/target"]
     ports: ["8000:8000"]
     depends_on: [postgres, temporal]

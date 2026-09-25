@@ -16,6 +16,7 @@ from sse_starlette.sse import EventSourceResponse
 from agents.core.db import Database
 from agents.core.evidence import EvidenceBoard
 from agents.core.models import Alert
+from agents.core.telemetry import init_tracing
 from mcp_servers.policy import PolicyEngine
 from orchestrator.api import IncidentRunner, default_runner
 from slackbot.notify import verify_slack_signature
@@ -42,6 +43,7 @@ def alertmanager_to_alerts(payload: dict[str, Any]) -> list[Alert]:
 
 
 def create_app(db: Database | None = None, runner: IncidentRunner | None = None, signing_secret: str | None = None) -> FastAPI:
+    init_tracing("nightshift-gateway")
     db = db or Database(os.environ.get("NIGHTSHIFT_DB_URL", "sqlite:///nightshift.db"))
     board = EvidenceBoard(db)
     app = FastAPI(title="Nightshift gateway")

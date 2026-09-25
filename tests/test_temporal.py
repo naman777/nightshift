@@ -141,3 +141,13 @@ async def test_worker_crash_mid_incident_resumes_without_repeating_llm_calls(iso
             await env.sleep(timedelta(seconds=20))
             await h.result()
     assert llm_steps(crash_alert.fingerprint) == expected  # zero repeated LLM calls across the crash
+
+
+async def test_cost_ceiling_degrades_workflow_to_single_agent(isolated_db):
+    alert = make_alert("bad-config-push-lb-timeout-00")
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with worker(env):
+            handle = await env.client.start_workflow(InvestigationWorkflow.run, args=[alert.model_dump(mode="json"), "multi", 0.0001],
+                                                     id=f"inv-{alert.fingerprint}", task_queue=TASK_QUEUE)
+            out = await handle.result()
+    assert out["report"]["degraded"] is True and out["report"]["category"] == "config_change"

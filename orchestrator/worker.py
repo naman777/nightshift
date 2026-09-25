@@ -7,6 +7,7 @@ import os
 from temporalio.client import Client
 from temporalio.worker import Worker
 
+from agents.core.telemetry import init_tracing
 from orchestrator import activities
 from orchestrator.workflows import InvestigationWorkflow, RemediationWorkflow
 
@@ -18,6 +19,7 @@ def make_worker(client: Client) -> Worker:
 
 
 async def main() -> None:
+    init_tracing("nightshift-worker")
     client = await Client.connect(os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"))
     print(f"nightshift worker connected, task queue={TASK_QUEUE}", flush=True)
     await make_worker(client).run()

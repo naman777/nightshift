@@ -171,12 +171,16 @@ class AgentLoop:
         rejected = 0
         finding: Finding | None = None
 
-        with span(f"agent.{self.name}", question=question[:200]):
+        with span(f"agent.{self.name}", question=question[:200], incident_id=self.incident_id):
             for _ in range(self.budget.max_llm_calls):
                 tools = [self.final_schema] if submit_only else [self.final_schema, *schemas]
                 t0 = time.perf_counter()
-                with span(f"llm.{self.name}", model=self.model):
+                with span(f"llm.{self.name}", model=self.model, incident_id=self.incident_id) as sp:
                     resp = await self.llm.complete(self.system, st.messages, tools, self.model)
+                    if sp is not None:
+                        sp.set_attribute("nightshift.input_tokens", resp.usage.input_tokens)
+                        sp.set_attribute("nightshift.output_tokens", resp.usage.output_tokens)
+                        sp.set_attribute("nightshift.cost_usd", resp.usage.cost_usd)
                 st.usage = st.usage.add(resp.usage)
                 await self._emit("llm", self.model, resp.text[:300], int((time.perf_counter() - t0) * 1000))
                 st.messages.append(Message(role="assistant", content=resp.text, tool_calls=resp.tool_calls))
@@ -244,7 +248,7 @@ class AgentLoop:
         st.tool_calls += 1
         t0 = time.perf_counter()
         ctx = CallContext(incident_id=self.incident_id, agent=self.name)
-        with span(f"tool.{tc.name}", agent=self.name):
+        with span(f"tool.{tc.name}", agent=self.name, incident_id=self.incident_id):
             try:
                 if tc.name in self.local_tools:
                     out = self.local_tools[tc.name][1](tc.arguments)

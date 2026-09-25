@@ -48,7 +48,7 @@ class TemporalRunner:
             existing = True
         except Exception:
             existing = False
-        await self.client.start_workflow(InvestigationWorkflow.run, args=[alert.model_dump(mode="json"), mode], id=wid,
+        await self.client.start_workflow(InvestigationWorkflow.run, args=[alert.model_dump(mode="json"), mode, float(os.environ.get("NIGHTSHIFT_INCIDENT_BUDGET_USD", "1.0"))], id=wid,
                                          task_queue=TASK_QUEUE, id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING)
         return f"inc-{alert.fingerprint}", not existing
 
