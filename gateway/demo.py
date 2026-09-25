@@ -39,6 +39,7 @@ def main() -> None:
     ap.add_argument("--serve-only", action="store_true")
     a = ap.parse_args()
     os.environ.setdefault("NIGHTSHIFT_BACKEND", "sim")
+    os.environ.setdefault("NIGHTSHIFT_ALLOW_INSECURE", "1")  # local demo only: real deployments set NIGHTSHIFT_API_TOKEN
     os.environ.setdefault("NIGHTSHIFT_DB_URL", "sqlite:///nightshift-demo.db")
     from gateway.app import create_app
 

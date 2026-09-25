@@ -58,6 +58,8 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Proactive change review (`/webhook/change`, reviewer agent, `bench.proactive`: 197 commits, recall/precision/FPR)
 - [x] Prompt caching + cache-aware cost model, schema enums + output vocabulary in the commander prompt, optional bearer-token auth, static stack-consistency tests
 
+- [x] Independent adversarial review: 9 issues fixed (fail-closed auth + dashboard proxy, wrapper escaping, pre-write audit row, no auto-retry of writes, target-aware remediation scoring, ...)
+
 ## Remaining ideas
 - [ ] Real-LLM benchmark run (needs API key) -> replace README table headline; fill resume bullets
 - [ ] Voice paging, kubectl MCP server (stretch, not started)

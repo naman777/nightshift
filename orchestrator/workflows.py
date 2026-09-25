@@ -73,8 +73,10 @@ class RemediationWorkflow:
         if self._decision != "approved":
             await _quick(A.set_status_activity, alert, incident_id, "rejected")
             return {"status": "rejected", "action": action}
-        result = await _run(A.execute_action_activity, alert, incident_id, action, self._approval.user, self._approval.confirmation,
-                            self._approval.reason, report.get("evidence", []))
+        result = await workflow.execute_activity(  # a write is NOT idempotent: never auto-retry it (a human decides after a failure)
+            A.execute_action_activity, args=[alert, incident_id, action, self._approval.user, self._approval.confirmation,
+                                             self._approval.reason, report.get("evidence", [])],
+            start_to_close_timeout=AGENT_TIMEOUT, heartbeat_timeout=timedelta(seconds=15), retry_policy=RetryPolicy(maximum_attempts=1))
         status = "blocked" if result["blocked"] else "resolved"
         await _quick(A.set_status_activity, alert, incident_id, status)
         return {"status": status, "action": action, "result": result}

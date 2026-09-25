@@ -3,7 +3,7 @@
   "split": "dev",
   "repeats": 3,
   "scenarios": 25,
-  "run_dir": "C:\\Users\\naman\\OneDrive\\Desktop\\main-projects\\nightshift\\bench\\results\\runs\\20260926-031350",
+  "run_dir": "C:\\Users\\naman\\OneDrive\\Desktop\\main-projects\\nightshift\\bench\\results\\runs\\20260926-032723",
   "policy": "offline reference policy (mock provider); not LLM results",
   "configs": {
     "naive-recent-change": {
@@ -33,9 +33,9 @@
         "p95": 0.8
       },
       "wall_time_s": {
-        "mean": 0.0007,
-        "p50": 0.0006,
-        "p95": 0.0013
+        "mean": 0.0011,
+        "p50": 0.0008,
+        "p95": 0.0023
       },
       "llm_calls_mean": 0.0,
       "tool_calls_mean": 0.0
@@ -67,9 +67,9 @@
         "p95": 0.8
       },
       "wall_time_s": {
-        "mean": 0.0035,
-        "p50": 0.0021,
-        "p95": 0.0089
+        "mean": 0.0024,
+        "p50": 0.0018,
+        "p95": 0.0047
       },
       "llm_calls_mean": 0.0,
       "tool_calls_mean": 0.0
@@ -82,7 +82,7 @@
       "top3_accuracy": 1.0,
       "judge_accuracy": 1.0,
       "service_accuracy": 1.0,
-      "remediation_quality": 1.0,
+      "remediation_quality": 0.96,
       "unsafe_action_rate": 0.0,
       "evidence_grounding": 1.0,
       "red_herring_accuracy": 1.0,
@@ -101,9 +101,9 @@
         "p95": 21.89
       },
       "wall_time_s": {
-        "mean": 0.0125,
-        "p50": 0.0109,
-        "p95": 0.021
+        "mean": 0.0152,
+        "p50": 0.0143,
+        "p95": 0.0268
       },
       "llm_calls_mean": 8.0,
       "tool_calls_mean": 7.0
@@ -116,7 +116,7 @@
       "top3_accuracy": 1.0,
       "judge_accuracy": 1.0,
       "service_accuracy": 1.0,
-      "remediation_quality": 1.0,
+      "remediation_quality": 0.96,
       "unsafe_action_rate": 0.0,
       "evidence_grounding": 1.0,
       "red_herring_accuracy": 1.0,
@@ -125,9 +125,9 @@
       "heldout_accuracy": null,
       "injection_obeyed_rate": 0.0,
       "cost_usd": {
-        "mean": 0.0795,
-        "p50": 0.0815,
-        "p95": 0.091
+        "mean": 0.0822,
+        "p50": 0.0842,
+        "p95": 0.0937
       },
       "modeled_time_s": {
         "mean": 16.6428,
@@ -135,9 +135,9 @@
         "p95": 18.54
       },
       "wall_time_s": {
-        "mean": 0.0147,
-        "p50": 0.0132,
-        "p95": 0.0277
+        "mean": 0.0172,
+        "p50": 0.0152,
+        "p95": 0.0316
       },
       "llm_calls_mean": 16.16,
       "tool_calls_mean": 10.32
@@ -150,7 +150,7 @@
       "top3_accuracy": 1.0,
       "judge_accuracy": 1.0,
       "service_accuracy": 1.0,
-      "remediation_quality": 1.0,
+      "remediation_quality": 0.96,
       "unsafe_action_rate": 0.0,
       "evidence_grounding": 1.0,
       "red_herring_accuracy": 1.0,
@@ -159,9 +159,9 @@
       "heldout_accuracy": null,
       "injection_obeyed_rate": 0.0,
       "cost_usd": {
-        "mean": 0.0336,
-        "p50": 0.034,
-        "p95": 0.0374
+        "mean": 0.0362,
+        "p50": 0.0367,
+        "p95": 0.04
       },
       "modeled_time_s": {
         "mean": 16.6428,
@@ -169,9 +169,9 @@
         "p95": 18.54
       },
       "wall_time_s": {
-        "mean": 0.0137,
-        "p50": 0.0124,
-        "p95": 0.0246
+        "mean": 0.0139,
+        "p50": 0.0136,
+        "p95": 0.0211
       },
       "llm_calls_mean": 16.16,
       "tool_calls_mean": 10.32
@@ -184,7 +184,7 @@
       "top3_accuracy": 1.0,
       "judge_accuracy": 1.0,
       "service_accuracy": 1.0,
-      "remediation_quality": 1.0,
+      "remediation_quality": 0.96,
       "unsafe_action_rate": 0.0,
       "evidence_grounding": 1.0,
       "red_herring_accuracy": 1.0,
@@ -193,9 +193,9 @@
       "heldout_accuracy": null,
       "injection_obeyed_rate": 0.0,
       "cost_usd": {
-        "mean": 0.0795,
-        "p50": 0.0815,
-        "p95": 0.091
+        "mean": 0.0822,
+        "p50": 0.0842,
+        "p95": 0.0937
       },
       "modeled_time_s": {
         "mean": 16.6428,
@@ -203,9 +203,9 @@
         "p95": 18.54
       },
       "wall_time_s": {
-        "mean": 0.0151,
-        "p50": 0.0128,
-        "p95": 0.0269
+        "mean": 0.0153,
+        "p50": 0.0136,
+        "p95": 0.0255
       },
       "llm_calls_mean": 16.16,
       "tool_calls_mean": 10.32
@@ -218,7 +218,7 @@
       "top3_accuracy": 1.0,
       "judge_accuracy": 1.0,
       "service_accuracy": 1.0,
-      "remediation_quality": 1.0,
+      "remediation_quality": 0.96,
       "unsafe_action_rate": 0.0,
       "evidence_grounding": 1.0,
       "red_herring_accuracy": 1.0,
@@ -227,9 +227,9 @@
       "heldout_accuracy": null,
       "injection_obeyed_rate": 0.0,
       "cost_usd": {
-        "mean": 0.0811,
-        "p50": 0.0836,
-        "p95": 0.0934
+        "mean": 0.0838,
+        "p50": 0.0862,
+        "p95": 0.0961
       },
       "modeled_time_s": {
         "mean": 17.192,
@@ -237,9 +237,9 @@
         "p95": 19.34
       },
       "wall_time_s": {
-        "mean": 0.0136,
-        "p50": 0.0126,
-        "p95": 0.0233
+        "mean": 0.0163,
+        "p50": 0.0141,
+        "p95": 0.0337
       },
       "llm_calls_mean": 16.16,
       "tool_calls_mean": 10.32

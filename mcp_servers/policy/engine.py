@@ -27,7 +27,7 @@ DEFAULT_TIMEOUTS = {Tier.READ_ONLY: 15.0, Tier.REVERSIBLE: 60.0, Tier.DESTRUCTIV
 
 
 def kill_switch_on() -> bool:
-    return os.environ.get("NIGHTSHIFT_DRY_RUN", "0").lower() in ("1", "true", "yes")
+    return os.environ.get("NIGHTSHIFT_DRY_RUN", "0").lower() in ("1", "true", "yes", "on", "y")
 
 
 @dataclass
@@ -81,8 +81,13 @@ class PolicyEngine:
         if tool.tier is not Tier.READ_ONLY and dry:
             self.audit(ctx, tool, args, "dry_run", "kill switch (NIGHTSHIFT_DRY_RUN) is on", True)
             return ToolResult(f"DRY RUN (kill switch): {tool.name} {json.dumps(args, sort_keys=True)}", dry_run=True)
+        if tool.tier is not Tier.READ_ONLY:  # a write that dies mid-flight must still leave a trace
+            self.audit(ctx, tool, args, "attempted", reason, dry)
         try:
             out = await asyncio.wait_for(server.call(tool, positional_ok(tool.handler, args)), self.timeouts[tool.tier])
+        except asyncio.CancelledError:
+            self.audit(ctx, tool, args, "cancelled", "call cancelled (worker shutdown / activity cancelled)", dry)
+            raise
         except asyncio.TimeoutError:
             self.audit(ctx, tool, args, "timeout", f"exceeded {self.timeouts[tool.tier]}s", dry)
             return ToolResult(f"tool timed out after {self.timeouts[tool.tier]}s", is_error=True)

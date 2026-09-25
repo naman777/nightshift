@@ -7,6 +7,11 @@ from agents.core.evidence import EvidenceBoard
 from agents.core.models import LLMResponse, Message, ToolCall
 
 
+@pytest.fixture(autouse=True)
+def _dev_auth(monkeypatch):
+    monkeypatch.setenv("NIGHTSHIFT_ALLOW_INSECURE", "1")  # tests exercise the gate explicitly where they need it
+
+
 @pytest.fixture
 def db():
     d = Database.memory()

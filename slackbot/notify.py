@@ -83,7 +83,10 @@ def default_notifier() -> Notifier:
 
 
 def verify_slack_signature(signing_secret: str, timestamp: str, body: bytes, signature: str, now: float | None = None) -> bool:
-    if abs((now or time.time()) - float(timestamp)) > 300:
+    try:
+        if abs((now or time.time()) - float(timestamp)) > 300:
+            return False
+    except ValueError:
         return False
     base = b"v0:" + timestamp.encode() + b":" + body
     expected = "v0=" + hmac.new(signing_secret.encode(), base, hashlib.sha256).hexdigest()

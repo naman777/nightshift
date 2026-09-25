@@ -1,4 +1,4 @@
-export const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:8000';
+export const GATEWAY = '/api/gateway'; // same-origin proxy (app/api/gateway) that adds the server-side auth token
 
 export type Incident = { id: string; fingerprint: string; status: string; created_at: number; updated_at: number };
 export type Evidence = {

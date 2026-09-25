@@ -23,7 +23,11 @@ class DockerRuntimeBackend:
 
     async def _run(self, *cmd: str) -> dict[str, Any]:
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-        out, _ = await proc.communicate()
+        try:
+            out, _ = await proc.communicate()
+        except asyncio.CancelledError:
+            proc.kill()  # never leave an orphaned docker/git process running after a timeout or cancellation
+            raise
         return {"ok": proc.returncode == 0, "output": out.decode(errors="replace")[-1000:]}
 
     async def restart(self, service, replica):

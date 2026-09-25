@@ -25,11 +25,19 @@ from slackbot.notify import Notifier, default_notifier, verify_slack_signature
 RESULTS_DIR = Path(os.environ.get("NIGHTSHIFT_RESULTS", "bench/results"))
 
 
+def insecure_ok() -> bool:
+    return os.environ.get("NIGHTSHIFT_ALLOW_INSECURE", "0").lower() in ("1", "true", "yes")
+
+
 def require_token(request: Request) -> None:
-    """Optional shared secret (NIGHTSHIFT_API_TOKEN) for every mutating endpoint. Read-only endpoints and Slack's signed callback are unaffected.
+    """Shared secret (NIGHTSHIFT_API_TOKEN) for every mutating endpoint; FAILS CLOSED when unset unless NIGHTSHIFT_ALLOW_INSECURE=1. Approvals are the trust gate's human input, so they must be authenticated.
     Production-grade auth (SSO, per-user approvals) is out of scope: put the gateway behind your proxy."""
     token = os.environ.get("NIGHTSHIFT_API_TOKEN")
-    if token and not hmac.compare_digest(request.headers.get("authorization", ""), f"Bearer {token}"):
+    if not token:
+        if insecure_ok():
+            return
+        raise HTTPException(401, "gateway auth is not configured: set NIGHTSHIFT_API_TOKEN (or NIGHTSHIFT_ALLOW_INSECURE=1 for local development)")
+    if not hmac.compare_digest(request.headers.get("authorization", ""), f"Bearer {token}"):
         raise HTTPException(401, "missing or invalid bearer token")
 
 
@@ -132,6 +140,8 @@ def create_app(db: Database | None = None, runner: IncidentRunner | None = None,
     @app.post("/slack/interactive")
     async def slack_interactive(request: Request) -> dict:
         raw = await request.body()
+        if not secret and not insecure_ok():
+            raise HTTPException(401, "SLACK_SIGNING_SECRET is not configured")
         if secret and not verify_slack_signature(secret, request.headers.get("X-Slack-Request-Timestamp", "0"), raw,
                                                  request.headers.get("X-Slack-Signature", "")):
             raise HTTPException(401, "bad signature")

@@ -74,6 +74,8 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
+    entrypoint: ["sh", "-c", "printf %s \"$$NIGHTSHIFT_API_TOKEN\" > /tmp/token && exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml"]
+    environment: {NIGHTSHIFT_API_TOKEN: "${NIGHTSHIFT_API_TOKEN:-dev-token-change-me}"}
     volumes: ["./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"]
     ports: ["9093:9093"]
 
@@ -114,6 +116,7 @@ services:
     environment: &ns-env
       NIGHTSHIFT_BACKEND: live
       NIGHTSHIFT_ORCH: temporal
+      NIGHTSHIFT_API_TOKEN: "${NIGHTSHIFT_API_TOKEN:-dev-token-change-me}"   # required by the gateway; set your own in .env
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       NIGHTSHIFT_DB_URL: postgresql://nightshift:nightshift@postgres:5432/nightshift
       TEMPORAL_ADDRESS: temporal:7233
@@ -138,7 +141,8 @@ services:
     depends_on: [postgres, temporal]
 
   dashboard:
-    build: {context: ./dashboard, args: {NEXT_PUBLIC_GATEWAY_URL: "http://localhost:8000"}}
+    build: {context: ./dashboard}
+    environment: {GATEWAY_INTERNAL_URL: "http://gateway:8000", NIGHTSHIFT_API_TOKEN: "${NIGHTSHIFT_API_TOKEN:-dev-token-change-me}"}
     ports: ["3001:3000"]
     depends_on: [gateway]
 

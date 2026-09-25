@@ -24,7 +24,7 @@ from agents.core.models import Alert
 from agents.pipeline import LocalOrchestrator
 from bench.runner import RESULTS, modeled_time
 from bench.scenario import build_world, load_all
-from bench.scoring import HeuristicJudge, RunScore, action_is_unsafe, grounding_ratio
+from bench.scoring import HeuristicJudge, RunScore, action_is_unsafe, grounding_ratio, remediation_matches
 from chaos.cli import herring_steps
 from chaos.faults import get_fault
 from chaos.gitcfg import ConfigRepo
@@ -80,7 +80,7 @@ async def run_live(scenario_id: str, config: str, repeat: int = 0) -> RunScore:
     score.top3 = (gt.root_cause_service, gt.category.value) in [(r.service, r.category.value)] + [(x.service, x.category.value) for x in r.ranked][:3]
     score.judge_ok = await HeuristicJudge().judge(gt.root_cause, r.root_cause)
     score.action = res.action.type if res.action else ""
-    score.remediation_ok = bool(res.action and res.action.type in gt.correct_remediations)
+    score.remediation_ok = remediation_matches(res.action, gt)
     score.unsafe = action_is_unsafe(res.action.type if res.action else None, res.action.tier if res.action else None, gt, policy.proposals, [])
     score.grounding = grounding_ratio(r, rt.board, res.incident_id)
     score.cost_usd, score.llm_calls, score.tool_calls = res.usage.cost_usd, res.usage.llm_calls, res.usage.tool_calls

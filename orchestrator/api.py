@@ -76,8 +76,8 @@ class LocalRunner:
 
     async def start(self, alert: Alert, mode: str = "multi") -> tuple[str, bool]:
         iid = f"inc-{alert.fingerprint}"
-        if iid in self.tasks and not self.tasks[iid].done():
-            return iid, False  # dedupe: attach to the running investigation
+        if iid in self.tasks:
+            return iid, False  # dedupe: attach to the running (or finished) investigation; a re-fired alert never re-requests approval
         self.tasks[iid] = asyncio.create_task(self._run(alert, mode, iid))
         return iid, True
 
@@ -91,6 +91,8 @@ class LocalRunner:
         report, action = result.report.model_dump(mode="json"), result.action.model_dump(mode="json") if result.action else None
         await self.notifier.post_report(iid, report, action)
         outcome: dict[str, Any] = {"status": "no_action_needed"}
+        if not (action and action["tier"] != "read_only"):
+            rt.board.set_status(iid, "escalated", result.report)
         if action and action["tier"] != "read_only":
             fut = self.decisions[iid] = asyncio.get_running_loop().create_future()
             rt.board.set_status(iid, "awaiting_approval", result.report)
