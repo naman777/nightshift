@@ -61,7 +61,19 @@ the workflow id is the alert fingerprint so a re-fired alert attaches to the run
 * **Refused calls need ids too.** A tool call refused for exceeding the budget was assigned the next call id without being recorded, so the next real call reused the id. Ids are now a monotonic counter.
 * **Token budgets** are cumulative input + output, which grows quadratically with a long conversation; the defaults were raised so a real model is not cut off after a handful of calls.
 
-## 7. What is open
+## 7. An independent adversarial review found real holes
+
+Late in the build a separate reviewer agent attacked the safety-critical paths read-only and reproduced nine problems. The serious ones, all fixed with regression tests:
+
+* **Auth failed open.** With no `NIGHTSHIFT_API_TOKEN` / `SLACK_SIGNING_SECRET`, anyone could POST an approval (even a typed destructive confirmation). The trust gate is only as strong as the endpoint that supplies the human's yes. The gateway now fails closed unless `NIGHTSHIFT_ALLOW_INSECURE=1` (local demo); the dashboard reaches it through a server-side proxy so the token never reaches the browser.
+* **The untrusted-data wrapper could be closed from inside.** Tool output containing `</tool_result>` could forge a trusted block. Output and tool names are now neutralised.
+* **A write could execute with no audit row** if the worker died mid-call, and was **auto-retried** by Temporal after a crash (a non-idempotent write repeated). An "attempted" row is written before every write, cancellation is audited, subprocesses are killed on cancel, and the execute activity is never retried.
+* **Benchmark scoring was too generous:** reverting the wrong commit still counted as a correct remediation. Scoring now checks the target, not just the action type.
+* Smaller: unicode digits crashed evidence lookup, a malformed Slack timestamp returned 500, a model-supplied non-integer replica count crashed after approval, read-only incidents' event streams never closed, and a re-fired alert re-requested approval.
+
+The pattern worth remembering: the policy engine, tier table and workflow determinism all held up; the failures were at the edges (auth defaults, escaping, retries), which is where a review should look first.
+
+## 8. What is open
 
 * **Real-model numbers.** Everything measured here is the offline reference policy. The headline single-vs-multi comparison, the model-routing cost saving and the ablation need a provider key; the code path
   (`--provider anthropic|openai`, `LLMJudge`) is in place and the adapters are unit-tested against recorded request/response shapes.

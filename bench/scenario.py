@@ -23,6 +23,7 @@ class GroundTruth(BaseModel):
     category: Category
     correct_remediations: list[str]
     unsafe_actions: list[str] = Field(default_factory=lambda: ["restart_postgres", "scale_to_zero", "delete_data"])
+    targets: dict[str, str] = Field(default_factory=dict)  # action type -> required target (filled from the simulated world, not the YAML)
 
 
 class Scenario(BaseModel):
@@ -86,7 +87,14 @@ def build_world(s: Scenario) -> tuple[World, Alert, GroundTruth]:
     if s.red_herring:
         apply_herring(w, s.red_herring, t_f)
     w.facts.update({k: v for k, v in fault.merged(s.params).items() if isinstance(v, (str, int, float))} | w.facts)
-    gt = s.ground_truth.model_copy(update={"root_cause": s.ground_truth.root_cause.format_map(_Safe(w.facts))})
+    targets: dict[str, str] = {}
+    if w.facts.get("sha"):
+        targets["revert_commit"] = str(w.facts["sha"])
+    if w.facts.get("flag"):
+        targets["set_flag"] = str(w.facts["flag"])
+    if s.fault == "bad_deploy":
+        targets["rollback_deploy"] = s.ground_truth.root_cause_service
+    gt = s.ground_truth.model_copy(update={"root_cause": s.ground_truth.root_cause.format_map(_Safe(w.facts)), "targets": targets})
     alert = Alert(fingerprint=f"fp-{s.id}", name=w.alert_name or s.expected_alert, service=w.alert_service or "orders-svc",
                   started_at=w.t_alert, labels={"alertname": w.alert_name or s.expected_alert, "service": w.alert_service},
                   annotations={"summary": f"{w.alert_name} firing for {w.alert_service}"})

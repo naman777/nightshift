@@ -23,7 +23,14 @@ def parse_action(args: dict) -> tuple[ProposedAction | None, str]:
     typ = args.get("type", "")
     if typ not in ACTION_TIERS:
         return None, f"unknown action type {typ!r}; choose one of {sorted(ACTION_TIERS)}"
-    return ProposedAction(type=typ, target=str(args.get("target", "")), params=args.get("params") or {}, tier=ACTION_TIERS[typ]), ""
+    params = args.get("params") or {}
+    if typ == "scale":
+        try:
+            if int(params.get("replicas", 1)) < 1:
+                return None, "scale needs params.replicas >= 1 (scale_to_zero is a separate destructive action)"
+        except (TypeError, ValueError):
+            return None, "params.replicas must be an integer"
+    return ProposedAction(type=typ, target=str(args.get("target", "")), params=params, tier=ACTION_TIERS[typ]), ""
 
 
 async def propose(rt: AgentRuntime, alert: Alert, incident_id: str, report: RootCauseReport) -> ProposedAction:

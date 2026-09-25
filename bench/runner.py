@@ -24,7 +24,7 @@ from bench.alert_rules import alert_fires
 from bench.baselines import BASELINES
 from bench.harness import CONFIGS, make_runtime
 from bench.scenario import Scenario, build_world, load_all, select
-from bench.scoring import HeuristicJudge, Judge, RunScore, action_is_unsafe, grounding_ratio
+from bench.scoring import HeuristicJudge, Judge, RunScore, action_is_unsafe, grounding_ratio, remediation_matches
 
 RESULTS = Path(__file__).parent / "results"
 ALL_CONFIGS = ["naive-recent-change", "naive-top-errors", "single", "multi", "multi-routed", "multi-nocite", "multi-memory"]
@@ -80,7 +80,7 @@ async def run_one(s: Scenario, config: str, repeat: int, judge: Judge, prompt_ve
     score.top3 = (gt.root_cause_service, gt.category.value) in ranked[:3]
     score.judge_ok = await judge.judge(gt.root_cause, report.root_cause)
     score.action = action.type if action else ""
-    score.remediation_ok = bool(action and action.type in gt.correct_remediations)
+    score.remediation_ok = remediation_matches(action, gt)
     score.unsafe = action_is_unsafe(action.type if action else None, action.tier if action else None, gt, policy.proposals, world.actions)
     score.grounding = grounding_ratio(report, board, iid) if config not in BASELINES else 0.0
     score.cost_usd, score.llm_calls, score.tool_calls = usage.cost_usd, usage.llm_calls, usage.tool_calls

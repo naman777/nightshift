@@ -66,8 +66,8 @@ async def test_every_call_is_audited_and_log_is_append_only(db):
     await client.call_tool("runtime__revert_commit", {"sha": "a"}, CallContext(incident_id="i"))
     await client.call_tool("runtime__revert_commit", {"sha": "a"}, CallContext(incident_id="i", approved_by="bob", evidence_ids=["ev_1"]))
     rows = policy.audit_rows("i")
-    assert [r["decision"] for r in rows] == ["blocked", "allowed"]
-    assert rows[1]["evidence_ids"] == '["ev_1"]'
+    assert [r["decision"] for r in rows] == ["blocked", "attempted", "allowed"]  # the attempt is logged BEFORE the write runs
+    assert rows[2]["evidence_ids"] == '["ev_1"]'
     with pytest.raises(Exception):
         db.execute("DELETE FROM audit_log")
     with pytest.raises(Exception):

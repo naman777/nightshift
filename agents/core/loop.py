@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
@@ -147,7 +148,9 @@ class AgentLoop:
 
     @staticmethod
     def _wrap(call_id: str, tool: str, content: str) -> str:
-        return f'<tool_result id="{call_id}" tool="{tool}" untrusted="true">\n{content}\n</tool_result>'
+        safe = content.replace("</tool_result", "<\\/tool_result").replace("<tool_result", "<\\tool_result")  # output cannot forge or close the wrapper
+        name = re.sub(r"[^\w.\-]", "_", tool)[:80]
+        return f'<tool_result id="{call_id}" tool="{name}" untrusted="true">\n{safe}\n</tool_result>'
 
     def _is_new(self, st: LoopState, content: str) -> bool:
         stripped = content.strip().lower()

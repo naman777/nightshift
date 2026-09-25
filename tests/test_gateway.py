@@ -144,3 +144,34 @@ async def test_optional_bearer_token_protects_mutating_endpoints(stack, monkeypa
         assert (await c.get("/incidents")).status_code == 200                       # read-only stays open
         ok = await c.post("/incidents/inc-x/approve", json={"user": "alice"}, headers={"Authorization": "Bearer t0ken"})
         assert ok.status_code == 200
+
+
+async def test_sse_stream_emits_agent_steps_and_ends_when_resolved(stack):
+    app, runner, notifier = stack
+    async with client(app) as c:
+        iid = (await c.post("/webhook/alertmanager", json=payload("fp-sse", "scheduler-backlog-workers-1-00"))).json()["incidents"][0]["incident_id"]
+        for _ in range(200):
+            if runner.decisions.get(iid):
+                break
+            await __import__("asyncio").sleep(0.05)
+        await c.post(f"/incidents/{iid}/approve", json={"user": "alice"})
+        await runner.wait(iid)
+        body = (await c.get(f"/incidents/{iid}/stream")).text
+    assert "event: step" in body and "event: status" in body and '"status": "resolved"' in body
+
+
+async def test_gateway_fails_closed_without_credentials(stack, monkeypatch):
+    monkeypatch.delenv("NIGHTSHIFT_ALLOW_INSECURE")
+    monkeypatch.delenv("NIGHTSHIFT_API_TOKEN", raising=False)
+    app, runner, notifier = stack
+    async with client(app) as c:
+        r = await c.post("/incidents/inc-x/approve", json={"user": "anyone", "confirmation": "CONFIRM scale_to_zero", "reason": "x"})
+        assert r.status_code == 401 and "not configured" in r.text
+    app2 = create_app(db=Database.memory(), runner=runner, signing_secret="")  # Slack callback with no signing secret is refused, not skipped
+    body = urlencode({"payload": json.dumps({"actions": [{"action_id": "nightshift_approve", "value": json.dumps({"incident_id": "inc-1"})}]})}).encode()
+    async with client(app2) as c:
+        assert (await c.post("/slack/interactive", content=body)).status_code == 401
+
+
+def test_slack_signature_rejects_garbage_timestamp():
+    assert verify_slack_signature("s", "abc", b"", "") is False

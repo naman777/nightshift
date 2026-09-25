@@ -3,8 +3,6 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 COPY . .
-ARG NEXT_PUBLIC_GATEWAY_URL=http://localhost:8000
-ENV NEXT_PUBLIC_GATEWAY_URL=$NEXT_PUBLIC_GATEWAY_URL
 RUN npm run build
 
 FROM node:20-alpine

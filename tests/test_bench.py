@@ -101,3 +101,16 @@ async def test_telemetry_outage_surfaces_as_tool_errors_not_crashes():
     rt, _ = make_runtime(world, CONFIGS["multi"])
     result = await LocalOrchestrator(rt).investigate(alert)  # must finish and produce a report, however uncertain
     assert result.report.root_cause
+
+
+def test_remediation_must_hit_the_right_target():
+    from agents.core.models import ProposedAction
+    from bench.scoring import remediation_matches
+
+    s = next(x for x in SCENARIOS if x.id == "bad-config-push-lb-timeout-00")
+    _, _, gt = build_world(s)
+    sha = gt.targets["revert_commit"]
+    assert remediation_matches(ProposedAction(type="revert_commit", target=sha), gt)
+    assert not remediation_matches(ProposedAction(type="revert_commit", target="deadbeef"), gt)   # wrong commit is not a fix
+    assert not remediation_matches(ProposedAction(type="revert_commit", target=""), gt)
+    assert not remediation_matches(ProposedAction(type="escalate", target="on-call"), gt)

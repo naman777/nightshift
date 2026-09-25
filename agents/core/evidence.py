@@ -84,7 +84,7 @@ class EvidenceBoard:
         return [self._to_row(r) for r in self.db.execute(sql + " ORDER BY seq", params)]
 
     def get(self, incident_id: str, ev_id: str) -> EvidenceRow | None:
-        if not ev_id.startswith("ev_") or not ev_id[3:].isdigit():
+        if not ev_id.startswith("ev_") or not (ev_id[3:].isascii() and ev_id[3:].isdigit()):
             return None
         rows = self.db.execute("SELECT * FROM evidence WHERE seq = ? AND incident_id = ?", [int(ev_id[3:]), incident_id])
         return self._to_row(rows[0]) if rows else None
