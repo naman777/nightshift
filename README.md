@@ -77,7 +77,7 @@ report that table instead. Full methodology, splits, judge calibration and limit
 
 ```bash
 pip install -e ".[dev]"
-make test                                            # 110+ tests, including crash-and-resume against a real Temporal test server
+make test                                            # 140+ tests, including crash-and-resume against a real Temporal test server
 make investigate SCENARIO=bad-deploy-n-plus-one-00   # watch agents work in the terminal
 make investigate SCENARIO=bad-deploy-n-plus-one-00 MODE=single
 make bench-smoke                                     # the 10-scenario CI gate
@@ -145,7 +145,7 @@ permissions, the simulator and the live chaos CLI share one fault definition, an
 
 ## Status and honesty
 
-* Verified here: everything Python (114 tests), the Temporal crash-resume behaviour against the Temporal test server, the dashboard build and a browser walk-through
+* Verified here: everything Python (140+ tests), the Temporal crash-resume behaviour against the Temporal test server, the dashboard build and a browser walk-through
   (fire alert -> live lanes -> approve -> resolved -> audit row).
 * Written but **not executed in the authoring environment** (no Go toolchain, Docker daemon not running): the Go services and stand-ins, `docker-compose.yml`, and the observability
   configs. CI compiles and vets the Go code and validates the compose file; expect a small fix or two on first `make demo`. `make go-check` compiles the Go services in a container.

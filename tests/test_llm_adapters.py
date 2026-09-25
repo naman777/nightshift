@@ -59,3 +59,59 @@ def test_cli_investigates_a_scenario(capsys):
     assert "CORRECT" in out and "resource_leak" in out and "not executed" in out
     assert cli_main(["investigate", "no-such-scenario"]) == 2
     assert cli_main(["scenarios"]) == 0
+
+
+async def test_transient_errors_are_retried_and_malformed_tool_arguments_do_not_crash(monkeypatch):
+    import agents.core.llm as llm_mod
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr(llm_mod.asyncio, "sleep", no_sleep)
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            return httpx.Response(429 if calls["n"] == 1 else 529, json={"error": "overloaded"})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "", "tool_calls": [
+            {"id": "c1", "type": "function", "function": {"name": "submit_finding", "arguments": "{not json"}}]}}], "usage": {}})
+
+    r = await OpenAILLM("k", httpx.AsyncClient(transport=httpx.MockTransport(handler))).complete("s", HISTORY, TOOLS, "gpt-4o")
+    assert calls["n"] == 3 and r.tool_calls[0].arguments == {"__malformed__": "{not json"}
+
+
+async def test_client_errors_are_not_retried():
+    import pytest
+
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(401, json={"error": "bad key"})
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await AnthropicLLM("bad", httpx.AsyncClient(transport=httpx.MockTransport(handler))).complete("s", HISTORY, TOOLS, "claude-haiku-4-5")
+    assert calls["n"] == 1
+
+
+def test_every_tool_schema_is_valid_json_schema():
+    import jsonschema
+
+    from agents.commander import DECISION_SCHEMA, PLAN_SCHEMA
+    from agents.core.loop import SUBMIT_SCHEMA
+    from agents.proactive import RISK_SCHEMA
+    from agents.remediation import ACTION_SCHEMA
+    from agents.single_agent import SUBMIT_REPORT
+    from bench.harness import CONFIGS, make_runtime
+    from bench.scenario import build_world, load_all
+    import asyncio
+
+    world = build_world(load_all()[0])[0]
+    rt, _ = make_runtime(world, CONFIGS["multi"])
+    tools = [t.as_llm() for t in asyncio.run(rt.client.list_tools())]
+    schemas = [SUBMIT_SCHEMA, PLAN_SCHEMA, DECISION_SCHEMA, ACTION_SCHEMA, SUBMIT_REPORT, RISK_SCHEMA, *tools]
+    assert len(tools) == 21  # 12 read-only + 9 runtime write tools
+    for t in schemas:
+        jsonschema.Draft202012Validator.check_schema(t["input_schema"])
+        assert len(t["name"]) <= 64 and all(c.isalnum() or c in "_-" for c in t["name"])  # valid tool name for every provider
