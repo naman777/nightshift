@@ -1,0 +1,163 @@
+"""Thin model adapter: Anthropic / OpenAI over httpx, plus a deterministic mock. Owns token + cost accounting."""
+from __future__ import annotations
+
+import json
+import os
+from typing import Any, Awaitable, Callable, Protocol
+
+import httpx
+
+from .models import LLMResponse, Message, ToolCall, Usage
+
+# USD per 1M tokens (input, output). Unknown models fall back to DEFAULT_PRICE.
+PRICES: dict[str, tuple[float, float]] = {
+    "claude-opus-4-5": (5.0, 25.0),
+    "claude-sonnet-4-5": (3.0, 15.0),
+    "claude-haiku-4-5": (1.0, 5.0),
+    "gpt-4o": (2.5, 10.0),
+    "gpt-4o-mini": (0.15, 0.6),
+    "mock-strong": (5.0, 25.0),
+    "mock-cheap": (1.0, 5.0),
+}
+DEFAULT_PRICE = (3.0, 15.0)
+
+
+def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
+    pin, pout = PRICES.get(model, DEFAULT_PRICE)
+    return round((input_tokens * pin + output_tokens * pout) / 1_000_000, 6)
+
+
+def estimate_tokens(text: str) -> int:
+    return max(1, len(text) // 4)
+
+
+class ToolSchema(dict):
+    """{'name','description','input_schema'} — JSON-schema for a tool."""
+
+
+class LLM(Protocol):
+    async def complete(self, system: str, messages: list[Message], tools: list[dict], model: str,
+                       max_tokens: int = 2048) -> LLMResponse: ...
+
+
+# -- Mock ---------------------------------------------------------------------------
+
+Responder = Callable[[str, list[Message], list[dict], str], LLMResponse | Awaitable[LLMResponse]]
+
+
+class MockLLM:
+    """Deterministic provider driven by a responder function: (system, messages, tools, model) -> LLMResponse.
+
+    Token counts are estimated from text length so budgets and cost accounting behave realistically.
+    """
+
+    def __init__(self, responder: Responder):
+        self.responder = responder
+        self.calls = 0
+
+    async def complete(self, system, messages, tools, model, max_tokens=2048) -> LLMResponse:
+        self.calls += 1
+        out = self.responder(system, messages, tools, model)
+        if hasattr(out, "__await__"):
+            out = await out
+        in_tok = estimate_tokens(system) + sum(estimate_tokens(m.content) + 20 * len(m.tool_calls) for m in messages)
+        out_tok = estimate_tokens(out.text) + sum(estimate_tokens(json.dumps(t.arguments)) + 8 for t in out.tool_calls)
+        out.usage = Usage(input_tokens=in_tok, output_tokens=out_tok, cost_usd=cost_usd(model, in_tok, out_tok), llm_calls=1)
+        out.model = model
+        return out
+
+
+# -- Anthropic ----------------------------------------------------------------------
+
+class AnthropicLLM:
+    URL = "https://api.anthropic.com/v1/messages"
+
+    def __init__(self, api_key: str | None = None, client: httpx.AsyncClient | None = None):
+        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+        self.client = client or httpx.AsyncClient(timeout=120)
+
+    @staticmethod
+    def _messages(messages: list[Message]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for m in messages:
+            if m.role == "user":
+                out.append({"role": "user", "content": m.content})
+            elif m.role == "assistant":
+                blocks: list[dict[str, Any]] = []
+                if m.content:
+                    blocks.append({"type": "text", "text": m.content})
+                blocks += [{"type": "tool_use", "id": t.id, "name": t.name, "input": t.arguments} for t in m.tool_calls]
+                out.append({"role": "assistant", "content": blocks})
+            else:  # tool result
+                block = {"type": "tool_result", "tool_use_id": m.tool_call_id, "content": m.content}
+                if out and out[-1]["role"] == "user" and isinstance(out[-1]["content"], list):
+                    out[-1]["content"].append(block)
+                else:
+                    out.append({"role": "user", "content": [block]})
+        return out
+
+    async def complete(self, system, messages, tools, model, max_tokens=2048) -> LLMResponse:
+        body = {"model": model, "max_tokens": max_tokens, "system": system, "messages": self._messages(messages),
+                "tools": [{"name": t["name"], "description": t["description"], "input_schema": t["input_schema"]} for t in tools]}
+        r = await self.client.post(self.URL, json=body, headers={
+            "x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+        r.raise_for_status()
+        data = r.json()
+        text = "".join(b.get("text", "") for b in data["content"] if b["type"] == "text")
+        calls = [ToolCall(id=b["id"], name=b["name"], arguments=b["input"]) for b in data["content"] if b["type"] == "tool_use"]
+        u = data.get("usage", {})
+        i, o = u.get("input_tokens", 0), u.get("output_tokens", 0)
+        return LLMResponse(text=text, tool_calls=calls, model=model,
+                           usage=Usage(input_tokens=i, output_tokens=o, cost_usd=cost_usd(model, i, o), llm_calls=1))
+
+
+# -- OpenAI -------------------------------------------------------------------------
+
+class OpenAILLM:
+    URL = "https://api.openai.com/v1/chat/completions"
+
+    def __init__(self, api_key: str | None = None, client: httpx.AsyncClient | None = None):
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+        self.client = client or httpx.AsyncClient(timeout=120)
+
+    @staticmethod
+    def _messages(system: str, messages: list[Message]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = [{"role": "system", "content": system}]
+        for m in messages:
+            if m.role == "user":
+                out.append({"role": "user", "content": m.content})
+            elif m.role == "assistant":
+                msg: dict[str, Any] = {"role": "assistant", "content": m.content or None}
+                if m.tool_calls:
+                    msg["tool_calls"] = [{"id": t.id, "type": "function",
+                                          "function": {"name": t.name, "arguments": json.dumps(t.arguments)}} for t in m.tool_calls]
+                out.append(msg)
+            else:
+                out.append({"role": "tool", "tool_call_id": m.tool_call_id, "content": m.content})
+        return out
+
+    async def complete(self, system, messages, tools, model, max_tokens=2048) -> LLMResponse:
+        body = {"model": model, "max_tokens": max_tokens, "messages": self._messages(system, messages),
+                "tools": [{"type": "function", "function": {"name": t["name"], "description": t["description"],
+                                                            "parameters": t["input_schema"]}} for t in tools]}
+        r = await self.client.post(self.URL, json=body, headers={"Authorization": f"Bearer {self.api_key}"})
+        r.raise_for_status()
+        data = r.json()
+        msg = data["choices"][0]["message"]
+        calls = [ToolCall(id=c["id"], name=c["function"]["name"], arguments=json.loads(c["function"]["arguments"] or "{}"))
+                 for c in msg.get("tool_calls") or []]
+        u = data.get("usage", {})
+        i, o = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
+        return LLMResponse(text=msg.get("content") or "", tool_calls=calls, model=model,
+                           usage=Usage(input_tokens=i, output_tokens=o, cost_usd=cost_usd(model, i, o), llm_calls=1))
+
+
+def make_llm(provider: str | None = None, responder: Responder | None = None) -> LLM:
+    provider = provider or os.environ.get("NIGHTSHIFT_LLM_PROVIDER", "mock")
+    if provider == "anthropic":
+        return AnthropicLLM()
+    if provider == "openai":
+        return OpenAILLM()
+    if responder is None:
+        raise ValueError("mock provider needs a responder (see agents.scripted)")
+    return MockLLM(responder)
