@@ -29,7 +29,7 @@ async def fire(port: int, scenario: str) -> None:
             except httpx.HTTPError:
                 await asyncio.sleep(0.2)
         r = await c.post(f"http://127.0.0.1:{port}/webhook/alertmanager", json=payload)
-        print(f"alert fired -> {r.json()}\nincident page: http://localhost:3001/incidents/inc-demo-{s.id}  (approve it to execute the simulated revert)")
+        print(f"alert fired -> {r.json()}\nincident page: http://localhost:3001/incidents/inc-demo-{s.id}  (approve it to execute the simulated revert)", flush=True)
 
 
 def main() -> None:

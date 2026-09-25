@@ -66,7 +66,7 @@ EMPTY_MARKERS = ("[]", "{}", "null", "no data", "no results", "no matches", '"se
 @dataclass
 class Budget:
     max_tool_calls: int = 8
-    max_tokens: int = 40_000
+    max_tokens: int = 60_000
     max_llm_calls: int = 20
     call_timeout_s: float = 20.0
     result_char_limit: int = 7000
@@ -85,6 +85,7 @@ class LoopState:
     seen_hashes: set[str] = field(default_factory=set)
     stale: int = 0
     tool_calls: int = 0
+    seq: int = 0  # monotonically increasing call id, even for calls that were refused
     usage: Usage = field(default_factory=Usage)
 
 
@@ -234,7 +235,8 @@ class AgentLoop:
         return None
 
     async def _run_tool(self, tc: ToolCall, st: LoopState, specs: dict[str, ToolSpec], submit_only: bool) -> str:
-        call_id = f"call_{len(st.calls) + 1}"
+        st.seq += 1
+        call_id = f"call_{st.seq}"
         if submit_only or st.tool_calls >= self.budget.max_tool_calls:
             return self._wrap(call_id, tc.name, f"TOOL BUDGET EXHAUSTED. Call {self.final_name}.")
         if tc.name not in specs:
@@ -274,7 +276,10 @@ class AgentLoop:
     async def _handle_submit(self, tc: ToolCall, st: LoopState) -> tuple[Finding | None, str]:
         args = tc.arguments
         if self.final_handler is not None:
-            out, err = self.final_handler(args)
+            try:
+                out, err = self.final_handler(args)
+            except Exception as e:  # a malformed submission is feedback for the model, never a crash
+                return None, f"could not process submission: {type(e).__name__}: {e}"
             if out is None:
                 return None, err
             self.output = out

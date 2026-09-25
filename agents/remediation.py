@@ -29,7 +29,7 @@ def parse_action(args: dict) -> tuple[ProposedAction | None, str]:
 async def propose(rt: AgentRuntime, alert: Alert, incident_id: str, report: RootCauseReport) -> ProposedAction:
     fallback = report.proposed_action or ProposedAction(type="escalate", target="on-call", tier=Tier.READ_ONLY)
     loop = AgentLoop("remediation", rt.llm, rt.commander_model, load("remediation", rt.prompt_version), None,
-                     budget=Budget(max_tool_calls=1, max_tokens=6_000), board=rt.board, incident_id=incident_id, on_step=rt.on_step,
+                     budget=Budget(max_tool_calls=1, max_tokens=12_000), board=rt.board, incident_id=incident_id, on_step=rt.on_step,
                      final_schema=ACTION_SCHEMA, final_handler=parse_action)
     await loop.run("Choose the safest effective action.", f"Root-cause report:\n{report.model_dump_json(indent=1)}")
     action: ProposedAction = loop.output or fallback
