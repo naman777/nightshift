@@ -95,3 +95,9 @@ The Prometheus recording rules (`observability/prometheus/rules/recording.yml`) 
 
 `bench/alert_rules.py` mirrors `observability/prometheus/rules/alerts.yml`. Before a scenario is scored, the runner checks its expected alert would actually fire;
 if not, the scenario is marked invalid (that is a bug in the alert rules or the fault, not in the agent). This caught two mislabelled scenarios during development.
+
+## Operational notes from review
+
+* The chaos CLI (`make chaos`, `deploy`) drives `docker compose` and must run **on the host**; the worker container only has the docker CLI, not the compose plugin or compose file.
+* `crashed_replica` uses `docker stop` (not `kill`) so the `restart: unless-stopped` policy does not heal the fault.
+* `ServiceMemoryGrowth` compares memory to its 30-minute minimum, so it can fire soon after Prometheus starts.
