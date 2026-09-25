@@ -9,3 +9,6 @@ node_modules/
 bench/results/runs/
 .pytest_cache/
 dist/
+target/.configrepo/
+target/.chaos_state.json
+target/deploys.jsonl

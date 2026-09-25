@@ -119,3 +119,28 @@ class LocalRunner:
         fut = self.decisions.get(incident_id)
         if fut and not fut.done():
             fut.set_result({"approved": False, "user": user})
+
+
+class LazyTemporalRunner:
+    """Connects on first use so the gateway can start before Temporal is up (compose start-up ordering)."""
+
+    def __init__(self, address: str | None = None):
+        self.address, self._inner = address, None
+
+    async def _get(self) -> TemporalRunner:
+        if self._inner is None:
+            self._inner = await TemporalRunner.connect(self.address)
+        return self._inner
+
+    async def start(self, alert: Alert, mode: str = "multi") -> tuple[str, bool]:
+        return await (await self._get()).start(alert, mode)
+
+    async def approve(self, incident_id: str, user: str, confirmation: str = "", reason: str = "") -> None:
+        await (await self._get()).approve(incident_id, user, confirmation, reason)
+
+    async def reject(self, incident_id: str, user: str) -> None:
+        await (await self._get()).reject(incident_id, user)
+
+
+def default_runner(db: Any = None) -> IncidentRunner:
+    return LazyTemporalRunner() if os.environ.get("NIGHTSHIFT_ORCH", "local") == "temporal" else LocalRunner(db=db)

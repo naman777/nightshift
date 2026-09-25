@@ -1,0 +1,3 @@
+# payments-svc config (hot reloaded)
+handler_timeout_ms: 2000
+log_level: info

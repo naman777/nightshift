@@ -1,0 +1,146 @@
+# The whole stack: target system + observability + Temporal + Nightshift itself.
+#   make up      start everything          make chaos SCENARIO=...   inject a fault
+#   make demo    up + prints the URLs      docker kill nightshift-worker   (crash-and-resume demo)
+name: nightshift
+
+x-go: &go
+  restart: unless-stopped
+  volumes: ["./target/config:/config:ro"]
+  labels: {nightshift.logs: "true"}
+
+services:
+  # ---------------------------------------------------------------- target system
+  postgres:
+    image: postgres:16
+    command: ["postgres", "-c", "max_connections=30"]
+    environment: {POSTGRES_USER: nightshift, POSTGRES_PASSWORD: nightshift, POSTGRES_DB: orders}
+    volumes: ["./target/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro", "pgdata:/var/lib/postgresql/data"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U nightshift -d orders"], interval: 3s, retries: 20}
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    ports: ["8474:8474"]
+
+  toxiproxy-setup:
+    image: curlimages/curl:8.10.1
+    depends_on: [toxiproxy]
+    restart: "no"
+    entrypoint: ["sh", "-c", "sleep 3 && curl -sf -X POST toxiproxy:8474/proxies -d '{\"name\":\"payments\",\"listen\":\"0.0.0.0:8081\",\"upstream\":\"payments-svc:8082\"}' || true"]
+
+  payments-svc:
+    <<: *go
+    build: {context: ./target, args: {SERVICE: payments-svc, GIT_SHA: "${GIT_SHA:-dev}"}}
+    mem_limit: 512m
+
+  orders-svc-1: &orders
+    <<: *go
+    build: {context: ./target, args: {SERVICE: orders-svc, GIT_SHA: "${GIT_SHA:-dev}", BUG: "${ORDERS_BUG:-}"}}
+    container_name: nightshift-orders-svc-1
+    environment: {REPLICA: orders-svc-1, DATABASE_URL: "postgres://nightshift:nightshift@postgres:5432/orders?sslmode=disable", PAYMENTS_URL: "http://toxiproxy:8081"}
+    depends_on: {postgres: {condition: service_healthy}, toxiproxy-setup: {condition: service_started}}
+    mem_limit: 512m
+
+  orders-svc-2:
+    <<: *orders
+    container_name: nightshift-orders-svc-2
+    environment: {REPLICA: orders-svc-2, DATABASE_URL: "postgres://nightshift:nightshift@postgres:5432/orders?sslmode=disable", PAYMENTS_URL: "http://toxiproxy:8081"}
+
+  # STAND-INS for the real C++ load balancer and Foreman scheduler (same config keys, same metrics; swap the service in later)
+  lb:
+    <<: *go
+    build: {context: ./target, args: {SERVICE: stubs/lb, GIT_SHA: "${GIT_SHA:-dev}"}}
+    ports: ["8080:8080"]
+    depends_on: [orders-svc-1, orders-svc-2]
+
+  scheduler:
+    <<: *go
+    build: {context: ./target, args: {SERVICE: stubs/scheduler, GIT_SHA: "${GIT_SHA:-dev}"}}
+    environment: {DATABASE_URL: "postgres://nightshift:nightshift@postgres:5432/orders?sslmode=disable"}
+    ports: ["8090:8090"]
+    depends_on: {postgres: {condition: service_healthy}}
+
+  loadgen:
+    image: grafana/k6:0.54.0
+    command: ["run", "/script.js"]
+    volumes: ["./target/loadgen/script.js:/script.js:ro"]
+    depends_on: [lb]
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- observability
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes: ["./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro", "./observability/prometheus/rules:/etc/prometheus/rules:ro"]
+    ports: ["9090:9090"]
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    volumes: ["./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"]
+    ports: ["9093:9093"]
+
+  loki:
+    image: grafana/loki:3.2.1
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes: ["./observability/loki/loki.yml:/etc/loki/loki.yml:ro"]
+    ports: ["3100:3100"]
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    command: ["-config.file=/etc/promtail/promtail.yml"]
+    volumes: ["./observability/promtail/promtail.yml:/etc/promtail/promtail.yml:ro", "/var/run/docker.sock:/var/run/docker.sock:ro"]
+    depends_on: [loki]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment: {GF_AUTH_ANONYMOUS_ENABLED: "true", GF_AUTH_ANONYMOUS_ORG_ROLE: Admin}
+    volumes: ["./observability/grafana/provisioning:/etc/grafana/provisioning:ro", "./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro"]
+    ports: ["3000:3000"]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment: {COLLECTOR_OTLP_ENABLED: "true"}
+    ports: ["16686:16686", "4317:4317"]
+
+  # ---------------------------------------------------------------- durable execution
+  temporal:
+    image: temporalio/temporal:latest
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--ui-port", "8233"]
+    ports: ["7233:7233", "8233:8233"]
+
+  # ---------------------------------------------------------------- Nightshift
+  gateway:
+    build: {context: ., dockerfile: Dockerfile.agents}
+    command: ["uvicorn", "gateway.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    env_file: [{path: .env, required: false}]
+    environment: &ns-env
+      NIGHTSHIFT_BACKEND: live
+      NIGHTSHIFT_ORCH: temporal
+      NIGHTSHIFT_DB_URL: postgresql://nightshift:nightshift@postgres:5432/nightshift
+      TEMPORAL_ADDRESS: temporal:7233
+      PROMETHEUS_URL: http://prometheus:9090
+      LOKI_URL: http://loki:3100
+      CONFIG_REPO: /app/target/config
+      CONFIG_GIT_DIR: /app/target/.configrepo
+      DEPLOY_LOG: /app/target/deploys.jsonl
+      CODE_ROOT: /app/target/orders-svc
+    volumes: ["./target:/app/target"]
+    ports: ["8000:8000"]
+    depends_on: [postgres, temporal]
+
+  nightshift-worker:
+    build: {context: ., dockerfile: Dockerfile.agents}
+    container_name: nightshift-worker
+    command: ["python", "-m", "orchestrator.worker"]
+    env_file: [{path: .env, required: false}]
+    environment: *ns-env
+    volumes: ["./target:/app/target", "/var/run/docker.sock:/var/run/docker.sock"]
+    restart: "no"   # `docker kill nightshift-worker`, then `docker start nightshift-worker`: the investigation resumes
+    depends_on: [postgres, temporal]
+
+  dashboard:
+    build: {context: ./dashboard}
+    environment: {NEXT_PUBLIC_GATEWAY_URL: "http://localhost:8000"}
+    ports: ["3001:3000"]
+    depends_on: [gateway]
+
+volumes:
+  pgdata:

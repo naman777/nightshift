@@ -17,7 +17,7 @@ from agents.core.db import Database
 from agents.core.evidence import EvidenceBoard
 from agents.core.models import Alert
 from mcp_servers.policy import PolicyEngine
-from orchestrator.api import IncidentRunner, LocalRunner
+from orchestrator.api import IncidentRunner, default_runner
 from slackbot.notify import verify_slack_signature
 
 RESULTS_DIR = Path(os.environ.get("NIGHTSHIFT_RESULTS", "bench/results"))
@@ -46,7 +46,7 @@ def create_app(db: Database | None = None, runner: IncidentRunner | None = None,
     board = EvidenceBoard(db)
     app = FastAPI(title="Nightshift gateway")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-    app.state.runner = runner or LocalRunner(db=db)
+    app.state.runner = runner or default_runner(db)
     secret = signing_secret if signing_secret is not None else os.environ.get("SLACK_SIGNING_SECRET", "")
 
     @app.get("/healthz")

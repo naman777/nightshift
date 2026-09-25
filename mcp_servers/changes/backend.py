@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -16,14 +17,16 @@ class ChangesBackend(Protocol):
 
 
 class GitChangesBackend:
-    def __init__(self, repo: str = "target/config", deploy_log: str = "target/deploys.jsonl"):
+    def __init__(self, repo: str = "target/config", deploy_log: str = "target/deploys.jsonl", git_dir: str | None = None):
         self.repo, self.deploy_log = Path(repo), Path(deploy_log)
+        self.git_dir = git_dir or os.environ.get("CONFIG_GIT_DIR", "")
 
     def now(self) -> float:
         return time.time()
 
     def _git(self, *args: str) -> str:
-        return subprocess.run(["git", "-C", str(self.repo), *args], capture_output=True, text=True, timeout=15).stdout
+        base = ["git", f"--git-dir={self.git_dir}", f"--work-tree={self.repo}"] if self.git_dir else ["git", "-C", str(self.repo)]
+        return subprocess.run([*base, *args], capture_output=True, text=True, timeout=15).stdout
 
     async def deploys(self, since, service):
         if not self.deploy_log.exists():
@@ -35,7 +38,7 @@ class GitChangesBackend:
         fmt = "%H|%ct|%an|%s"
         out = self._git("log", f"--since=@{int(since)}", f"--format={fmt}", "--", *([path] if path else []))
         commits = []
-        for line in out.splitlines():
+        for line in reversed(out.splitlines()):  # oldest first, so equal-second commits keep their order
             sha, ts, author, msg = line.split("|", 3)
             files = self._git("show", "--name-only", "--format=", sha).split()
             commits.append({"sha": sha[:8], "ts": int(ts), "author": author, "message": msg, "files": files})

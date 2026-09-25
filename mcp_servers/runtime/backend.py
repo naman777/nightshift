@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -32,7 +33,9 @@ class DockerRuntimeBackend:
         return await self._run("python", "-m", "chaos.cli", "deploy", service, "--sha", sha)
 
     async def revert_commit(self, sha):
-        return await self._run("git", "-C", str(self.config_repo), "revert", "--no-edit", sha)
+        gd = os.environ.get("CONFIG_GIT_DIR", "")
+        base = ["git", f"--git-dir={gd}", f"--work-tree={self.config_repo}"] if gd else ["git", "-C", str(self.config_repo)]
+        return await self._run(*base, "revert", "--no-edit", sha)
 
     async def set_flag(self, flag, value):
         return await self._run("python", "-m", "chaos.cli", "flag", flag, value)

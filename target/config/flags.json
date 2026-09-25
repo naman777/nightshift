@@ -1,0 +1,6 @@
+{
+  "enable_unbounded_cache": false,
+  "enable_session_cache": false,
+  "enable_prefetch": false,
+  "retain_receipts": false
+}

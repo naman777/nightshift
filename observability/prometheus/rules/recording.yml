@@ -1,0 +1,22 @@
+# Recording rules give every service the SAME metric names the agents' MCP servers query
+# (mcp_servers/metrics/backend.py CATALOGUE). Raw gauges that already carry a `service` label
+# (db_connections_in_use, disk_used_ratio, upstream_healthy, queue_depth) need no rule.
+groups:
+  - name: nightshift-recording
+    rules:
+      - record: request_rate
+        expr: sum by (service) (rate(http_requests_total[1m]))
+      - record: error_rate
+        expr: sum by (service) (rate(http_requests_total{status=~"5.."}[1m])) / clamp_min(sum by (service) (rate(http_requests_total[1m])), 0.001)
+      - record: p99_latency_seconds
+        expr: histogram_quantile(0.99, sum by (service, le) (rate(http_request_duration_seconds_bucket[1m])))
+      - record: memory_bytes
+        expr: sum by (service) (process_resident_memory_bytes)
+      - record: cpu_ratio
+        expr: sum by (service) (rate(process_cpu_seconds_total[1m]))
+      - record: restarts_total
+        expr: sum by (service) (changes(process_start_time_seconds[1h]))
+      - record: log_lines_per_second
+        expr: sum by (service) (rate(log_lines_total[1m]))
+      - record: dependency_latency_p99_seconds
+        expr: histogram_quantile(0.99, sum by (service, le) (rate(dependency_latency_seconds_bucket[1m])))

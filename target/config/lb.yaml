@@ -1,0 +1,6 @@
+# lb config (hot reloaded). Same keys the real C++ LB will honour.
+upstream_timeout_ms: 2000
+upstream_weight_orders_1: 50
+upstream_weight_orders_2: 50
+health_check_interval_ms: 2000
+log_level: info

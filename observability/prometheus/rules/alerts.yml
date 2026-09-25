@@ -1,0 +1,29 @@
+# Thresholds mirror bench/alert_rules.py: a benchmark scenario whose alert never fires is marked INVALID.
+groups:
+  - name: nightshift-alerts
+    rules:
+      - alert: HighErrorRate_orders
+        expr: max(error_rate{service=~"lb|orders-svc"}) > 0.05
+        for: 1m
+        labels: {severity: critical, service: orders-svc}
+        annotations: {summary: "5xx rate above 5% for orders traffic"}
+      - alert: HighLatency_orders
+        expr: p99_latency_seconds{service="orders-svc"} > 0.6
+        for: 1m
+        labels: {severity: critical, service: orders-svc}
+        annotations: {summary: "orders-svc p99 latency above 600ms"}
+      - alert: ServiceMemoryGrowth
+        expr: memory_bytes / (memory_bytes offset 30m) > 1.8
+        for: 2m
+        labels: {severity: warning}
+        annotations: {summary: "memory grew 1.8x in 30 minutes"}
+      - alert: JobQueueBacklog
+        expr: queue_depth{service="scheduler"} > 100
+        for: 1m
+        labels: {severity: critical, service: scheduler}
+        annotations: {summary: "scheduler job queue is backing up"}
+      - alert: DiskFillingFast
+        expr: log_lines_per_second > 400
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: "log volume above 400 lines/s (disk filling)"}

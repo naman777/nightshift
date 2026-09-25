@@ -1,0 +1,5 @@
+# scheduler config (hot reloaded). Same keys the real Foreman will honour.
+worker_count: 8
+settlement_schedule: "0 3 * * *"
+enqueue_per_100ms: 1
+log_level: info

@@ -1,0 +1,5 @@
+# orders-svc config (hot reloaded)
+request_timeout_ms: 3000
+payments_timeout_ms: 1500
+db_pool_size: 10
+log_level: info
