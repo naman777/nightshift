@@ -1,6 +1,7 @@
 """Thin model adapter: Anthropic / OpenAI over httpx, plus a deterministic mock. Owns token + cost accounting."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from typing import Any, Awaitable, Callable, Protocol
@@ -30,6 +31,26 @@ def cost_usd(model: str, input_tokens: int, output_tokens: int, cache_read: int 
 
 def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
+
+
+RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
+
+
+async def post_with_retry(client: httpx.AsyncClient, url: str, attempts: int = 4, **kw: Any) -> httpx.Response:
+    """POST with exponential backoff on rate limits, overload and transient network errors (LLM APIs return 429/529 under load)."""
+    delay = 1.0
+    for i in range(attempts):
+        try:
+            r = await client.post(url, **kw)
+            if r.status_code not in RETRY_STATUS or i == attempts - 1:
+                r.raise_for_status()
+                return r
+        except (httpx.TransportError, httpx.TimeoutException):
+            if i == attempts - 1:
+                raise
+        await asyncio.sleep(delay)
+        delay *= 2
+    raise RuntimeError("unreachable")  # pragma: no cover
 
 
 class ToolSchema(dict):
@@ -102,9 +123,8 @@ class AnthropicLLM:
         body = {"model": model, "max_tokens": max_tokens, "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 "messages": self._messages(messages),
                 "tools": [{"name": t["name"], "description": t["description"], "input_schema": t["input_schema"]} for t in tools]}
-        r = await self.client.post(self.URL, json=body, headers={
+        r = await post_with_retry(self.client, self.URL, json=body, headers={
             "x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
-        r.raise_for_status()
         data = r.json()
         text = "".join(b.get("text", "") for b in data["content"] if b["type"] == "text")
         calls = [ToolCall(id=b["id"], name=b["name"], arguments=b["input"]) for b in data["content"] if b["type"] == "tool_use"]
@@ -114,6 +134,15 @@ class AnthropicLLM:
         return LLMResponse(text=text, tool_calls=calls, model=model,
                            usage=Usage(input_tokens=i + cr + cw, output_tokens=o, cost_usd=cost_usd(model, i, o, cr, cw), llm_calls=1,
                                        cache_read_tokens=cr, cache_write_tokens=cw))
+
+
+def _parse_args(raw: str | None) -> dict[str, Any]:
+    """Models occasionally emit malformed JSON arguments; surface that to the loop as a tool error instead of crashing the run."""
+    try:
+        val = json.loads(raw or "{}")
+        return val if isinstance(val, dict) else {"__malformed__": raw}
+    except ValueError:
+        return {"__malformed__": raw}
 
 
 # -- OpenAI -------------------------------------------------------------------------
@@ -145,11 +174,10 @@ class OpenAILLM:
         body = {"model": model, "max_tokens": max_tokens, "messages": self._messages(system, messages),
                 "tools": [{"type": "function", "function": {"name": t["name"], "description": t["description"],
                                                             "parameters": t["input_schema"]}} for t in tools]}
-        r = await self.client.post(self.URL, json=body, headers={"Authorization": f"Bearer {self.api_key}"})
-        r.raise_for_status()
+        r = await post_with_retry(self.client, self.URL, json=body, headers={"Authorization": f"Bearer {self.api_key}"})
         data = r.json()
         msg = data["choices"][0]["message"]
-        calls = [ToolCall(id=c["id"], name=c["function"]["name"], arguments=json.loads(c["function"]["arguments"] or "{}"))
+        calls = [ToolCall(id=c["id"], name=c["function"]["name"], arguments=_parse_args(c["function"]["arguments"]))
                  for c in msg.get("tool_calls") or []]
         u = data.get("usage", {})
         i, o = u.get("prompt_tokens", 0), u.get("completion_tokens", 0)
