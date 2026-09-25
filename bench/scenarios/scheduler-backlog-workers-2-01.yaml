@@ -1,0 +1,24 @@
+id: scheduler-backlog-workers-2-01
+fault: scheduler_backlog
+params:
+  workers: 2
+red_herring:
+  type: harmless_config
+  minutes_before: 15
+  service: payments-svc
+expected_alert: JobQueueBacklog
+ground_truth:
+  root_cause: scheduler worker_count reduced from {old} to {workers} in commit {sha}
+  root_cause_service: scheduler
+  category: capacity
+  correct_remediations:
+  - revert_commit
+  - set_config
+  - scale
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: dev
+smoke: false

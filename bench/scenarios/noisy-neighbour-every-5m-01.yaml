@@ -1,0 +1,21 @@
+id: noisy-neighbour-every-5m-01
+fault: noisy_neighbour
+params:
+  schedule: '*/5 * * * *'
+red_herring: null
+expected_alert: HighLatency_orders
+ground_truth:
+  root_cause: settlement job schedule changed to '{schedule}' in commit {sha}, burning
+    CPU shared with orders-svc at peak
+  root_cause_service: scheduler
+  category: resource_contention
+  correct_remediations:
+  - revert_commit
+  - set_config
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: dev
+smoke: false

@@ -1,0 +1,23 @@
+id: memory-leak-orders-cache-00
+fault: memory_leak
+params: {}
+red_herring:
+  type: harmless_deploy
+  minutes_before: 20
+  service: payments-svc
+expected_alert: ServiceMemoryGrowth
+ground_truth:
+  root_cause: feature flag {flag} enabled in commit {sha} causes unbounded memory
+    growth in {flag_service}
+  root_cause_service: orders-svc
+  category: resource_leak
+  correct_remediations:
+  - set_flag
+  - revert_commit
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: dev
+smoke: true

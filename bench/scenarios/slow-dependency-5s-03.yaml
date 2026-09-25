@@ -1,0 +1,21 @@
+id: slow-dependency-5s-03
+fault: slow_dependency
+params:
+  latency_ms: 5000
+red_herring: null
+expected_alert: HighLatency_orders
+ground_truth:
+  root_cause: payments-svc is responding slowly (~{latency_ms}ms of added latency);
+    orders-svc latency and errors are symptoms
+  root_cause_service: payments-svc
+  category: dependency_latency
+  correct_remediations:
+  - escalate
+  - set_config
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: heldout
+smoke: false

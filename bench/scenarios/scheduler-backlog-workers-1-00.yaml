@@ -1,0 +1,20 @@
+id: scheduler-backlog-workers-1-00
+fault: scheduler_backlog
+params: {}
+red_herring: null
+expected_alert: JobQueueBacklog
+ground_truth:
+  root_cause: scheduler worker_count reduced from {old} to {workers} in commit {sha}
+  root_cause_service: scheduler
+  category: capacity
+  correct_remediations:
+  - revert_commit
+  - set_config
+  - scale
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: dev
+smoke: true

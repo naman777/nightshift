@@ -1,0 +1,23 @@
+id: log-flood-orders-deploy-02
+fault: log_flood
+params: {}
+red_herring:
+  type: harmless_deploy
+  minutes_before: 20
+  service: payments-svc
+expected_alert: DiskFillingFast
+ground_truth:
+  root_cause: log_level set to debug in commit {sha}, flooding {log_service} logs
+    and filling disk
+  root_cause_service: orders-svc
+  category: log_flood
+  correct_remediations:
+  - revert_commit
+  - set_config
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: heldout
+smoke: false

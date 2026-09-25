@@ -1,0 +1,24 @@
+id: db-connection-exhaustion-settlement-00
+fault: db_connection_exhaustion
+params: {}
+red_herring:
+  type: harmless_deploy
+  minutes_before: 20
+  service: payments-svc
+expected_alert: HighErrorRate_orders
+ground_truth:
+  root_cause: scheduler job {job} is holding {held} database connections, exhausting
+    the orders-svc pool
+  root_cause_service: scheduler
+  category: connection_exhaustion
+  correct_remediations:
+  - restart_replica
+  - set_config
+  - scale
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: dev
+smoke: true

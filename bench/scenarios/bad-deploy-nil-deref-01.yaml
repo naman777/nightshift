@@ -1,0 +1,19 @@
+id: bad-deploy-nil-deref-01
+fault: bad_deploy
+params:
+  bug: nil_deref
+red_herring: null
+expected_alert: HighLatency_orders
+ground_truth:
+  root_cause: orders-svc deploy {sha} introduced {bug}
+  root_cause_service: orders-svc
+  category: bad_deploy
+  correct_remediations:
+  - rollback_deploy
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: dev
+smoke: false

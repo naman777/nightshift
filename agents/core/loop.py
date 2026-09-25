@@ -69,7 +69,7 @@ class Budget:
     max_tokens: int = 40_000
     max_llm_calls: int = 20
     call_timeout_s: float = 20.0
-    result_char_limit: int = 4000
+    result_char_limit: int = 7000
 
 
 @dataclass
@@ -88,6 +88,11 @@ class LoopState:
     usage: Usage = field(default_factory=Usage)
 
 
+class _Local(Exception):
+    def __init__(self, content: str):
+        self.content = content
+
+
 StepSink = Callable[[Step], Awaitable[None] | None]
 
 
@@ -104,14 +109,21 @@ class AgentLoop:
         board: EvidenceBoard | None = None,
         incident_id: str = "",
         on_step: StepSink | None = None,
-        extra_tools: list[ToolSpec] | None = None,
+        local_tools: dict[str, tuple[ToolSpec, Callable[[dict], Any]]] | None = None,
+        final_schema: dict | None = None,
+        final_handler: Callable[[dict], tuple[Any, str]] | None = None,
     ):
         self.name, self.llm, self.model = name, llm, model
         self.system = system_prompt + SAFETY_SUFFIX
         self.client, self.allowed = client, allowed_tools
         self.budget = budget or Budget()
         self.board, self.incident_id, self.on_step = board, incident_id, on_step
-        self.extra_tools = extra_tools or []
+        self.local_tools = local_tools or {}
+        self.final_schema = final_schema or SUBMIT_SCHEMA
+        self.final_name = self.final_schema["name"]
+        self.final_handler = final_handler
+        self.output: Any = None
+        self._last_state = LoopState()
         self.steps: list[Step] = []
 
     async def _emit(self, kind: str, name: str = "", detail: str = "", ms: int = 0) -> None:
@@ -128,8 +140,8 @@ class AgentLoop:
             for t in await self.client.list_tools():
                 if self.allowed is None or t.name in self.allowed:
                     specs[t.name] = t
-        for t in self.extra_tools:
-            specs[t.name] = t
+        for name, (spec, _) in self.local_tools.items():
+            specs[name] = spec
         return [t.as_llm() for t in specs.values()], specs
 
     @staticmethod
@@ -147,7 +159,7 @@ class AgentLoop:
         return True
 
     async def run(self, question: str, context: str = "") -> Finding:
-        st = LoopState()
+        st = self._last_state = LoopState()
         schemas, specs = await self._tool_schemas()
         user = f"## Your question\n{question}\n"
         if context:
@@ -160,7 +172,7 @@ class AgentLoop:
 
         with span(f"agent.{self.name}", question=question[:200]):
             for _ in range(self.budget.max_llm_calls):
-                tools = [SUBMIT_SCHEMA] if submit_only else [SUBMIT_SCHEMA, *schemas]
+                tools = [self.final_schema] if submit_only else [self.final_schema, *schemas]
                 t0 = time.perf_counter()
                 with span(f"llm.{self.name}", model=self.model):
                     resp = await self.llm.complete(self.system, st.messages, tools, self.model)
@@ -172,19 +184,19 @@ class AgentLoop:
                     if submit_only:
                         stop_reason = "budget"
                         break
-                    st.messages.append(Message(role="user", content="Call a tool or call submit_finding."))
+                    st.messages.append(Message(role="user", content=f"Call a tool or call {self.final_name}."))
                     submit_only = st.usage.llm_calls >= self.budget.max_llm_calls - 2
                     continue
 
                 for tc in resp.tool_calls:
-                    if tc.name == SUBMIT:
+                    if tc.name == self.final_name:
                         finding, err = await self._handle_submit(tc, st)
                         if finding is not None:
                             if not submit_only:
                                 stop_reason = "submitted"
                             break
                         rejected += 1
-                        st.messages.append(Message(role="tool", tool_call_id=tc.id, tool_name=SUBMIT, content=err))
+                        st.messages.append(Message(role="tool", tool_call_id=tc.id, tool_name=self.final_name, content=err))
                         if rejected >= 2:
                             stop_reason = "error"
                         continue
@@ -199,7 +211,7 @@ class AgentLoop:
                         stop_reason = reason
                         submit_only = True
                         st.messages.append(Message(role="user", content=(
-                            f"Stop condition reached ({reason}). Call submit_finding now with what you have; "
+                            f"Stop condition reached ({reason}). Call {self.final_name} now with what you have; "
                             "use status=inconclusive if the evidence is not enough.")))
 
         st.usage = st.usage.model_copy(update={"tool_calls": st.tool_calls})
@@ -224,7 +236,7 @@ class AgentLoop:
     async def _run_tool(self, tc: ToolCall, st: LoopState, specs: dict[str, ToolSpec], submit_only: bool) -> str:
         call_id = f"call_{len(st.calls) + 1}"
         if submit_only or st.tool_calls >= self.budget.max_tool_calls:
-            return self._wrap(call_id, tc.name, "TOOL BUDGET EXHAUSTED. Call submit_finding.")
+            return self._wrap(call_id, tc.name, f"TOOL BUDGET EXHAUSTED. Call {self.final_name}.")
         if tc.name not in specs:
             return self._wrap(call_id, tc.name, f"unknown tool '{tc.name}'. Available: {sorted(specs)}")
         st.tool_calls += 1
@@ -232,8 +244,13 @@ class AgentLoop:
         ctx = CallContext(incident_id=self.incident_id, agent=self.name)
         with span(f"tool.{tc.name}", agent=self.name):
             try:
+                if tc.name in self.local_tools:
+                    out = self.local_tools[tc.name][1](tc.arguments)
+                    raise _Local(out if isinstance(out, str) else json.dumps(out, default=str))
                 res = await asyncio.wait_for(self.client.call_tool(tc.name, tc.arguments, ctx), self.budget.call_timeout_s)
                 content, err = res.content, res.is_error or res.blocked
+            except _Local as lo:
+                content, err = lo.content, False
             except asyncio.TimeoutError:
                 content, err = f"tool timed out after {self.budget.call_timeout_s}s", True
             except Exception as e:  # tool failures are observations, not crashes
@@ -256,6 +273,12 @@ class AgentLoop:
 
     async def _handle_submit(self, tc: ToolCall, st: LoopState) -> tuple[Finding | None, str]:
         args = tc.arguments
+        if self.final_handler is not None:
+            out, err = self.final_handler(args)
+            if out is None:
+                return None, err
+            self.output = out
+            return Finding(agent=self.name, question="", summary=str(args.get("summary", ""))[:500]), ""
         try:
             claims = [ClaimIn(**c) for c in args.get("claims", [])]
         except Exception as e:

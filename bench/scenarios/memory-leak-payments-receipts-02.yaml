@@ -1,0 +1,23 @@
+id: memory-leak-payments-receipts-02
+fault: memory_leak
+params:
+  service: payments-svc
+  flag: retain_receipts
+  message: 'flags: retain receipts in memory'
+red_herring: null
+expected_alert: ServiceMemoryGrowth
+ground_truth:
+  root_cause: feature flag {flag} enabled in commit {sha} causes unbounded memory
+    growth in {flag_service}
+  root_cause_service: payments-svc
+  category: resource_leak
+  correct_remediations:
+  - set_flag
+  - revert_commit
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: heldout
+smoke: false

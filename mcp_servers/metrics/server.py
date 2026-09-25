@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from agents.core.models import Tier
@@ -45,10 +46,10 @@ def build(backend: MetricsBackend) -> Server:
                     o = onset(pts)
                     if o is None:
                         continue
-                    ratio = (recent["avg"] + 1e-9) / (base["avg"] + 1e-9)
+                    ratio = min(1000.0, max(0.001, (recent["avg"] + 1e-9) / (base["avg"] + 1e-9)))
                     found.append({"metric": metric, "service": svc, "baseline_avg": base["avg"], "recent_avg": recent["avg"],
                                   "change_ratio": round(ratio, 2), "started_at": int(o)})
-        found.sort(key=lambda d: abs(d["change_ratio"] - 1), reverse=True)
+        found.sort(key=lambda d: abs(math.log(d["change_ratio"])), reverse=True)
         return {"now": int(now), "anomalies": found[:10]}
 
     @srv.tool("compare_windows", "Compare a metric's average/max between two windows (e.g. before vs after a suspected change time).",

@@ -1,0 +1,23 @@
+id: bad-config-push-payments-timeout-03
+fault: bad_config_push
+params:
+  service: payments-svc
+  key: handler_timeout_ms
+  old: 2000
+  value: 20
+red_herring: null
+expected_alert: HighErrorRate_orders
+ground_truth:
+  root_cause: '{cfg_service} {key} changed from {old} to {value} in commit {sha}'
+  root_cause_service: payments-svc
+  category: config_change
+  correct_remediations:
+  - revert_commit
+  - set_config
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: heldout
+smoke: false

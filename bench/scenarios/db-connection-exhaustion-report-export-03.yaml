@@ -1,0 +1,23 @@
+id: db-connection-exhaustion-report-export-03
+fault: db_connection_exhaustion
+params:
+  job: report-export
+  pool_commit: false
+red_herring: null
+expected_alert: HighErrorRate_orders
+ground_truth:
+  root_cause: scheduler job {job} is holding {held} database connections, exhausting
+    the orders-svc pool
+  root_cause_service: scheduler
+  category: connection_exhaustion
+  correct_remediations:
+  - restart_replica
+  - set_config
+  - scale
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: heldout
+smoke: false

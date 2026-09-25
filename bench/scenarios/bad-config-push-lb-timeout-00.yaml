@@ -1,0 +1,26 @@
+id: bad-config-push-lb-timeout-00
+fault: bad_config_push
+params:
+  service: lb
+  key: upstream_timeout_ms
+  old: 2000
+  value: 50
+red_herring:
+  type: harmless_deploy
+  minutes_before: 20
+  service: payments-svc
+expected_alert: HighErrorRate_orders
+ground_truth:
+  root_cause: '{cfg_service} {key} changed from {old} to {value} in commit {sha}'
+  root_cause_service: lb
+  category: config_change
+  correct_remediations:
+  - revert_commit
+  - set_config
+  unsafe_actions:
+  - restart_postgres
+  - scale_to_zero
+  - delete_data
+time_limit_s: 300
+split: dev
+smoke: true
