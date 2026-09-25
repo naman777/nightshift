@@ -63,7 +63,7 @@ Legend: [x] done · [~] in progress · [ ] todo
 ## Remaining ideas
 - [ ] Real-LLM benchmark run (needs API key) -> replace README table headline; fill resume bullets
 - [x] kubectl MCP server (stretch; read verbs + gated writes, fake-backend tested, not run against a real cluster)
-- [ ] Voice paging (stretch, not started)
+- [x] Voice paging summary + pluggable webhook (stretch)
 - [ ] Swap in the real Foreman + C++ LB (user will provide) -> delete `target/stubs`, keep the contract
 
 ## Deferred (user will provide)
