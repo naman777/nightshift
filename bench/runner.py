@@ -145,7 +145,9 @@ async def run_all(split: str, configs: list[str], repeats: int, limit: int | Non
     summary = {"prompt_version": LATEST, "split": split, "repeats": repeats, "scenarios": len(scenarios), "run_dir": str(run_dir),
                "policy": "offline reference policy (mock provider); not LLM results", "configs": aggregate(scores)}
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf8")
+    text = json.dumps(summary, indent=2)
+    (out_dir / "summary.json").write_text(text, encoding="utf8")
+    (out_dir / f"summary-{split}.json").write_text(text, encoding="utf8")
     return summary
 
 
@@ -157,12 +159,24 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default=str(RESULTS))
     ap.add_argument("--fail-below", type=float, default=None, help="exit 1 if exact-match accuracy is below this (CI gate)")
+    ap.add_argument("--baseline", default=None, help="JSON {config: accuracy}; exit 1 if any config drops more than --max-drop below it")
+    ap.add_argument("--max-drop", type=float, default=0.10)
+    ap.add_argument("--write-baseline", default=None, help="write the accuracies of this run to a baseline file")
     a = ap.parse_args(argv)
     configs = ALL_CONFIGS if a.config == "all" else a.config.split(",")
     summary = asyncio.run(run_all(a.split, configs, a.repeats, a.limit, Path(a.out)))
     from bench.report import render_markdown
 
     print(render_markdown(summary))
+    accs = {k: c["root_cause_accuracy"] for k, c in summary["configs"].items()}
+    if a.write_baseline:
+        Path(a.write_baseline).write_text(json.dumps(accs, indent=2), encoding="utf8")
+    if a.baseline:
+        base = json.loads(Path(a.baseline).read_text(encoding="utf8"))
+        regress = {k: (base[k], v) for k, v in accs.items() if k in base and v < base[k] - a.max_drop}
+        if regress:
+            print(f"FAIL: accuracy regressed more than {a.max_drop:.0%} vs baseline: {regress}", file=sys.stderr)
+            return 1
     if a.fail_below is not None:
         worst = min(c["root_cause_accuracy"] for k, c in summary["configs"].items() if not k.startswith("naive"))
         if worst < a.fail_below:

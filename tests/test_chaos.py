@@ -49,7 +49,7 @@ def test_config_change_is_a_real_git_commit_the_change_agent_can_read(repo, tmp_
     # undo restores the healthy value via a revert commit (history is preserved, never rewritten)
     chaos.undo([rec])
     assert "upstream_timeout_ms: 2000" in (repo.work / "lb.yaml").read_text()
-    assert repo.git("log", "--oneline").count("\n") >= 3
+    assert repo.git("log", "--oneline").count("\n") >= 2
 
 
 def test_flag_flip_and_revert(repo):

@@ -1,0 +1,56 @@
+'use client';
+import { BenchConfig, BenchSummary, getJSON } from '@/lib/api';
+import { usePoll } from '@/lib/usePoll';
+
+const LABEL: Record<string, string> = {
+  'naive-recent-change': 'Naive: blame last change', 'naive-top-errors': 'Naive: blame noisiest service', single: 'Single agent',
+  multi: 'Multi-agent', 'multi-routed': 'Multi-agent + model routing', 'multi-nocite': 'Multi-agent, no citation rule (ablation)',
+};
+const pct = (x: number | null | undefined) => (x == null ? 'n/a' : `${Math.round(x * 100)}%`);
+const HEADERS = ['Configuration', 'Accuracy', 'Top-3', 'Remediation', 'Unsafe', 'Grounding', 'Red-herring', 'Held-out', 'Cost', 'Time p50/p95'];
+
+export default function Benchmark() {
+  const { data } = usePoll(() => getJSON<BenchSummary>('/bench/results'), 10000);
+  const cfgs = Object.entries(data?.configs ?? {}) as [string, BenchConfig][];
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold">Benchmark</h1>
+      {data?.policy && <p className="text-sm text-amber-300/80">{data.policy}</p>}
+      {cfgs.length === 0 && <p className="text-slate-400">No results yet. Run <code>make bench</code>.</p>}
+      <div className="space-y-2">
+        {cfgs.map(([name, c]) => (
+          <div key={name} className="flex items-center gap-3 text-sm">
+            <div className="w-64 text-slate-300">{LABEL[name] ?? name}</div>
+            <div className="flex-1 bg-slate-900 rounded h-5 overflow-hidden">
+              <div className={name.startsWith('naive') ? 'bg-slate-500 h-5' : 'bg-blue-500 h-5'} style={{ width: `${c.root_cause_accuracy * 100}%` }} />
+            </div>
+            <div className="w-12 text-right">{pct(c.root_cause_accuracy)}</div>
+          </div>
+        ))}
+      </div>
+      {cfgs.length > 0 && (
+        <table className="w-full text-sm border border-slate-800">
+          <thead className="text-left text-xs text-slate-500">
+            <tr>{HEADERS.map((h) => <th key={h} className="p-2">{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {cfgs.map(([name, c]) => (
+              <tr key={name} className="border-t border-slate-800">
+                <td className="p-2">{LABEL[name] ?? name}</td>
+                <td className="p-2">{pct(c.root_cause_accuracy)} ±{Math.round(c.accuracy_std * 100)}</td>
+                <td className="p-2">{pct(c.top3_accuracy)}</td>
+                <td className="p-2">{pct(c.remediation_quality)}</td>
+                <td className="p-2">{pct(c.unsafe_action_rate)}</td>
+                <td className="p-2">{pct(c.evidence_grounding)}</td>
+                <td className="p-2">{pct(c.red_herring_accuracy)}</td>
+                <td className="p-2">{pct(c.heldout_accuracy)}</td>
+                <td className="p-2">${c.cost_usd.mean.toFixed(3)}</td>
+                <td className="p-2">{c.modeled_time_s.p50.toFixed(1)}s / {c.modeled_time_s.p95.toFixed(1)}s</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}

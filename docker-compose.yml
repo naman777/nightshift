@@ -137,8 +137,7 @@ services:
     depends_on: [postgres, temporal]
 
   dashboard:
-    build: {context: ./dashboard}
-    environment: {NEXT_PUBLIC_GATEWAY_URL: "http://localhost:8000"}
+    build: {context: ./dashboard, args: {NEXT_PUBLIC_GATEWAY_URL: "http://localhost:8000"}}
     ports: ["3001:3000"]
     depends_on: [gateway]
 

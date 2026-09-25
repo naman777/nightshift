@@ -24,7 +24,7 @@ class BadConfigPush(Fault):
         if kind == "timeout":
             w.add_effect("error_rate", "lb", t_f, "mult", 40, 20)
             w.add_effect("p99_latency_seconds", "lb", t_f, "mult", 1.6, 20)
-            w.add_log("lb", "error", "upstream timed out ({value}ms) while reading response from upstream orders-svc-{n} path=/orders",
+            w.add_log("lb", "error", "upstream timed out ({value}ms) while reading response from upstream orders-svc-2 path=/orders",
                       t_f, every_s=2)
         elif kind == "weight":
             w.add_effect("cpu_ratio", "orders-svc", t_f, "mult", 3.0, 30)
