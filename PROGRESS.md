@@ -55,9 +55,13 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Cost-ceiling degrade to single-agent (local + Temporal), OTel -> Jaeger exporter, Slack Bolt (Socket Mode) app, `--prompt-version`
 - [x] Stretch: incident memory (verified recall, leave-one-out eval, poisoned-memory test); hard set 30% -> 90% with memory
 
+- [x] Proactive change review (`/webhook/change`, reviewer agent, `bench.proactive`: 197 commits, recall/precision/FPR)
+- [x] Prompt caching + cache-aware cost model, schema enums + output vocabulary in the commander prompt, optional bearer-token auth, static stack-consistency tests
+
 ## Remaining ideas
 - [ ] Real-LLM benchmark run (needs API key) -> replace README table headline; fill resume bullets
-- [ ] Proactive mode (change agent on every deploy), voice paging, kubectl MCP server (stretch, not started)
+- [ ] Voice paging, kubectl MCP server (stretch, not started)
+- [ ] Swap in the real Foreman + C++ LB (user will provide) -> delete `target/stubs`, keep the contract
 
 ## Deferred (user will provide)
 - Foreman (Go scheduler), C++ load balancer (sim uses generic `scheduler` / `lb` names)

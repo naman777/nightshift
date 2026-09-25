@@ -47,6 +47,14 @@ flowchart LR
 | Gateway | `gateway/app.py` | Alertmanager webhook (dedupe by fingerprint), incident API, SSE stream, approval endpoints, Slack interaction endpoint with signature verification. |
 | Dashboard | `dashboard/` | Next.js: live agent lanes, evidence board, report with approve/reject, audit log, benchmark page. |
 
+## Beyond the reactive loop
+
+* **Proactive mode**: `POST /webhook/change` -> `agents/proactive.py` reviews each change before any alert (see docs/benchmark.md).
+* **Incident memory**: `agents/core/memory.py` gives the commander verified similar past incidents as a bounded prior.
+* **Cost controls**: a per-incident dollar ceiling degrades to single-agent mode (or stops follow-up rounds); Anthropic prompt caching on the system block; per-agent model routing.
+* **Access control**: optional `NIGHTSHIFT_API_TOKEN` bearer token on every mutating endpoint; Slack callbacks are verified by signing secret with replay protection. Production-grade SSO is out of scope.
+* **Observability of the agents themselves**: OpenTelemetry spans (agent / llm / tool, with incident id, tokens and cost) exported to Jaeger when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
 ## Key design decisions
 
 **Agents never touch infrastructure.** Every call is `InProcessClient -> PolicyEngine.execute -> Server`. The tier is declared by the write tool

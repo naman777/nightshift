@@ -67,6 +67,12 @@ that the benchmark separates a real investigation from a rule of thumb (the two 
 and a planted prompt injection is ignored. A 10-scenario **hard stress set** (decoy changes, concurrent faults, telemetry outages) is included precisely because the reference policy does not ace it (30%); the stretch-goal **incident memory** lifts it to 90% on repeat-style faults (see the benchmark doc for why that is a best case). The single-vs-multi-agent comparison only becomes meaningful with real models: run `make bench` with `NIGHTSHIFT_LLM_PROVIDER=anthropic` and
 report that table instead. Full methodology, splits, judge calibration and limitations: [docs/benchmark.md](docs/benchmark.md). Time to diagnosis is *modelled* (see the doc).
 
+## Beyond the reactive loop
+
+* **Proactive review**: a CI/CD hook (`POST /webhook/change`) has a reviewer agent read every diff and flag risky changes *before* an alert.
+* **Incident memory**: the commander sees verified similar past incidents as a bounded prior (hard-set accuracy 30% -> 90% on repeat-style faults; see the benchmark doc for the caveats).
+* **Cost controls**: per-incident dollar ceiling that degrades to single-agent mode, prompt caching, cheap-specialist / strong-commander routing.
+
 ## Try it in 60 seconds (no docker, no API keys)
 
 ```bash

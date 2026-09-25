@@ -22,9 +22,10 @@ PRICES: dict[str, tuple[float, float]] = {
 DEFAULT_PRICE = (3.0, 15.0)
 
 
-def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
+def cost_usd(model: str, input_tokens: int, output_tokens: int, cache_read: int = 0, cache_write: int = 0) -> float:
+    """`input_tokens` are the uncached input tokens; cache reads bill at 10% and cache writes at 125% of the input price."""
     pin, pout = PRICES.get(model, DEFAULT_PRICE)
-    return round((input_tokens * pin + output_tokens * pout) / 1_000_000, 6)
+    return round((input_tokens * pin + cache_read * pin * 0.1 + cache_write * pin * 1.25 + output_tokens * pout) / 1_000_000, 6)
 
 
 def estimate_tokens(text: str) -> int:
@@ -97,7 +98,9 @@ class AnthropicLLM:
         return out
 
     async def complete(self, system, messages, tools, model, max_tokens=2048) -> LLMResponse:
-        body = {"model": model, "max_tokens": max_tokens, "system": system, "messages": self._messages(messages),
+        # cache_control on the system block caches tools + system across the many calls of one investigation
+        body = {"model": model, "max_tokens": max_tokens, "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+                "messages": self._messages(messages),
                 "tools": [{"name": t["name"], "description": t["description"], "input_schema": t["input_schema"]} for t in tools]}
         r = await self.client.post(self.URL, json=body, headers={
             "x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
@@ -107,8 +110,10 @@ class AnthropicLLM:
         calls = [ToolCall(id=b["id"], name=b["name"], arguments=b["input"]) for b in data["content"] if b["type"] == "tool_use"]
         u = data.get("usage", {})
         i, o = u.get("input_tokens", 0), u.get("output_tokens", 0)
+        cr, cw = u.get("cache_read_input_tokens", 0), u.get("cache_creation_input_tokens", 0)
         return LLMResponse(text=text, tool_calls=calls, model=model,
-                           usage=Usage(input_tokens=i, output_tokens=o, cost_usd=cost_usd(model, i, o), llm_calls=1))
+                           usage=Usage(input_tokens=i + cr + cw, output_tokens=o, cost_usd=cost_usd(model, i, o, cr, cw), llm_calls=1,
+                                       cache_read_tokens=cr, cache_write_tokens=cw))
 
 
 # -- OpenAI -------------------------------------------------------------------------

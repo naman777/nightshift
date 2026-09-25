@@ -23,16 +23,17 @@ async def test_anthropic_request_and_response_translation():
         seen["body"], seen["headers"] = json.loads(request.content), request.headers
         return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"},
                                                      {"type": "tool_use", "id": "tu_2", "name": "submit_finding", "input": {"summary": "s"}}],
-                                         "usage": {"input_tokens": 1000, "output_tokens": 200}})
+                                         "usage": {"input_tokens": 1000, "output_tokens": 200, "cache_read_input_tokens": 4000, "cache_creation_input_tokens": 500}})
 
     llm = AnthropicLLM("k", httpx.AsyncClient(transport=httpx.MockTransport(handler)))
     r = await llm.complete("sys", HISTORY, TOOLS, "claude-haiku-4-5")
     b = seen["body"]
-    assert seen["headers"]["x-api-key"] == "k" and b["system"] == "sys" and b["tools"][0]["input_schema"]["type"] == "object"
+    assert seen["headers"]["x-api-key"] == "k" and b["system"] == [{"type": "text", "text": "sys", "cache_control": {"type": "ephemeral"}}] and b["tools"][0]["input_schema"]["type"] == "object"
     assert b["messages"][1]["content"][1] == {"type": "tool_use", "id": "tu_1", "name": "metrics__top_anomalies", "input": {"window_minutes": 30}}
     assert b["messages"][2] == {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "tu_1", "content": "<tool_result>...</tool_result>"}]}
     assert r.text == "ok" and r.tool_calls[0].name == "submit_finding" and r.tool_calls[0].arguments == {"summary": "s"}
-    assert r.usage.input_tokens == 1000 and r.usage.cost_usd == round((1000 * 1 + 200 * 5) / 1e6, 6)
+    assert r.usage.input_tokens == 5500 and r.usage.cache_read_tokens == 4000 and r.usage.cache_write_tokens == 500
+    assert r.usage.cost_usd == round((1000 * 1 + 4000 * 0.1 + 500 * 1.25 + 200 * 5) / 1e6, 6)  # cache reads are 10x cheaper
 
 
 async def test_openai_request_and_response_translation():

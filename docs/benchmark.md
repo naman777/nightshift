@@ -96,6 +96,14 @@ and the standard splits stay at 100% with unchanged unsafe-action rate. Read thi
 Memory cannot help a novel fault, and a wrong-but-verified lookalike could mislead, so it is bounded: a memory-derived candidate is capped below direct-evidence strength, never wins a tie, and never supplies a write-action
 target (its proposed action is `escalate`). `tests/test_memory.py::test_poisoned_memory_does_not_override_strong_evidence` pins that behaviour.
 
+## Proactive change review (stretch goal, measured separately)
+
+`POST /webhook/change` (a CI/CD hook) sends every deploy / config / flag change to a reviewer agent (`agents/proactive.py`) that reads the diff and rates its risk *before any alert fires*;
+medium/high changes are flagged to Slack with reasons that cite the diff they read. `python -m bench.proactive` reviews all 197 commits in the 50 simulated histories in isolation and scores them
+against the simulator's truth (a commit is risky iff it causes an incident there): recall 100%, precision 100%, false-positive rate 0% (naive "flag everything": precision 19%).
+Like everything produced by the offline policy this is by construction, not a language-model result: the reviewer's rules were written knowing the fault library. The value of the harness is that the same
+`review_change` code path, prompt (`prompts/v1/reviewer.md`) and scoring run unchanged with a real provider. Note that hard-set commits from *concurrent* faults are labelled risky (they would cause their own incident).
+
 ## Judge and calibration
 
 The default judge is a token-overlap heuristic (`HeuristicJudge`): the explanation must mention at least 55% of the salient identifiers in the ground-truth sentence

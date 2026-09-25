@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import os
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -19,9 +20,17 @@ from agents.core.models import Alert
 from agents.core.telemetry import init_tracing
 from mcp_servers.policy import PolicyEngine
 from orchestrator.api import IncidentRunner, default_runner
-from slackbot.notify import verify_slack_signature
+from slackbot.notify import Notifier, default_notifier, verify_slack_signature
 
 RESULTS_DIR = Path(os.environ.get("NIGHTSHIFT_RESULTS", "bench/results"))
+
+
+def require_token(request: Request) -> None:
+    """Optional shared secret (NIGHTSHIFT_API_TOKEN) for every mutating endpoint. Read-only endpoints and Slack's signed callback are unaffected.
+    Production-grade auth (SSO, per-user approvals) is out of scope: put the gateway behind your proxy."""
+    token = os.environ.get("NIGHTSHIFT_API_TOKEN")
+    if token and not hmac.compare_digest(request.headers.get("authorization", ""), f"Bearer {token}"):
+        raise HTTPException(401, "missing or invalid bearer token")
 
 
 class ApprovalBody(BaseModel):
@@ -42,26 +51,41 @@ def alertmanager_to_alerts(payload: dict[str, Any]) -> list[Alert]:
     return out
 
 
-def create_app(db: Database | None = None, runner: IncidentRunner | None = None, signing_secret: str | None = None) -> FastAPI:
+def create_app(db: Database | None = None, runner: IncidentRunner | None = None, signing_secret: str | None = None,
+               notifier: Notifier | None = None) -> FastAPI:
     init_tracing("nightshift-gateway")
     db = db or Database(os.environ.get("NIGHTSHIFT_DB_URL", "sqlite:///nightshift.db"))
     board = EvidenceBoard(db)
     app = FastAPI(title="Nightshift gateway")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
     app.state.runner = runner or default_runner(db)
+    app.state.notifier = notifier or default_notifier()
     secret = signing_secret if signing_secret is not None else os.environ.get("SLACK_SIGNING_SECRET", "")
 
     @app.get("/healthz")
     async def healthz() -> dict:
         return {"ok": True}
 
-    @app.post("/webhook/alertmanager")
+    @app.post("/webhook/alertmanager", dependencies=[Depends(require_token)])
     async def webhook(payload: dict) -> dict:
         started = []
         for alert in alertmanager_to_alerts(payload):
             iid, new = await app.state.runner.start(alert, os.environ.get("NIGHTSHIFT_MODE", "multi"))
             started.append({"incident_id": iid, "new": new})
         return {"incidents": started}
+
+    @app.post("/webhook/change", dependencies=[Depends(require_token)])
+    async def change_webhook(payload: dict) -> dict:
+        """CI/CD deploy hook: review the change BEFORE any alert fires (proactive mode). Medium/high risk is flagged to Slack."""
+        from agents.proactive import review_change
+        from orchestrator.runtime_factory import build_runtime
+
+        rt, _ = build_runtime(payload.get("labels"), benchmark_mode=True, db=db)
+        risk = await review_change(rt, payload)
+        if risk.flagged:
+            await app.state.notifier.post_outcome(f"review-{risk.sha}", f":warning: *{risk.risk.upper()} risk change* `{risk.sha}` "
+                                                  f"({risk.service}): " + "; ".join(risk.reasons))
+        return {**risk.model_dump(), "flagged": risk.flagged}
 
     @app.get("/incidents")
     async def incidents() -> list[dict]:
@@ -95,12 +119,12 @@ def create_app(db: Database | None = None, runner: IncidentRunner | None = None,
                 await asyncio.sleep(0.5)
         return EventSourceResponse(events())
 
-    @app.post("/incidents/{iid}/approve")
+    @app.post("/incidents/{iid}/approve", dependencies=[Depends(require_token)])
     async def approve(iid: str, body: ApprovalBody) -> dict:
         await app.state.runner.approve(iid, body.user, body.confirmation, body.reason)
         return {"ok": True}
 
-    @app.post("/incidents/{iid}/reject")
+    @app.post("/incidents/{iid}/reject", dependencies=[Depends(require_token)])
     async def reject(iid: str, body: ApprovalBody) -> dict:
         await app.state.runner.reject(iid, body.user)
         return {"ok": True}

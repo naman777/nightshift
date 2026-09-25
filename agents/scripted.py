@@ -565,6 +565,70 @@ def single_brain(messages: list[Message]) -> LLMResponse:
     return _call("submit_report", 0, report=report, claims=claims)
 
 
+def _num(x: str) -> float | None:
+    m = re.search(r"-?\d+(\.\d+)?", x or "")
+    return float(m.group(0)) if m else None
+
+
+def assess_diff(message: str, diff: str) -> tuple[str, list[str]]:
+    """Rule-of-thumb change review (the offline reference policy for the proactive reviewer)."""
+    rank = {"low": 0, "medium": 1, "high": 2}
+    risk, reasons = "low", []
+
+    def flag(level: str, why: str) -> None:
+        nonlocal risk
+        reasons.append(why)
+        if rank[level] > rank[risk]:
+            risk = level
+
+    key, old, new = _diff_kv(diff)
+    o, n = _num(old), _num(new)
+    if key.startswith("#"):
+        reasons.append("comment-only change")
+    elif key.endswith("_timeout_ms") and o and n is not None:
+        if n < o / 5 or n < 100:
+            flag("high", f"{key} cut from {old} to {new}: requests will time out")
+        elif n > o:
+            reasons.append(f"{key} raised from {old} to {new}: loosening, low risk")
+    elif key.startswith("upstream_weight") and n == 0:
+        flag("high", f"{key} set to 0: all traffic shifts to the remaining upstream(s)")
+    elif key == "worker_count" and o and n is not None and n <= o / 2:
+        flag("high", f"worker_count cut from {old} to {new}: the job queue will back up")
+    elif key == "log_level" and new.strip('"') == "debug":
+        flag("high", "log_level set to debug: hot-path logging can flood logs and fill the disk")
+    elif key == "health_check_interval_ms" and o and n and n >= o * 10:
+        flag("high", f"health_check_interval_ms stretched from {old} to {new}: dead upstreams keep receiving traffic")
+    elif key == "db_pool_size" and o and n is not None and n <= o / 2:
+        flag("medium", f"db_pool_size halved from {old} to {new}: connection exhaustion risk")
+    elif key == "settlement_schedule":
+        m = re.match(r"\"?\*/(\d+)", new)
+        if m and int(m.group(1)) < 30:
+            flag("high", f"settlement job now runs every {m.group(1)} minutes: CPU contention with orders at peak")
+    elif re.search(r"cache|prefetch|retain|unbounded", key, re.I) and new.strip() == "true":
+        flag("high", f"flag {key} enabled: unbounded in-memory growth risk")
+    if re.search(r"one query per order|for _, o := range orders", diff):
+        flag("high", "per-row query inside a loop (N+1): latency scales with result size")
+    if re.search(r"orders\[0\]|items\[0\]", diff):
+        flag("high", "indexes element 0 of a possibly empty slice: panics on empty results")
+    if re.search(r"status <> 'archived'", diff):
+        flag("high", "query drops the indexed customer filter: full table scan")
+    if re.search(r"go\.mod|zerolog", diff) and risk == "low":
+        reasons.append("dependency bump / logging format only")
+    return risk, reasons or ["no risky pattern found in the diff"]
+
+
+def reviewer_brain(messages: list[Message]) -> LLMResponse:
+    res = tool_results(messages)
+    q = user_text(messages)
+    if not res:
+        m = re.search(r"sha=(\S+)", q)
+        return _call("changes__commit_diff", 0, sha=m.group(1) if m else "")
+    obj = res[0]["obj"] or {}
+    msg = (re.search(r'message="([^"]*)"', q) or [None, ""])[1]
+    risk, reasons = assess_diff(msg, obj.get("diff", ""))
+    return _call("submit_risk", 0, risk=risk, reasons=[{"text": r, "tool_call_ref": res[0]["id"]} for r in reasons])
+
+
 def heuristic_responder(system: str, messages: list[Message], tools: list[dict], model: str) -> LLMResponse:
     role = role_of(system)
     names = {t["name"] for t in tools}
@@ -572,6 +636,8 @@ def heuristic_responder(system: str, messages: list[Message], tools: list[dict],
         return commander_plan_brain(messages) if "submit_plan" in names else commander_converge_brain(messages)
     if role == "remediation":
         return remediation_brain(messages)
+    if role == "reviewer":
+        return reviewer_brain(messages)
     if role == "single":
         return single_brain(messages)
     return specialist_brain(role, messages)

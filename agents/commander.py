@@ -21,6 +21,10 @@ ACTION_TIERS: dict[str, Tier] = {
     "none": Tier.READ_ONLY, "scale_to_zero": Tier.DESTRUCTIVE, "restart_postgres": Tier.DESTRUCTIVE, "delete_data": Tier.DESTRUCTIVE,
 }
 
+SERVICES = ["orders-svc", "payments-svc", "lb", "scheduler", "postgres"]
+CATEGORIES = [c.value for c in Category]
+ACTION_TARGET_HELP = ("revert_commit: the commit sha. rollback_deploy: the service (params.sha = previous good sha). set_flag: the flag name (params.value). "
+                      "set_config: the service (params.key, params.value). restart_replica: the replica name. scale: the service (params.replicas). escalate: the owning team.")
 _ASSIGNMENTS = {"type": "array", "items": {"type": "object", "required": ["agent", "question"], "properties": {
     "agent": {"type": "string", "enum": ["metrics", "logs", "changes", "code"]}, "question": {"type": "string"},
     "hypothesis_ids": {"type": "array", "items": {"type": "string"}}}}}
@@ -38,11 +42,20 @@ DECISION_SCHEMA = {
         "action": {"type": "string", "enum": ["followup", "report"]},
         "summary": {"type": "string"},
         "assignments": _ASSIGNMENTS,
-        "report": {"type": "object", "properties": {
-            "root_cause": {"type": "string"}, "service": {"type": "string"}, "category": {"type": "string"},
-            "confidence": {"type": "number"}, "evidence": {"type": "array", "items": {"type": "string"}},
-            "ruled_out": {"type": "array", "items": {"type": "object"}}, "ranked": {"type": "array", "items": {"type": "object"}},
-            "proposed_action": {"type": "object"}}}}},
+        "report": {"type": "object", "required": ["root_cause", "service", "category", "confidence", "evidence"], "properties": {
+            "root_cause": {"type": "string", "description": "one sentence naming the component, the mechanism and (if known) the commit/deploy sha"},
+            "service": {"type": "string", "enum": SERVICES, "description": "the service that CAUSED the incident, not merely where symptoms show"},
+            "category": {"type": "string", "enum": CATEGORIES},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "evidence": {"type": "array", "items": {"type": "string"}, "description": "evidence ids from the board, e.g. ev_12"},
+            "ruled_out": {"type": "array", "items": {"type": "object", "required": ["hypothesis", "evidence"], "properties": {
+                "hypothesis": {"type": "string"}, "evidence": {"type": "array", "items": {"type": "string"}}}}},
+            "ranked": {"type": "array", "description": "up to 3 candidate causes, best first", "items": {"type": "object", "required": ["root_cause", "service", "category", "confidence"], "properties": {
+                "root_cause": {"type": "string"}, "service": {"type": "string", "enum": SERVICES}, "category": {"type": "string", "enum": CATEGORIES},
+                "confidence": {"type": "number"}}}},
+            "proposed_action": {"type": "object", "required": ["type"], "properties": {
+                "type": {"type": "string", "enum": sorted(ACTION_TIERS)}, "target": {"type": "string", "description": ACTION_TARGET_HELP},
+                "params": {"type": "object"}}}}}}},
 }
 SERVICE_MAP_SPEC = ToolSpec("service_map", "Topology: services, dependencies, config files.", {"type": "object", "properties": {}})
 EVIDENCE_SPEC = ToolSpec("evidence_read", "Read evidence rows from the board (optionally filter by agent).",

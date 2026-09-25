@@ -30,7 +30,7 @@ def stack():
     db = Database.memory()
     notifier = MemoryNotifier()
     runner = LocalRunner(notifier=notifier, db=db)
-    app = create_app(db=db, runner=runner, signing_secret="s3cret")
+    app = create_app(db=db, runner=runner, signing_secret="s3cret", notifier=notifier)
     return app, runner, notifier
 
 
@@ -115,3 +115,32 @@ async def test_slack_interactive_endpoint_verifies_signature(stack):
         hdr = {"X-Slack-Request-Timestamp": ts, "content-type": "application/x-www-form-urlencoded"}
         assert (await c.post("/slack/interactive", content=body, headers={**hdr, "X-Slack-Signature": "v0=nope"})).status_code == 401
         assert (await c.post("/slack/interactive", content=body, headers={**hdr, "X-Slack-Signature": good})).status_code == 200
+
+
+async def test_change_webhook_flags_risky_changes_before_any_alert(stack):
+    from bench.scenario import build_world, load_all
+
+    s = next(x for x in load_all() if x.id == "bad-config-push-lb-timeout-00")
+    world, _, _ = build_world(s)
+    app, runner, notifier = stack
+    risky = next(c for c in world.commits if c.sha in world.risky)
+    benign = next(c for c in world.commits if c.sha not in world.risky and c.kind == "deploy" and "chore" in c.message)
+    async with client(app) as c:
+        r1 = (await c.post("/webhook/change", json={"sha": risky.sha, "service": risky.service, "kind": risky.kind, "message": risky.message,
+                                                      "labels": {"scenario": s.id}})).json()
+        r2 = (await c.post("/webhook/change", json={"sha": benign.sha, "service": benign.service, "kind": "deploy", "message": benign.message,
+                                                      "labels": {"scenario": s.id}})).json()
+    assert r1["flagged"] and r1["risk"] == "high" and "upstream_timeout_ms" in r1["reasons"][0] and r1["queries"][0].startswith("changes__commit_diff")
+    assert not r2["flagged"] and r2["risk"] == "low"
+    assert [m["kind"] for m in notifier.messages] == ["outcome"] and "HIGH risk" in notifier.messages[0]["text"]  # only the risky one paged Slack
+
+
+async def test_optional_bearer_token_protects_mutating_endpoints(stack, monkeypatch):
+    monkeypatch.setenv("NIGHTSHIFT_API_TOKEN", "t0ken")
+    app, runner, notifier = stack
+    async with client(app) as c:
+        assert (await c.post("/incidents/inc-x/approve", json={"user": "mallory"})).status_code == 401
+        assert (await c.post("/webhook/alertmanager", json=payload("fp-auth"))).status_code == 401
+        assert (await c.get("/incidents")).status_code == 200                       # read-only stays open
+        ok = await c.post("/incidents/inc-x/approve", json={"user": "alice"}, headers={"Authorization": "Bearer t0ken"})
+        assert ok.status_code == 200

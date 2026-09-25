@@ -44,6 +44,8 @@ class Usage(BaseModel):
     cost_usd: float = 0.0
     llm_calls: int = 0
     tool_calls: int = 0
+    cache_read_tokens: int = 0    # prompt-cache hits (billed at 10% of the input price)
+    cache_write_tokens: int = 0   # prompt-cache writes (billed at 125% of the input price)
 
     def add(self, other: "Usage") -> "Usage":
         return Usage(
@@ -52,6 +54,8 @@ class Usage(BaseModel):
             cost_usd=round(self.cost_usd + other.cost_usd, 6),
             llm_calls=self.llm_calls + other.llm_calls,
             tool_calls=self.tool_calls + other.tool_calls,
+            cache_read_tokens=self.cache_read_tokens + other.cache_read_tokens,
+            cache_write_tokens=self.cache_write_tokens + other.cache_write_tokens,
         )
 
 

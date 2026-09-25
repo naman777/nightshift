@@ -73,10 +73,16 @@ def build_world(s: Scenario) -> tuple[World, Alert, GroundTruth]:
     w = World(seed=s.seed or int(hashlib.md5(s.id.encode()).hexdigest()[:6], 16) % 10_000)
     t_f = w.t_alert - s.alert_delay_s
     for extra in s.also_faults:  # applied first so the primary fault owns the alert name and the shared facts
+        w.facts.pop("sha", None)
         get_fault(extra["fault"]).apply_sim(w, extra.get("params", {}), t_f + extra.get("offset_s", 0))
+        if "sha" in w.facts:
+            w.risky.add(w.facts["sha"])
     w.outages = set(s.telemetry_outage)
     fault = get_fault(s.fault)
+    w.facts.pop("sha", None)
     fault.apply_sim(w, s.params, t_f)
+    if "sha" in w.facts:
+        w.risky.add(w.facts["sha"])
     if s.red_herring:
         apply_herring(w, s.red_herring, t_f)
     w.facts.update({k: v for k, v in fault.merged(s.params).items() if isinstance(v, (str, int, float))} | w.facts)

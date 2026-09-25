@@ -1,0 +1,23 @@
+{
+  "changes_reviewed": 197,
+  "causal_changes": 37,
+  "recall": 1.0,
+  "precision": 1.0,
+  "false_positive_rate": 0.0,
+  "cost_per_review_usd": 0.0055,
+  "baselines": {
+    "flag_everything": {
+      "recall": 1.0,
+      "precision": 0.1878,
+      "false_positive_rate": 1.0
+    },
+    "flag_nothing": {
+      "recall": 0.0,
+      "precision": null,
+      "false_positive_rate": 0.0
+    }
+  },
+  "missed": [],
+  "false_alarms": [],
+  "policy": "offline reference policy (mock provider); not LLM results"
+}
