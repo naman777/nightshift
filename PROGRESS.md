@@ -63,7 +63,11 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Dashboard redesign for demos: scenario launcher (50 scenarios, agent setup, offline vs real LLM), live stepper + "happening now / next", plan, agent cards, answer-key verdict, evidence / safety audit / activity tabs. Gateway `/demo/*` endpoints; commander plan/decision steps are now emitted. Fixed: launcher alerts use the scenario's clock; single-agent report no longer rejected for invented ruled-out evidence ids.
 
 ## Remaining ideas
-- [~] Real-LLM benchmark: first smoke run (10 scenarios) on gpt-6-luna via `python -m bench.real_llm` (single 50%, multi 60% exact). Still to do: fix ~2 rate-limit-degraded runs, dev/heldout splits, README table
+- [x] Real-LLM benchmark (`gpt-6-luna`): smoke, dev (v1 and v2), held-out (v2, 3 repeats), hard (v2); README table via `python -m bench.real_report --write`.
+      Held-out single 96% / multi 76%, 0% unsafe, 100% grounded. Prompt v2 (category definitions) roughly doubled dev accuracy. Single agent beat the team.
+      Prompt v3 (commit to a mechanism, no `unknown` hedging) is written but was NOT evaluated (run stopped); held-out failures were inspected, so held-out is lightly contaminated.
+- [x] `gpt-6-*` prices added to `agents/core/llm.py`; stored real-run costs recomputed from token counts
+- [x] Tag-contract tests (`tests/test_tag_contract.py`) guard the scripted-policy tag interface (typed evidence schema deliberately not done)
 - [x] kubectl MCP server (stretch; read verbs + gated writes, fake-backend tested, not run against a real cluster)
 - [x] Voice paging summary + pluggable webhook (stretch)
 - [ ] Swap in the real Foreman + C++ LB (user will provide) -> delete `target/stubs`, keep the contract
