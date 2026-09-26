@@ -62,7 +62,10 @@ def build_runtime(labels: dict[str, str] | None = None, benchmark_mode: bool = F
                   db: Database | None = None) -> tuple[AgentRuntime, PolicyEngine]:
     labels = labels or {}
     db = db or shared_db()
-    if os.environ.get("NIGHTSHIFT_BACKEND", "sim") == "sim" and labels.get("scenario"):
+    # A `scenario` label (dashboard launcher, benchmark) always means "investigate that simulated world", even when this
+    # process otherwise runs against the live stack: real Alertmanager alerts never carry it. Without this, a scenario
+    # launched from the dashboard of a live gateway is investigated against healthy live telemetry and comes back inconclusive.
+    if labels.get("scenario"):
         from bench.sim import sim_backends
 
         backends = sim_backends(_world(labels["scenario"]))
