@@ -1,4 +1,4 @@
-.PHONY: start test lint bench bench-dev bench-heldout bench-smoke report scenarios investigate demo-sim up down demo chaos scenario chaos-revert go-check dashboard
+.PHONY: setup-external up-real demo-real down-real start test lint bench bench-dev bench-heldout bench-smoke report scenarios investigate demo-sim up down demo chaos scenario chaos-revert go-check dashboard
 
 PY ?= python
 SCENARIO ?= bad-config-push-lb-timeout-00
@@ -38,6 +38,27 @@ up:
 
 down:
 	docker compose down -v
+
+# ---- the same stack with the REAL C++ load balancer and the REAL Foreman scheduler (opt-in; the stub stack above is unchanged) --------
+COMPOSE_REAL = docker compose -f docker-compose.yml -f docker-compose.real.yml
+
+setup-external:                               ## clone + patch external/load-balancer and external/foreman
+	test -d external/foreman || git clone https://github.com/naman777/Foreman external/foreman
+	test -d external/load-balancer || git clone https://github.com/naman777/Load-Balancer-CPP external/load-balancer
+	git -C external/foreman config core.autocrlf false
+	git -C external/load-balancer config core.autocrlf false
+	git -C external/load-balancer log --oneline | grep -q "host:port backends" || git -C external/load-balancer am ../patches/*.patch
+
+up-real: setup-external
+	$(PY) -m chaos.cli init
+	GIT_SHA=$$(git rev-parse --short HEAD 2>/dev/null || echo dev) $(COMPOSE_REAL) up -d --build
+
+demo-real: up-real
+	@echo "Real C++ load balancer + real Foreman. Grafana http://localhost:3000 | Temporal UI http://localhost:8233 | Dashboard http://localhost:3001"
+	@echo "Then: make chaos SCENARIO=bad-config-push-lb-timeout-00   or   SCENARIO=scheduler-backlog-workers-1-00"
+
+down-real:
+	$(COMPOSE_REAL) down -v
 
 demo: up
 	@echo "Grafana http://localhost:3000 | Temporal UI http://localhost:8233 | Dashboard http://localhost:3001 | Jaeger http://localhost:16686"
