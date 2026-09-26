@@ -70,6 +70,10 @@ def create_app(db: Database | None = None, runner: IncidentRunner | None = None,
     app.state.notifier = notifier or default_notifier()
     secret = signing_secret if signing_secret is not None else os.environ.get("SLACK_SIGNING_SECRET", "")
 
+    from gateway.demo_api import build_router, ground_truth
+
+    app.include_router(build_router(lambda: app.state.runner, require_token))
+
     @app.get("/healthz")
     async def healthz() -> dict:
         return {"ok": True}
@@ -104,8 +108,11 @@ def create_app(db: Database | None = None, runner: IncidentRunner | None = None,
         row = board.get_incident(iid)
         if not row:
             raise HTTPException(404, "unknown incident")
+        report = json.loads(row["report_json"]) if row["report_json"] else None
+        alert = json.loads(row["alert_json"] or "{}")
+        truth = ground_truth(alert.get("labels", {}).get("scenario", "")) if report else None  # revealed only once a diagnosis exists
         return {
-            "incident": {**row, "report": json.loads(row["report_json"]) if row["report_json"] else None, "alert": json.loads(row["alert_json"] or "{}")},
+            "incident": {**row, "report": report, "alert": alert, "ground_truth": truth},
             "evidence": [e.model_dump() for e in board.list(iid)],
             "steps": board.steps(iid),
             "audit": PolicyEngine(db).audit_rows(iid),

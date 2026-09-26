@@ -14,8 +14,10 @@ export type Report = {
   proposed_action: Action | null; usage: { cost_usd: number; llm_calls: number; tool_calls: number; input_tokens: number; output_tokens: number };
   rounds: number; degraded: boolean;
 };
+export type Truth = { root_cause: string; service: string; category: string; correct_remediations: string[]; unsafe_actions: string[] };
 export type IncidentDetail = {
-  incident: { id: string; status: string; report: Report | null; alert: { name?: string; service?: string; labels?: Record<string, string> } };
+  incident: { id: string; status: string; created_at?: number; updated_at?: number; report: Report | null; ground_truth: Truth | null;
+              alert: { name?: string; service?: string; labels?: Record<string, string> } };
   evidence: Evidence[]; steps: Step[]; audit: Audit[];
 };
 export type BenchConfig = {
@@ -35,4 +37,21 @@ export async function getJSON<T>(path: string): Promise<T> {
 export async function post(path: string, body: unknown): Promise<void> {
   const r = await fetch(`${GATEWAY}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
+}
+
+export type Scenario = {
+  id: string; fault: string; title: string; blurb: string; alert: string; difficulty: 'standard' | 'tricky' | 'hard';
+  tags: string[]; split: string; injection: boolean;
+};
+export type Provider = { id: 'mock' | 'openai'; label: string; note: string; available: boolean; model?: string };
+export type DemoConfig = { providers: Provider[] };
+
+export async function launch(body: { scenario: string; mode: string; provider: string; pace: boolean }): Promise<{ incident_id: string }> {
+  const r = await fetch(`${GATEWAY}/demo/launch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) {
+    let msg = `${r.status}`;
+    try { msg = (await r.json()).detail ?? msg; } catch { /* keep status */ }
+    throw new Error(msg);
+  }
+  return r.json();
 }
