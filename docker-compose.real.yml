@@ -14,7 +14,7 @@ services:
         lbsrc: ./external/load-balancer
     ports: ["8080:8080"]
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /metrics HTTP/1.0\\r\\n\\r\\n' >&3 && head -c 12 <&3 | grep -q '200 OK'"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /metrics HTTP/1.0\\r\\n\\r\\n' >&3 && head -c 20 <&3 | grep -q '200 OK'"]
       interval: 5s
       timeout: 3s
       retries: 10
