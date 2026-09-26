@@ -1,6 +1,10 @@
 """Static topology the commander can consult (in production this would be generated from service discovery)."""
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
+
 SERVICE_MAP = {
     "services": {
         "loadgen": {"role": "traffic generator", "calls": ["lb"]},
@@ -15,3 +19,7 @@ SERVICE_MAP = {
     },
     "notes": "Symptoms usually appear in orders-svc/lb because they sit at the top of the call graph; trace dependencies downward for causes.",
 }
+
+# Onboarding a real host: point NIGHTSHIFT_SERVICE_MAP at a JSON file describing that host's services instead of the demo topology.
+if os.environ.get("NIGHTSHIFT_SERVICE_MAP"):
+    SERVICE_MAP = json.loads(Path(os.environ["NIGHTSHIFT_SERVICE_MAP"]).read_text(encoding="utf8"))

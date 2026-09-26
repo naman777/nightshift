@@ -23,7 +23,7 @@ from mcp_servers.logs.backend import LokiBackend
 from mcp_servers.metrics.backend import PrometheusBackend
 from mcp_servers.policy import PolicyEngine
 from mcp_servers.registry import build_servers
-from mcp_servers.runtime.backend import DockerRuntimeBackend
+from mcp_servers.runtime.backend import DockerRuntimeBackend, SystemdRuntimeBackend
 
 
 class PacedLLM:
@@ -55,7 +55,7 @@ def live_backends() -> dict:
             "logs": LokiBackend(os.environ.get("LOKI_URL", "http://localhost:3100")),
             "changes": GitChangesBackend(os.environ.get("CONFIG_REPO", "target/config"), os.environ.get("DEPLOY_LOG", "target/deploys.jsonl")),
             "code": FsCodeBackend(os.environ.get("CODE_ROOT", "target/orders-svc")),
-            "runtime": DockerRuntimeBackend()}
+            "runtime": SystemdRuntimeBackend() if os.environ.get("NIGHTSHIFT_RUNTIME") == "systemd" else DockerRuntimeBackend()}
 
 
 def build_runtime(labels: dict[str, str] | None = None, benchmark_mode: bool = False,

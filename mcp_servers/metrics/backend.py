@@ -1,7 +1,10 @@
 """Metrics backend: Protocol + live Prometheus implementation."""
 from __future__ import annotations
 
+import json
+import os
 import time
+from pathlib import Path
 from typing import Protocol
 
 import httpx
@@ -38,7 +41,9 @@ class PrometheusBackend:
         return time.time()
 
     def catalogue(self) -> dict[str, list[str]]:
-        return CATALOGUE
+        # A real host defines its own metric/service catalogue (see onboard/host/catalogue.json); the demo one is the default.
+        path = os.environ.get("NIGHTSHIFT_CATALOGUE")
+        return json.loads(Path(path).read_text(encoding="utf8")) if path else CATALOGUE
 
     async def query_range(self, query, start, end, step):
         async with httpx.AsyncClient(timeout=10) as c:

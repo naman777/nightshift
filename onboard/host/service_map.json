@@ -1,0 +1,11 @@
+{
+  "services": {
+    "lb": {"role": "C++ TCP/HTTP load balancer (Load-Balancer-CPP), systemd unit lb.service; data path on :8080, admin/stats JSON on :8081 (listen port + 1)",
+           "calls": ["echo-backends"], "config": "lb.conf (port, backends, algo, threads, max_conn; SIGHUP reload)"},
+    "echo-backends": {"role": "three echo servers on :8001-:8003 started by the same unit as lb", "calls": []},
+    "lb-sandbox": {"role": "Nightshift's own throwaway copy of the balancer (unit nsbox-lb.service, data :8090, admin :8091, backends :8093-:8095) used for fault injection; not customer traffic",
+                   "calls": [], "config": "sandbox.conf"},
+    "host": {"role": "the EC2 instance itself (2 vCPU, ~7.6 GB); node_exporter metrics", "calls": []}
+  },
+  "notes": "Only black-box signals exist: HTTP/TCP probes of each port, host metrics, and journald logs. The app exports no metrics. Logs are plain text '[YYYY-MM-DD HH:MM:SS] [LEVEL] msg' and journald buffers them, so the journal timestamp can lag the embedded time. Source code of the balancer is available through the code tools."
+}
