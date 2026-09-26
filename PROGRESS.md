@@ -38,7 +38,7 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] 10 fault modules (simulated form + declarative live steps), 6 red-herring types, config git repo (external git dir), deploy log, chaos CLI
 - [x] Go services: orders-svc, payments-svc (real fault hooks: hot-reloaded config, flags, bad-deploy build arg), stand-ins for LB + Foreman (same contract)
 - [x] docker-compose (target + Prometheus/Alertmanager/Loki/Promtail/Grafana/Jaeger + Temporal + gateway + worker + dashboard), recording + alert rules
-- [ ] NOT executed here (no Go toolchain, docker daemon off): compile/vet in CI (`make go-check`), first `make demo` will likely need small fixes
+- [x] Docker stack executed 2026-09-26: Go compiles/vets in a container, all 19 containers run, live fault -> alert -> incident -> real-LLM diagnosis -> approval -> recovery, worker kill/resume verified (docs/live-stack.md)
 
 ## Phase 6 — Benchmark
 - [x] 40 scenarios (10 faults x 4), 13 with red herrings, 1 prompt-injection, 25 dev / 15 held-out, 10 smoke
@@ -77,3 +77,4 @@ Legend: [x] done · [~] in progress · [ ] todo
 
 ## Decisions
 - Slack approval is out of scope for now (code kept, unit-tested only, not tried in a real workspace); approvals go through the dashboard.
+- Real Foreman (TypeScript) and C++ load balancer cloned to `external/` and tested (26+4 and 31+12+6 checks pass, see external/README.md), but NOT wired into the stack: their metrics/config contracts differ from the stubs and need adapters.
