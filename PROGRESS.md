@@ -65,7 +65,7 @@ Legend: [x] done · [~] in progress · [ ] todo
 ## Remaining ideas
 - [x] Real-LLM benchmark (`gpt-6-luna`): smoke, dev (v1 and v2), held-out (v2, 3 repeats), hard (v2); README table via `python -m bench.real_report --write`.
       Held-out single 96% / multi 76%, 0% unsafe, 100% grounded. Prompt v2 (category definitions) roughly doubled dev accuracy. Single agent beat the team.
-      Prompt v3 (commit to a mechanism, no `unknown` hedging) evaluated on dev only: single 96%, multi 88% (dev is its tuning split; not yet run on held-out); held-out failures were inspected, so held-out is lightly contaminated.
+      Prompt v3 (commit to a mechanism, no `unknown` hedging) dev single 96% / multi 88%; held-out single 96% / multi 96% (lightly contaminated: v2 held-out failures had been inspected); held-out failures were inspected, so held-out is lightly contaminated.
 - [x] `gpt-6-*` prices added to `agents/core/llm.py`; stored real-run costs recomputed from token counts
 - [x] Tag-contract tests (`tests/test_tag_contract.py`) guard the scripted-policy tag interface (typed evidence schema deliberately not done)
 - [x] kubectl MCP server (stretch; read verbs + gated writes, fake-backend tested, not run against a real cluster)

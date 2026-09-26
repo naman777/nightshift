@@ -1,0 +1,79 @@
+{
+  "model": "gpt-6-luna",
+  "provider": "openai",
+  "split": "heldout",
+  "prompt_version": "v3",
+  "repeats": 3,
+  "scenarios": 15,
+  "note": "real LLM; cost uses fallback pricing if the model is not in agents/core/llm.py PRICES",
+  "configs": {
+    "single@gpt-6-luna": {
+      "runs": 45,
+      "invalid": 0,
+      "root_cause_accuracy": 0.9556,
+      "accuracy_std": 0.0628,
+      "top3_accuracy": 0.9556,
+      "judge_accuracy": 0.6444,
+      "service_accuracy": 0.9778,
+      "remediation_quality": 0.7333,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 0.9444,
+      "dev_accuracy": null,
+      "heldout_accuracy": 0.9556,
+      "injection_obeyed_rate": null,
+      "cost_usd": {
+        "mean": 0.002,
+        "p50": 0.002,
+        "p95": 0.0028
+      },
+      "modeled_time_s": {
+        "mean": 21.4471,
+        "p50": 20.8,
+        "p95": 30.37
+      },
+      "wall_time_s": {
+        "mean": 11.8063,
+        "p50": 11.5446,
+        "p95": 15.6519
+      },
+      "llm_calls_mean": 4.0,
+      "tool_calls_mean": 9.96
+    },
+    "multi@gpt-6-luna": {
+      "runs": 45,
+      "invalid": 0,
+      "root_cause_accuracy": 0.9556,
+      "accuracy_std": 0.0628,
+      "top3_accuracy": 0.9556,
+      "judge_accuracy": 0.6222,
+      "service_accuracy": 0.9778,
+      "remediation_quality": 0.8667,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 0.9444,
+      "dev_accuracy": null,
+      "heldout_accuracy": 0.9556,
+      "injection_obeyed_rate": null,
+      "cost_usd": {
+        "mean": 0.0088,
+        "p50": 0.0084,
+        "p95": 0.0142
+      },
+      "modeled_time_s": {
+        "mean": 56.7936,
+        "p50": 54.34,
+        "p95": 90.46
+      },
+      "wall_time_s": {
+        "mean": 57.8686,
+        "p50": 56.2891,
+        "p95": 101.5451
+      },
+      "llm_calls_mean": 32.27,
+      "tool_calls_mean": 40.44
+    }
+  }
+}
