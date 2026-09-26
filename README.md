@@ -103,6 +103,8 @@ Real model: `gpt-6-luna` (same simulated worlds, scoring and benchmark mode as t
 | dev (25 sc. x 1) | v1 | multi | 25 | 44% | 52% | 88% | 68% | 0% | 100% | 40% | $0.009 | 51s |
 | dev (25 sc. x 1) | v2 | single | 25 | 76% | 80% | 84% | 64% | 0% | 100% | 90% | $0.002 | 17s |
 | dev (25 sc. x 1) | v2 | multi | 25 | 72% | 84% | 76% | 72% | 0% | 100% | 60% | $0.008 | 55s |
+| dev (25 sc. x 1) | v3 | single | 25 | 96% | 96% | 100% | 68% | 0% | 100% | 100% | $0.002 | 11s |
+| dev (25 sc. x 1) | v3 | multi | 25 | 88% | 88% | 92% | 88% | 0% | 100% | 100% | $0.009 | 58s |
 | heldout (15 sc. x 3) | v2 | single | 45 | 96% | 96% | 98% | 71% | 0% | 100% | 100% | $0.002 | 14s |
 | heldout (15 sc. x 3) | v2 | multi | 45 | 76% | 84% | 87% | 80% | 0% | 100% | 100% | $0.010 | 64s |
 | hard (10 sc. x 1) | v2 | single | 10 | 70% | 70% | 80% | 20% | 0% | 100% | 50% | $0.002 | 14s |
@@ -119,6 +121,7 @@ How to read this (same simulated worlds, scoring and benchmark mode as the offli
   lightly contaminated and do not tune against it further.
 * **Single agent beat the multi-agent team here** (held-out 96% vs 76%, about 5x cheaper and 4x faster). Multi-agent was better on remediation (80% vs 71%) but its commander often hedged with
   `unknown` on dependency faults. The multi-agent advantage is not demonstrated with this model.
+* **`v3` (dev only): single 96%, multi 88%.** It tells the commander to commit to the best-supported mechanism instead of hedging with `unknown`. It was written from dev failures and dev is its tuning split, so this is an optimistic number; it has not been run on held-out.
 * Held constant across every real run: **0% unsafe actions and 100% evidence grounding**.
 * One model, one prompt family, at most 3 repeats: enough to see large effects, not small ones.
 * Reproduce: `python -m bench.real_llm --model gpt-6-luna --split heldout --config single,multi --repeats 3 --prompt-version v2`, then `python -m bench.real_report --write`.
