@@ -1,0 +1,67 @@
+# Maps generic probe/node metrics onto the metric names Nightshift's `metrics` tools query (see catalogue.json).
+groups:
+  - name: nightshift-host-recording
+    rules:
+      - record: error_rate
+        # fraction of failed data-path probes in the last minute
+        expr: 1 - avg by (service) (avg_over_time(probe_success{probe="data"}[1m]))
+      - record: p99_latency_seconds
+        expr: max by (service) (max_over_time(probe_duration_seconds{probe="data"}[1m]))
+      - record: upstream_healthy
+        expr: sum by (service) (probe_success{probe="backend"})
+      - record: admin_port_up
+        expr: min by (service) (probe_success{probe="admin"})
+      - record: backend_up
+        # per-backend (keeps the `instance` label = host:port), unlike upstream_healthy which sums it away
+        expr: probe_success{probe="backend"}
+      - record: unit_active
+        # 1 while the systemd unit is active; label_replace maps unit name -> Nightshift service name
+        expr: label_replace(label_replace(node_systemd_unit_state{state="active", name=~"lb.service|nsbox-lb.service"}, "service", "lb", "name", "lb.service"), "service", "lb-sandbox", "name", "nsbox-lb.service")
+      - record: backend_connections
+        expr: lb_backend_connections
+      - record: backend_healthy
+        expr: lb_backend_healthy
+      - record: admin_probe_seconds
+        expr: max by (service) (probe_duration_seconds{probe="admin"})
+      - record: host_cpu_ratio
+        expr: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m]))
+        labels: {service: host}
+      - record: host_memory_used_ratio
+        expr: 1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+        labels: {service: host}
+      - record: host_disk_used_ratio
+        expr: 1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}
+        labels: {service: host}
+
+  - name: nightshift-host-alerts
+    rules:
+      - alert: LBDataPathErrors
+        expr: error_rate{service=~"lb|lb-sandbox"} > 0.3
+        for: 30s
+        labels: {severity: critical}
+        annotations: {summary: "more than 30% of data-path probes failing"}
+      - alert: LBBackendUnhealthy
+        expr: upstream_healthy{service=~"lb|lb-sandbox"} < 3
+        for: 30s
+        labels: {severity: critical}
+        annotations: {summary: "fewer than 3 upstream backends accepting connections"}
+      - alert: LBUnitDown
+        expr: unit_active{service=~"lb|lb-sandbox"} == 0
+        for: 20s
+        labels: {severity: critical}
+        annotations: {summary: "systemd unit is not active"}
+      - alert: LBBackendConnectionsStuck
+        expr: max by (service) (backend_connections{service=~"lb|lb-sandbox"}) > 8
+        for: 30s
+        labels: {severity: warning}
+        annotations: {summary: "a backend is holding more than 8 open connections (requests not completing)"}
+      - alert: LBAdminPortUnresponsive
+        expr: admin_port_up{service=~"lb|lb-sandbox"} == 0
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: "admin/stats endpoint not answering probes"}
+      - alert: LBHighLatency
+        expr: p99_latency_seconds{service=~"lb|lb-sandbox"} > 0.5
+        for: 30s
+        labels: {severity: critical}
+        annotations: {summary: "data-path probe latency above 500ms"}

@@ -1,0 +1,14 @@
+{
+  "error_rate": ["lb", "lb-sandbox"],
+  "p99_latency_seconds": ["lb", "lb-sandbox"],
+  "upstream_healthy": ["lb", "lb-sandbox"],
+  "backend_up": ["lb", "lb-sandbox"],
+  "unit_active": ["lb", "lb-sandbox"],
+  "backend_connections": ["lb", "lb-sandbox"],
+  "backend_healthy": ["lb", "lb-sandbox"],
+  "admin_port_up": ["lb", "lb-sandbox"],
+  "admin_probe_seconds": ["lb", "lb-sandbox"],
+  "host_cpu_ratio": ["host"],
+  "host_memory_used_ratio": ["host"],
+  "host_disk_used_ratio": ["host"]
+}
