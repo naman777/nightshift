@@ -5,6 +5,7 @@ NIGHTSHIFT_BACKEND=live  -> tools talk to Prometheus / Loki / git / docker
 """
 from __future__ import annotations
 
+import asyncio
 import os
 from functools import lru_cache
 
@@ -24,6 +25,17 @@ from mcp_servers.registry import build_servers
 from mcp_servers.runtime.backend import DockerRuntimeBackend
 
 
+class PacedLLM:
+    """Adds latency to each model call (demo only). Wraps any LLM; the offline reference policy is otherwise instantaneous."""
+
+    def __init__(self, inner, delay_s: float):
+        self.inner, self.delay_s = inner, delay_s
+
+    async def complete(self, *args, **kwargs):
+        await asyncio.sleep(self.delay_s)
+        return await self.inner.complete(*args, **kwargs)
+
+
 @lru_cache(maxsize=1)
 def shared_db() -> Database:
     return Database(os.environ.get("NIGHTSHIFT_DB_URL", "sqlite:///nightshift.db"))
@@ -31,9 +43,9 @@ def shared_db() -> Database:
 
 @lru_cache(maxsize=64)
 def _world(scenario_id: str):
-    from bench.scenario import build_world, load_all
+    from bench.scenario import build_world, load_all, load_hard
 
-    s = next(x for x in load_all() if x.id == scenario_id)
+    s = next(x for x in [*load_all(), *load_hard()] if x.id == scenario_id)
     return build_world(s)[0]
 
 
@@ -57,12 +69,15 @@ def build_runtime(labels: dict[str, str] | None = None, benchmark_mode: bool = F
         backends = live_backends()
     policy = PolicyEngine(db, benchmark_mode=benchmark_mode)
     client = InProcessClient(build_servers(backends), policy)
-    provider = os.environ.get("NIGHTSHIFT_LLM_PROVIDER", "mock")
+    provider = labels.get("llm_provider") or os.environ.get("NIGHTSHIFT_LLM_PROVIDER", "mock")
     llm = make_llm(provider, responder=heuristic_responder)
+    if labels.get("pace"):  # demo pacing for the instant offline policy, so the audience can watch the agents work
+        llm = PacedLLM(llm, float(labels["pace"]))
+    model = labels.get("llm_model")
     board = EvidenceBoard(db)
     rt = AgentRuntime(llm=llm, client=client, board=board, on_step=lambda st: board.record_step(st.incident_id, st),
-                      commander_model=os.environ.get("NIGHTSHIFT_COMMANDER_MODEL", "mock-strong"),
-                      specialist_model=os.environ.get("NIGHTSHIFT_SPECIALIST_MODEL", "mock-cheap"),
+                      commander_model=model or os.environ.get("NIGHTSHIFT_COMMANDER_MODEL", "mock-strong"),
+                      specialist_model=model or os.environ.get("NIGHTSHIFT_SPECIALIST_MODEL", "mock-cheap"),
                       budget_usd=float(os.environ.get("NIGHTSHIFT_INCIDENT_BUDGET_USD", "1.0")),
                       memory=IncidentMemory(db) if os.environ.get("NIGHTSHIFT_MEMORY", "1") == "1" else None, memory_write=True)
     return rt, policy

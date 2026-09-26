@@ -32,13 +32,21 @@ async def investigate(rt: AgentRuntime, alert: Alert, incident_id: str) -> tuple
         if bad:
             return None, f"claims cite unknown tool calls {bad}; valid: {sorted(loop_calls)}"
         ids = []
+        minted = holder.setdefault("minted", {})  # a rejected submission that is retried must not duplicate evidence rows
         for c in args.get("claims", []):
             q, ref = loop_calls[c["tool_call_ref"]]
-            row = rt.board.add(EvidenceRow(incident_id=incident_id, agent="single", claim=c["claim"], evidence_query=q,
-                                           evidence_result_ref=ref, confidence=float(c.get("confidence", 0.6))))
-            ids.append(row.id)
+            key = (c["claim"], c["tool_call_ref"])
+            if key not in minted:
+                minted[key] = rt.board.add(EvidenceRow(incident_id=incident_id, agent="single", claim=c["claim"], evidence_query=q,
+                                                       evidence_result_ref=ref, confidence=float(c.get("confidence", 0.6)))).id
+            ids.append(minted[key])
         rep = dict(args["report"])
         rep["evidence"] = ids  # evidence ids are minted from the grounded claims
+        # The model cannot know the minted ids, so ids it invents for `ruled_out` are unverifiable: keep only real ones, and drop
+        # a ruled-out entry left with no citation at all (an uncited "ruled out" must not stand).
+        real = {e.id for e in rt.board.list(incident_id)}
+        rep["ruled_out"] = [{**x, "evidence": [e for e in x.get("evidence", []) if e in real]} for x in rep.get("ruled_out", []) if isinstance(x, dict)]
+        rep["ruled_out"] = [x for x in rep["ruled_out"] if x["evidence"]]
         report, err = parse_report({"report": rep}, rt, incident_id)
         return (report, "") if report else (None, err)
 
@@ -51,7 +59,8 @@ async def investigate(rt: AgentRuntime, alert: Alert, incident_id: str) -> tuple
         rows = rt.board.list(incident_id)
         rep = RootCauseReport(root_cause="Inconclusive: single agent ran out of budget", service=alert.service,
                               category=Category.UNKNOWN, confidence=0.1, evidence=[r.id for r in rows[:1]] or [],
-                              proposed_action=ProposedAction(type="escalate", target="on-call", tier=Tier.READ_ONLY), degraded=True)
+                              proposed_action=ProposedAction(type="escalate", target="on-call", tier=Tier.READ_ONLY), degraded=True,
+                              usage=finding.usage)
         return rep, finding.usage
     rep: RootCauseReport = loop.output
     return rep.model_copy(update={"usage": finding.usage}), finding.usage

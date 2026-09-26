@@ -60,6 +60,8 @@ Legend: [x] done · [~] in progress · [ ] todo
 
 - [x] Independent adversarial review: 9 issues fixed (fail-closed auth + dashboard proxy, wrapper escaping, pre-write audit row, no auto-retry of writes, target-aware remediation scoring, ...)
 
+- [x] Dashboard redesign for demos: scenario launcher (50 scenarios, agent setup, offline vs real LLM), live stepper + "happening now / next", plan, agent cards, answer-key verdict, evidence / safety audit / activity tabs. Gateway `/demo/*` endpoints; commander plan/decision steps are now emitted. Fixed: launcher alerts use the scenario's clock; single-agent report no longer rejected for invented ruled-out evidence ids.
+
 ## Remaining ideas
 - [~] Real-LLM benchmark: first smoke run (10 scenarios) on gpt-6-luna via `python -m bench.real_llm` (single 50%, multi 60% exact). Still to do: fix ~2 rate-limit-degraded runs, dev/heldout splits, README table
 - [x] kubectl MCP server (stretch; read verbs + gated writes, fake-backend tested, not run against a real cluster)

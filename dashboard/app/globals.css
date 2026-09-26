@@ -3,4 +3,17 @@
 @tailwind utilities;
 
 :root { color-scheme: dark; }
-body { background: #0b0f14; color: #e5e7eb; }
+body { background: #0a0d13; color: #e6e9ef; font-feature-settings: 'cv11', 'ss01'; -webkit-font-smoothing: antialiased; }
+::selection { background: rgba(129, 140, 248, 0.35); }
+
+@layer components {
+  .card { @apply rounded-xl border border-white/10 bg-white/[0.03]; }
+  .label { @apply text-[11px] font-medium uppercase tracking-wider text-slate-500; }
+  .chip { @apply inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium; }
+  .btn { @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40; }
+  .btn-primary { @apply btn bg-indigo-500 text-white hover:bg-indigo-400; }
+  .btn-ghost { @apply btn border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10; }
+}
+
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise 0.35s ease-out both; }

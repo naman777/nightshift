@@ -7,7 +7,7 @@ AI on-call engineer: multi-agent incident investigator (Python), Temporal durabi
 - `python -m agents.cli investigate <scenario-id> [--mode single] [--provider anthropic]`
 - `python -m bench.runner --split smoke|dev|heldout|hard --config all --repeats 3`, then `python -m bench.report` (rewrites README table between `BENCH:START/END`)
 - `python -m bench.gen_scenarios` / `python -m bench.gen_hard` regenerate scenario YAML (do not hand-edit them)
-- Dashboard: `cd dashboard && npm run dev` (needs `python -m gateway.demo` for data)
+- Dashboard: `python -m gateway.demo` then `cd dashboard && npm run dev` (http://localhost:3001; launch any scenario from the UI; OPENAI_API_KEY in .env enables the real-LLM option)
 
 ## Conventions that matter
 - Everything runs offline by design: the mock LLM (`agents/scripted.py`, an offline reference policy, NOT an LLM) + simulated `World` backends (`bench/sim`). Never present numbers from it as language-model results.

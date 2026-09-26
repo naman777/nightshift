@@ -1,7 +1,7 @@
-"""No-docker demo: start the gateway on a simulated incident and print where to look.
+"""No-docker demo: start the gateway (simulated backends); launch scenarios from the dashboard, or fire one from here.
 
   python -m gateway.demo                     # then open the dashboard: cd dashboard && npm run dev  (http://localhost:3001)
-  python -m gateway.demo --scenario bad-deploy-nil-deref-01 --serve-only
+  python -m gateway.demo --scenario bad-deploy-nil-deref-01     # also fire one scenario immediately
 
 Fires the alert through the same /webhook/alertmanager endpoint Alertmanager uses, so what you see is the real code path.
 """
@@ -34,10 +34,12 @@ async def fire(port: int, scenario: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--scenario", default="bad-config-push-lb-timeout-00")
+    ap.add_argument("--scenario", default=None, help="also fire this scenario at start-up (otherwise use the dashboard launcher)")
     ap.add_argument("--port", type=int, default=8000)
-    ap.add_argument("--serve-only", action="store_true")
     a = ap.parse_args()
+    from bench.real_llm import load_env
+
+    load_env()  # OPENAI_API_KEY from .env enables the "real LLM" option in the dashboard
     os.environ.setdefault("NIGHTSHIFT_BACKEND", "sim")
     os.environ.setdefault("NIGHTSHIFT_ALLOW_INSECURE", "1")  # local demo only: real deployments set NIGHTSHIFT_API_TOKEN
     os.environ.setdefault("NIGHTSHIFT_DB_URL", "sqlite:///nightshift-demo.db")
@@ -48,7 +50,7 @@ def main() -> None:
 
     async def run() -> None:
         task = asyncio.create_task(server.serve())
-        if not a.serve_only:
+        if a.scenario:
             await fire(a.port, a.scenario)
         await task
 

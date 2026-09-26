@@ -14,14 +14,27 @@ from typing import Any, Awaitable, Callable
 
 from agents import commander, remediation, single_agent, specialists
 from agents.core.memory import signature_from_evidence
-from agents.core.models import Alert, Assignment, Finding, ProposedAction, RootCauseReport, Usage
+from agents.core.models import Alert, Assignment, Finding, ProposedAction, RootCauseReport, Step, Usage
 from agents.runtime import AgentRuntime
 
 
 # -- individual steps (pure functions of their JSON input + the runtime) ---------------
 
+async def _note(rt: AgentRuntime, incident_id: str, kind: str, name: str, detail: dict | str) -> None:
+    """Emit a commander-level step (plan / decision) so the dashboard can show what the team intends to do next."""
+    if rt.on_step is None:
+        return
+    text = detail if isinstance(detail, str) else json.dumps(detail, separators=(",", ":"))
+    r = rt.on_step(Step(agent="commander", incident_id=incident_id, kind=kind, name=name, detail=text))
+    if hasattr(r, "__await__"):
+        await r
+
+
 async def step_plan(rt: AgentRuntime, alert: dict, incident_id: str) -> dict:
     p = await commander.plan(rt, Alert(**alert), incident_id)
+    await _note(rt, incident_id, "plan", "plan", {
+        "hypotheses": [{"id": h.id, "text": h.text[:140], "service": h.service, "category": h.category.value} for h in p.hypotheses[:6]],
+        "assignments": [{"agent": a.agent, "question": a.question[:160]} for a in p.assignments[:6]]})
     return p.model_dump(mode="json")
 
 
@@ -32,6 +45,8 @@ async def step_specialist(rt: AgentRuntime, incident_id: str, assignment: dict, 
 
 async def step_converge(rt: AgentRuntime, alert: dict, incident_id: str, plan: dict, round_no: int, findings: list[dict]) -> dict:
     d = await commander.converge(rt, Alert(**alert), incident_id, commander.Plan(**plan), round_no, [Finding(**f) for f in findings])
+    await _note(rt, incident_id, "decision", d.action, {
+        "round": round_no, "assignments": [{"agent": a.agent, "question": a.question[:160]} for a in d.assignments[:6]]})
     return d.model_dump(mode="json")
 
 
@@ -42,6 +57,7 @@ async def step_single(rt: AgentRuntime, alert: dict, incident_id: str) -> dict:
 
 async def step_propose(rt: AgentRuntime, alert: dict, incident_id: str, report: dict) -> dict:
     a = await remediation.propose(rt, Alert(**alert), incident_id, RootCauseReport(**report))
+    await _note(rt, incident_id, "decision", "propose", {"action": a.type, "target": a.target, "tier": a.tier.value})
     return a.model_dump(mode="json")
 
 
