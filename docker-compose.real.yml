@@ -1,0 +1,25 @@
+# Opt-in overlay: run the REAL components instead of the stubs. The default stack (docker-compose.yml) is unchanged.
+#
+#   make setup-external                      clone + patch external/load-balancer and external/foreman
+#   make demo-real                           = docker compose -f docker-compose.yml -f docker-compose.real.yml up -d --build
+#
+# What is real here:
+#   lb         the C++ load balancer (naman777/Load-Balancer-CPP + external/patches), reading target/config/lb.yaml
+#   scheduler  (added by the Foreman part of this overlay; see below)
+services:
+  lb:
+    build: !override
+      context: ./target/real/lb
+      additional_contexts:
+        lbsrc: ./external/load-balancer
+    ports: ["8080:8080"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /metrics HTTP/1.0\\r\\n\\r\\n' >&3 && head -c 12 <&3 | grep -q '200 OK'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  prometheus:
+    volumes: !override
+      - ./observability/prometheus/prometheus.real.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/rules:/etc/prometheus/rules:ro
