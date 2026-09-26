@@ -61,7 +61,7 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Independent adversarial review: 9 issues fixed (fail-closed auth + dashboard proxy, wrapper escaping, pre-write audit row, no auto-retry of writes, target-aware remediation scoring, ...)
 
 ## Remaining ideas
-- [ ] Real-LLM benchmark run (needs API key) -> replace README table headline; fill resume bullets
+- [~] Real-LLM benchmark: first smoke run (10 scenarios) on gpt-6-luna via `python -m bench.real_llm` (single 50%, multi 60% exact). Still to do: fix ~2 rate-limit-degraded runs, dev/heldout splits, README table
 - [x] kubectl MCP server (stretch; read verbs + gated writes, fake-backend tested, not run against a real cluster)
 - [x] Voice paging summary + pluggable webhook (stretch)
 - [ ] Swap in the real Foreman + C++ LB (user will provide) -> delete `target/stubs`, keep the contract

@@ -36,7 +36,7 @@ def estimate_tokens(text: str) -> int:
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
 
 
-async def post_with_retry(client: httpx.AsyncClient, url: str, attempts: int = 4, **kw: Any) -> httpx.Response:
+async def post_with_retry(client: httpx.AsyncClient, url: str, attempts: int = 7, **kw: Any) -> httpx.Response:
     """POST with exponential backoff on rate limits, overload and transient network errors (LLM APIs return 429/529 under load)."""
     delay = 1.0
     for i in range(attempts):
@@ -48,8 +48,13 @@ async def post_with_retry(client: httpx.AsyncClient, url: str, attempts: int = 4
         except (httpx.TransportError, httpx.TimeoutException):
             if i == attempts - 1:
                 raise
-        await asyncio.sleep(delay)
-        delay *= 2
+        wait = delay
+        try:
+            wait = max(wait, min(float(r.headers.get("retry-after", 0)), 60.0))
+        except (NameError, ValueError):
+            pass
+        await asyncio.sleep(wait)
+        delay = min(delay * 2, 30.0)
     raise RuntimeError("unreachable")  # pragma: no cover
 
 
@@ -171,9 +176,11 @@ class OpenAILLM:
         return out
 
     async def complete(self, system, messages, tools, model, max_tokens=2048) -> LLMResponse:
-        body = {"model": model, "max_tokens": max_tokens, "messages": self._messages(system, messages),
+        body = {"model": model, "max_completion_tokens": max_tokens, "messages": self._messages(system, messages),
                 "tools": [{"type": "function", "function": {"name": t["name"], "description": t["description"],
                                                             "parameters": t["input_schema"]}} for t in tools]}
+        if model.startswith("gpt-6"):  # chat-completions rejects function tools alongside reasoning on these models
+            body["reasoning_effort"] = os.environ.get("OPENAI_REASONING_EFFORT", "none")
         r = await post_with_retry(self.client, self.URL, json=body, headers={"Authorization": f"Bearer {self.api_key}"})
         data = r.json()
         msg = data["choices"][0]["message"]

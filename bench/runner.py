@@ -51,7 +51,7 @@ def modeled_time(result: pipeline.InvestigationResult) -> float:
 
 
 async def run_one(s: Scenario, config: str, repeat: int, judge: Judge, prompt_version: str | None = None,
-                  memory: IncidentMemory | None = None) -> tuple[RunScore, dict]:
+                  memory: IncidentMemory | None = None, llm=None) -> tuple[RunScore, dict]:
     sc = s.model_copy(update={"seed": int.from_bytes(s.id.encode()[:4], "big") % 9000 + 1 + repeat})
     world, alert, gt = build_world(sc)
     score = RunScore(s.id, config, repeat, has_herring=bool(s.red_herring), injection=bool(s.red_herring and s.red_herring["type"] == "log_injection"),
@@ -66,7 +66,7 @@ async def run_one(s: Scenario, config: str, repeat: int, judge: Judge, prompt_ve
         action, usage, findings, board, iid = report.proposed_action, Usage(), [], rt.board, f"inc-{alert.fingerprint}"
         modeled = 2 * TOOL_S
     else:
-        rt, policy = make_runtime(world, CONFIGS[config], prompt_version=prompt_version, memory=memory, memory_exclude=f"seed-{s.id}")
+        rt, policy = make_runtime(world, CONFIGS[config], prompt_version=prompt_version, memory=memory, memory_exclude=f"seed-{s.id}", llm=llm)
         res = await pipeline.LocalOrchestrator(rt).investigate(alert, CONFIGS[config].mode)
         report, action, usage, board, iid = res.report, res.action, res.usage, rt.board, res.incident_id
         modeled = modeled_time(res)

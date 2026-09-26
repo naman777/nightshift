@@ -13,3 +13,4 @@ target/.configrepo/
 target/.chaos_state.json
 target/deploys.jsonl
 nightshift-demo.db
+bench/results/real-llm/runs/
