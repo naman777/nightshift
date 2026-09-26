@@ -15,6 +15,7 @@ AI on-call engineer: multi-agent incident investigator (Python), Temporal durabi
 - A fault is defined once in `chaos/faults/<name>.py` (simulated form `apply_sim` + declarative `live_steps`). Change both together. Every scenario's alert must fire per `bench/alert_rules.py` (mirror of `observability/prometheus/rules/alerts.yml`).
 - Claim tag format (`[metric name=... service=...]`, `[log ...]`, `[change ...]`, `[code ...]`) is an interface between `agents/scripted.py` builders and its diagnosis parser; changing one side silently breaks the reference policy.
 - Held-out scenarios are only for the final table. Do not tune against them.
-- `target/stubs/{lb,scheduler}` stand in for the user's C++ LB and Foreman (to be provided later); keep their config keys / metric names as the contract.
+- `target/stubs/{lb,scheduler}` are the default stand-ins; the REAL C++ LB and Foreman run via `docker-compose.real.yml` (`make demo-real`, clones in git-ignored `external/`, LB patches in `external/patches/`, Foreman adapter in `target/real/foreman/`). Keep the stubs' config keys / metric names as the contract for both.
+- Docker on this machine: the shell sets `DOCKER_HOST=tcp://127.0.0.1:8888` (dead); use `unset DOCKER_HOST; export DOCKER_CONTEXT=desktop-linux`. The gateway/worker use the real model via `NIGHTSHIFT_LLM_PROVIDER=openai` etc. in the git-ignored `.env`.
 - Go and docker files were written without a Go toolchain / running Docker daemon: CI (`.github/workflows/ci.yml`) compiles them; `make go-check` does it in a container.
 - File creation: bash heredocs with mixed quotes failed to parse in this environment; prefer the Write tool.

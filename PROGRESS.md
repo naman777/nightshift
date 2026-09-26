@@ -77,4 +77,4 @@ Legend: [x] done · [~] in progress · [ ] todo
 
 ## Decisions
 - Slack approval is out of scope for now (code kept, unit-tested only, not tried in a real workspace); approvals go through the dashboard.
-- Real Foreman (TypeScript) and C++ load balancer cloned to `external/` and tested (26+4 and 31+12+6 checks pass, see external/README.md), but NOT wired into the stack: their metrics/config contracts differ from the stubs and need adapters.
+- [x] Real Foreman (TypeScript) and real C++ load balancer cloned to `external/`, tested, patched (LB) and wired in as an opt-in overlay `docker-compose.real.yml` (`make demo-real`); one live fault verified end to end on each with the real model (docs/live-stack.md). Other faults on the real components implemented but not exercised; `bench/live.py` not run.

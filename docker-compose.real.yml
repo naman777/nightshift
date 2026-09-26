@@ -23,3 +23,108 @@ services:
     volumes: !override
       - ./observability/prometheus/prometheus.real.yml:/etc/prometheus/prometheus.yml:ro
       - ./observability/prometheus/rules:/etc/prometheus/rules:ro
+
+  # ------------------------------------------------------------------ real Foreman (naman777/Foreman, TypeScript) as `scheduler`
+  # Foreman's own data services live in this project under a foreman- prefix and never touch any other Foreman project on the machine.
+  foreman-postgres:
+    image: postgres:16-alpine
+    environment: {POSTGRES_USER: foreman, POSTGRES_PASSWORD: foreman, POSTGRES_DB: foreman}
+    volumes: ["foreman_pgdata:/var/lib/postgresql/data"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U foreman"], interval: 5s, timeout: 5s, retries: 10}
+
+  foreman-redis:
+    image: redis:7-alpine
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 5s, retries: 10}
+
+  foreman-minio:
+    image: minio/minio:latest
+    command: server /data
+    environment: {MINIO_ROOT_USER: minioadmin, MINIO_ROOT_PASSWORD: minioadmin}
+    volumes: ["foreman_minio:/data"]
+    healthcheck: {test: ["CMD", "mc", "ready", "local"], interval: 5s, timeout: 5s, retries: 10}
+
+  foreman-migrate:
+    image: postgres:16-alpine
+    depends_on: {foreman-postgres: {condition: service_healthy}}
+    environment: {PGHOST: foreman-postgres, PGUSER: foreman, PGPASSWORD: foreman, PGDATABASE: foreman}
+    volumes: ["./external/foreman/migrations:/migrations:ro"]
+    entrypoint: /bin/sh
+    command:
+      - -ec
+      - |
+        psql -v ON_ERROR_STOP=1 -f /migrations/000001_init_schema.up.sql
+        psql -v ON_ERROR_STOP=1 -f /migrations/000002_add_token_hash.up.sql
+    restart: "no"
+
+  foreman-coordinator:
+    build: {context: ./external/foreman/node/coordinator}
+    container_name: nightshift-foreman-coordinator-1
+    depends_on:
+      foreman-migrate: {condition: service_completed_successfully}
+      foreman-redis: {condition: service_healthy}
+      foreman-minio: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgres://foreman:foreman@foreman-postgres:5432/foreman?sslmode=disable
+      REDIS_URL: redis://foreman-redis:6379
+      MINIO_ENDPOINT: foreman-minio:9000
+      MINIO_PUBLIC_ENDPOINT: localhost:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      COORDINATOR_SECRET: ${FOREMAN_SECRET:-dev-secret-change-in-prod}
+      PUBLIC_DEMO_ENABLED: "false"
+      PORT: 8080
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  foreman-worker-1: &foreman-worker
+    build: {context: ./external/foreman/node/worker}
+    container_name: nightshift-foreman-worker-1
+    depends_on: {foreman-coordinator: {condition: service_healthy}}
+    environment: &foreman-worker-env
+      COORDINATOR_URL: http://foreman-coordinator:8080
+      COORDINATOR_SECRET: ${FOREMAN_SECRET:-dev-secret-change-in-prod}
+      MINIO_ENDPOINT: foreman-minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      WORKER_CPU_CORES: 4            # declared capacity: 4 one-core jobs in parallel per worker => 12 slots with 3 workers
+      WORKER_MEMORY_MB: 2048
+      WORKER_MAX_PARALLEL_JOBS: 4
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
+    restart: "no"                    # the scheduler adapter starts/stops workers to honour worker_count
+
+  foreman-worker-2:
+    <<: *foreman-worker
+    container_name: nightshift-foreman-worker-2
+
+  foreman-worker-3:
+    <<: *foreman-worker
+    container_name: nightshift-foreman-worker-3
+
+  # The adapter IS the `scheduler` service: same name, port, metrics and config contract as the stub. See target/real/foreman/adapter.py.
+  scheduler:
+    build: !override {context: ./target/real/foreman}
+    environment: !override
+      FOREMAN_URL: http://foreman-coordinator:8080
+      FOREMAN_SECRET: ${FOREMAN_SECRET:-dev-secret-change-in-prod}
+      WORKER_CONTAINERS: nightshift-foreman-worker-1,nightshift-foreman-worker-2,nightshift-foreman-worker-3
+      COORDINATOR_CONTAINER: nightshift-foreman-coordinator-1
+      ORDERS_DB_CONTAINER: nightshift-postgres-1
+      JOB_RATE: ${FOREMAN_JOB_RATE:-0.9}       # Foreman workers poll every 3 s and take ONE job per poll: ~0.33 jobs/s per worker, ~1 job/s with 3
+      JOB_SECONDS: ${FOREMAN_JOB_SECONDS:-3}
+    volumes: ["./target/config:/config:ro", "/var/run/docker.sock:/var/run/docker.sock"]
+    ports: ["8090:8090"]
+    depends_on: !override
+      postgres: {condition: service_healthy}
+      foreman-coordinator: {condition: service_healthy}
+
+  # Foreman jobs (psql containers) reach the orders database through the host: publish it on a non-conflicting port.
+  postgres:
+    ports: ["15432:5432"]
+
+volumes:
+  foreman_pgdata:
+  foreman_minio:

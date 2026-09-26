@@ -7,7 +7,7 @@ git clone https://github.com/naman777/Foreman        external/foreman
 git clone https://github.com/naman777/Load-Balancer-CPP external/load-balancer
 git -C external/foreman        config core.autocrlf false   # on Windows, before checkout, or shell scripts get CRLF endings
 git -C external/load-balancer  config core.autocrlf false
-git -C external/load-balancer  apply ../patches/load-balancer-test-fixes.patch
+git -C external/load-balancer  am ../patches/*.patch
 ```
 
 ## Verified (2026-09-26)
@@ -19,11 +19,9 @@ git -C external/load-balancer  apply ../patches/load-balancer-test-fixes.patch
 | Foreman coordinator / worker tests | 31/31 and 12/12 pass |
 | Foreman `node scripts/node-smoke.mjs` against `docker compose up` | all 6 checks pass (health, success, failure, timeout, artifact, 6 concurrent jobs, WebSocket) |
 
-## Not yet wired into the Nightshift stack, and why
+## Wired into the stack (opt-in)
 
-The real components do not satisfy the stub contracts in `target/stubs/`, so a drop-in swap is not possible:
+`docker-compose.real.yml` runs both as the `lb` and `scheduler` services (`make demo-real`). What that took, what was verified and what was not:
+see [docs/live-stack.md](../docs/live-stack.md#real-components-opt-in-overlay-docker-composerealyml).
 
-* **Load balancer**: no `/metrics` (JSON `/stats` only); backends are `127.0.0.1:<port>` only (no hostnames); no `upstream_timeout_ms` (idle timeout is hard-coded), health-check interval is fixed at 5 s; config is `port/backends/weights/algo/threads/max_conn`, reloaded with SIGHUP (weights and algo only).
-* **Foreman**: a TypeScript coordinator + Docker workers (not Go); `/metrics` is JSON behind a dashboard session; no `worker_count`/`settlement_schedule`/`db_connections_in_use`/`POST /admin/jobs` contract.
-
-Wiring them in means adapters (a Prometheus exporter for each, `socat` forwarders for the balancer) and re-expressing the LB and scheduler faults in terms of the keys they really have (`weights`, `algo`, `max_conn`, worker containers).
+The balancer needs the patches in `external/patches/` (`git am`); they add `host:port` backends, `upstream_timeout_ms`, Prometheus `/metrics`, JSON logs and fix a SIGHUP crash. Foreman is used unmodified.
