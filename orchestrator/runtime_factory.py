@@ -11,6 +11,7 @@ from functools import lru_cache
 
 from agents.core.db import Database
 from agents.core.evidence import EvidenceBoard
+from agents.prompts import LATEST
 from agents.core.llm import make_llm
 from agents.core.mcp_client import InProcessClient
 from agents.core.memory import IncidentMemory
@@ -78,6 +79,7 @@ def build_runtime(labels: dict[str, str] | None = None, benchmark_mode: bool = F
     rt = AgentRuntime(llm=llm, client=client, board=board, on_step=lambda st: board.record_step(st.incident_id, st),
                       commander_model=model or os.environ.get("NIGHTSHIFT_COMMANDER_MODEL", "mock-strong"),
                       specialist_model=model or os.environ.get("NIGHTSHIFT_SPECIALIST_MODEL", "mock-cheap"),
+                      prompt_version=os.environ.get("NIGHTSHIFT_PROMPT_VERSION") or LATEST,
                       budget_usd=float(os.environ.get("NIGHTSHIFT_INCIDENT_BUDGET_USD", "1.0")),
                       memory=IncidentMemory(db) if os.environ.get("NIGHTSHIFT_MEMORY", "1") == "1" else None, memory_write=True)
     return rt, policy

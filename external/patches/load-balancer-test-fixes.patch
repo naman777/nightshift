@@ -1,0 +1,95 @@
+diff --git a/load-balancer/Makefile b/load-balancer/Makefile
+index ef0fa5c..3eecbf7 100644
+--- a/load-balancer/Makefile
++++ b/load-balancer/Makefile
+@@ -16,7 +16,7 @@ main.o: main.cpp $(HEADERS)
+ LoadBalancer.o: LoadBalancer.cpp $(HEADERS)
+ 	$(CXX) $(CXXFLAGS) -c LoadBalancer.cpp
+ 
+-$(TEST_BIN): ../tests/test_lb.cpp $(HEADERS)
++$(TEST_BIN): ../tests/test_lb.cpp $(HEADERS) LoadBalancer.o
+ 	$(CXX) $(CXXFLAGS) -o $(TEST_BIN) ../tests/test_lb.cpp LoadBalancer.o
+ 
+ test: $(TEST_BIN)
+diff --git a/scripts/test.sh b/scripts/test.sh
+index 13098f5..29bd66d 100644
+--- a/scripts/test.sh
++++ b/scripts/test.sh
+@@ -7,8 +7,8 @@ set -euo pipefail
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ PASS=0; FAIL=0
+ 
+-pass() { echo "PASS  $1"; ((PASS++)); }
+-fail() { echo "FAIL  $1 — $2"; ((FAIL++)); }
++pass() { echo "PASS  $1"; PASS=$((PASS+1)); }
++fail() { echo "FAIL  $1 — $2"; FAIL=$((FAIL+1)); }
+ 
+ cleanup() {
+     pkill -f echo_server   2>/dev/null || true
+@@ -31,7 +31,7 @@ sleep 0.3
+ 
+ # ── Start load balancer ────────────────────────────────────────────────────────
+ "$ROOT/load-balancer/load_balancer" \
+-    --port 8080 --backends 8001,8002,8003 --algo lc --threads 8 &
++    --port 8080 --backends 8001,8002,8003 --algo rr --threads 8 &
+ sleep 0.5
+ 
+ # ── Tests ──────────────────────────────────────────────────────────────────────
+@@ -53,14 +53,14 @@ else
+ fi
+ 
+ # Stats reports 3 backends
+-BACKEND_COUNT=$(echo "$STATS" | grep -o '"port"' | wc -l | tr -d ' ')
++BACKEND_COUNT=$(echo "$STATS" | grep -o '"connections"' | wc -l | tr -d ' ')
+ if [ "$BACKEND_COUNT" -eq 3 ]; then
+     pass "Stats reports all 3 backends"
+ else
+     fail "Stats backend count" "expected 3, got $BACKEND_COUNT"
+ fi
+ 
+-# Least-connections distributes across multiple backends
++# Round-robin distributes across multiple backends (sequential requests always hit the first backend under least-connections, so lc is unit-tested instead)
+ PORTS_SEEN=$(for _ in $(seq 9); do curl -sf http://localhost:8080/ 2>/dev/null; done \
+              | grep -o '"port":[0-9]*' | sort -u | wc -l | tr -d ' ')
+ if [ "$PORTS_SEEN" -gt 1 ]; then
+diff --git a/tests/test_lb.cpp b/tests/test_lb.cpp
+index 17438c3..06e7e3f 100644
+--- a/tests/test_lb.cpp
++++ b/tests/test_lb.cpp
+@@ -96,26 +96,29 @@ void test_lc_routes_to_uncapped_backend() {
+ 
+ void test_rr_cycles_all_backends() {
+     std::vector<bool> healthy = {true, true, true};
++    std::vector<int> seq3 = {0, 1, 2}, conns3 = {0, 0, 0};
+     int idx = 0;
+-    assert(select_round_robin(idx, 3, healthy) == 0);
+-    assert(select_round_robin(idx, 3, healthy) == 1);
+-    assert(select_round_robin(idx, 3, healthy) == 2);
+-    assert(select_round_robin(idx, 3, healthy) == 0); // wraps
++    assert(select_weighted_rr(idx, seq3, conns3, healthy) == 0);
++    assert(select_weighted_rr(idx, seq3, conns3, healthy) == 1);
++    assert(select_weighted_rr(idx, seq3, conns3, healthy) == 2);
++    assert(select_weighted_rr(idx, seq3, conns3, healthy) == 0); // wraps
+     std::cout << "PASS  rr_cycles_all_backends\n";
+ }
+ 
+ void test_rr_skips_unhealthy() {
+     std::vector<bool> healthy = {true, false, true};
++    std::vector<int> seq3 = {0, 1, 2}, conns3 = {0, 0, 0};
+     int idx = 0;
+-    assert(select_round_robin(idx, 3, healthy) == 0);
+-    assert(select_round_robin(idx, 3, healthy) == 2); // skips index 1
++    assert(select_weighted_rr(idx, seq3, conns3, healthy) == 0);
++    assert(select_weighted_rr(idx, seq3, conns3, healthy) == 2); // skips index 1
+     std::cout << "PASS  rr_skips_unhealthy\n";
+ }
+ 
+ void test_rr_all_unhealthy() {
+     std::vector<bool> healthy = {false, false};
++    std::vector<int> seq2 = {0, 1}, conns2 = {0, 0};
+     int idx = 0;
+-    assert(select_round_robin(idx, 2, healthy) == -1);
++    assert(select_weighted_rr(idx, seq2, conns2, healthy) == -1);
+     std::cout << "PASS  rr_all_unhealthy\n";
+ }
+ 
