@@ -107,6 +107,8 @@ Real model: `gpt-6-luna` (same simulated worlds, scoring and benchmark mode as t
 | dev (25 sc. x 1) | v3 | multi | 25 | 88% | 88% | 92% | 88% | 0% | 100% | 100% | $0.009 | 58s |
 | heldout (15 sc. x 3) | v2 | single | 45 | 96% | 96% | 98% | 71% | 0% | 100% | 100% | $0.002 | 14s |
 | heldout (15 sc. x 3) | v2 | multi | 45 | 76% | 84% | 87% | 80% | 0% | 100% | 100% | $0.010 | 64s |
+| heldout (15 sc. x 3) | v3 | single | 45 | 96% | 96% | 98% | 73% | 0% | 100% | 100% | $0.002 | 12s |
+| heldout (15 sc. x 3) | v3 | multi | 45 | 96% | 96% | 98% | 87% | 0% | 100% | 100% | $0.009 | 58s |
 | hard (10 sc. x 1) | v2 | single | 10 | 70% | 70% | 80% | 20% | 0% | 100% | 50% | $0.002 | 14s |
 | hard (10 sc. x 1) | v2 | multi | 10 | 60% | 60% | 70% | 60% | 0% | 100% | 50% | $0.010 | 63s |
 
@@ -119,9 +121,9 @@ How to read this (same simulated worlds, scoring and benchmark mode as the offli
   *mechanism* (`resource_leak`, `log_flood`, `capacity`). `v2` adds category definitions and roughly doubled dev accuracy (single 32% -> 76%, multi 44% -> 72%). `v1` is kept so the comparison is reproducible.
 * **Dev is the split the prompt was tuned on; held-out (15 scenarios x 3 repeats) is the number to quote.** I looked at held-out failures after the fact to diagnose the multi-agent gap, so treat it as
   lightly contaminated and do not tune against it further.
-* **Single agent beat the multi-agent team here** (held-out 96% vs 76%, about 5x cheaper and 4x faster). Multi-agent was better on remediation (80% vs 71%) but its commander often hedged with
-  `unknown` on dependency faults. The multi-agent advantage is not demonstrated with this model.
-* **`v3` (dev only): single 96%, multi 88%.** It tells the commander to commit to the best-supported mechanism instead of hedging with `unknown`. It was written from dev failures and dev is its tuning split, so this is an optimistic number; it has not been run on held-out.
+* **Under `v2` the single agent beat the multi-agent team** (held-out 96% vs 76%, about 5x cheaper and 4x faster): the commander often hedged with `unknown` on dependency faults.
+  Under `v3` the two tie on accuracy (held-out 96% vs 96%) and multi-agent is better on remediation (87% vs 73%), but it still costs about 5x more and takes 4-5x longer. A multi-agent accuracy advantage is not demonstrated.
+* **`v3`** tells the commander to commit to the best-supported mechanism instead of hedging with `unknown` (dev: single 96%, multi 88%; held-out: single 96%, multi 96%). It was written from dev failures, but I had already seen `v2` held-out failures, so the `v3` held-out numbers are lightly contaminated and are not a clean generalisation result.
 * Held constant across every real run: **0% unsafe actions and 100% evidence grounding**.
 * One model, one prompt family, at most 3 repeats: enough to see large effects, not small ones.
 * Reproduce: `python -m bench.real_llm --model gpt-6-luna --split heldout --config single,multi --repeats 3 --prompt-version v2`, then `python -m bench.real_report --write`.
