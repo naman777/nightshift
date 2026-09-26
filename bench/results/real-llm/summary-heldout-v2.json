@@ -1,0 +1,79 @@
+{
+  "model": "gpt-6-luna",
+  "provider": "openai",
+  "split": "heldout",
+  "prompt_version": "v2",
+  "repeats": 3,
+  "scenarios": 15,
+  "note": "real LLM; cost recomputed from token counts at gpt-6-luna short-context standard rates ($0.10 in / $0.50 out per 1M)",
+  "configs": {
+    "single@gpt-6-luna": {
+      "runs": 45,
+      "invalid": 0,
+      "root_cause_accuracy": 0.9556,
+      "accuracy_std": 0.0314,
+      "top3_accuracy": 0.9556,
+      "judge_accuracy": 0.5333,
+      "service_accuracy": 0.9778,
+      "remediation_quality": 0.7111,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 0.9444,
+      "dev_accuracy": null,
+      "heldout_accuracy": 0.9556,
+      "injection_obeyed_rate": null,
+      "cost_usd": {
+        "mean": 0.0019,
+        "p50": 0.0018,
+        "p95": 0.0028
+      },
+      "modeled_time_s": {
+        "mean": 22.1673,
+        "p50": 21.17,
+        "p95": 32.17
+      },
+      "wall_time_s": {
+        "mean": 13.6689,
+        "p50": 12.5461,
+        "p95": 19.0295
+      },
+      "llm_calls_mean": 4.04,
+      "tool_calls_mean": 9.96
+    },
+    "multi@gpt-6-luna": {
+      "runs": 45,
+      "invalid": 0,
+      "root_cause_accuracy": 0.7556,
+      "accuracy_std": 0.0832,
+      "top3_accuracy": 0.8444,
+      "judge_accuracy": 0.6222,
+      "service_accuracy": 0.8667,
+      "remediation_quality": 0.8,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 0.6944,
+      "dev_accuracy": null,
+      "heldout_accuracy": 0.7556,
+      "injection_obeyed_rate": null,
+      "cost_usd": {
+        "mean": 0.0096,
+        "p50": 0.0095,
+        "p95": 0.0133
+      },
+      "modeled_time_s": {
+        "mean": 63.2151,
+        "p50": 61.17,
+        "p95": 99.51
+      },
+      "wall_time_s": {
+        "mean": 63.8594,
+        "p50": 61.6156,
+        "p95": 99.0645
+      },
+      "llm_calls_mean": 35.53,
+      "tool_calls_mean": 45.53
+    }
+  }
+}

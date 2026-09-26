@@ -1,4 +1,4 @@
-.PHONY: test lint bench bench-dev bench-heldout bench-smoke report scenarios investigate demo-sim up down demo chaos scenario chaos-revert go-check dashboard
+.PHONY: start test lint bench bench-dev bench-heldout bench-smoke report scenarios investigate demo-sim up down demo chaos scenario chaos-revert go-check dashboard
 
 PY ?= python
 SCENARIO ?= bad-config-push-lb-timeout-00
@@ -54,3 +54,6 @@ go-check:                                     ## compile + vet the Go services i
 
 dashboard:
 	cd dashboard && npm install && npm run dev
+
+start:                                        ## gateway + dashboard in one command (no docker)
+	$(PY) start.py
