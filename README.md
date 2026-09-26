@@ -88,7 +88,7 @@ Invalid scenarios (expected alert never fired): 0.
 API keys), not by a language model. It scores near 100% on the simulated world because it was written by someone who knows that world. What the table demonstrates is that the harness works,
 that the benchmark separates a real investigation from a rule of thumb (the two naive baselines land at 5-20%), and that the safety properties hold: 0% unsafe actions, 100% evidence grounding,
 and a planted prompt injection is ignored. A 10-scenario **hard stress set** (decoy changes, concurrent faults, telemetry outages) is included precisely because the reference policy does not ace it (30%); the stretch-goal **incident memory** lifts it to 90% on repeat-style faults (see the benchmark doc for why that is a best case). The single-vs-multi-agent comparison only becomes meaningful with real models: run `make bench` with `NIGHTSHIFT_LLM_PROVIDER=anthropic` and
-report that table instead (a first real-model run is below). Full methodology, splits, judge calibration and limitations: [docs/benchmark.md](docs/benchmark.md). Time to diagnosis is *modelled* (see the doc).
+report that table instead (real-model runs are in the next section). Full methodology, splits, judge calibration and limitations: [docs/benchmark.md](docs/benchmark.md). Time to diagnosis is *modelled* (see the doc).
 
 ## Real-LLM results (`gpt-6-luna`)
 
@@ -126,7 +126,7 @@ How to read this (same simulated worlds, scoring and benchmark mode as the offli
 * **`v3`** tells the commander to commit to the best-supported mechanism instead of hedging with `unknown` (dev: single 96%, multi 88%; held-out: single 96%, multi 96%). It was written from dev failures, but I had already seen `v2` held-out failures, so the `v3` held-out numbers are lightly contaminated and are not a clean generalisation result.
 * Held constant across every real run: **0% unsafe actions and 100% evidence grounding**.
 * One model, one prompt family, at most 3 repeats: enough to see large effects, not small ones.
-* Reproduce: `python -m bench.real_llm --model gpt-6-luna --split heldout --config single,multi --repeats 3 --prompt-version v2`, then `python -m bench.real_report --write`.
+* Reproduce (swap `v2` for `v3` or `v1` to compare): `python -m bench.real_llm --model gpt-6-luna --split heldout --config single,multi --repeats 3 --prompt-version v2`, then `python -m bench.real_report --write`. Needs `OPENAI_API_KEY` in `.env`; a full held-out run costs well under a dollar at gpt-6-luna prices ($0.10 in / $0.50 out per 1M tokens).
 
 ## Beyond the reactive loop
 
@@ -192,7 +192,7 @@ More detail in [docs/architecture.md](docs/architecture.md). The pieces worth re
 | Path | What it is |
 | --- | --- |
 | `agents/core/` | agent loop, LLM adapter (Anthropic, OpenAI, mock), evidence board + citation validator, MCP client |
-| `agents/` | commander, specialists, remediation, single-agent baseline, versioned prompts (`prompts/v1`) |
+| `agents/` | commander, specialists, remediation, single-agent baseline, versioned prompts (`prompts/v1` baseline, `v2` category definitions, `v3` commit-to-a-mechanism) |
 | `mcp_servers/` | metrics, logs, changes, code, runtime servers + the policy layer (tiers, kill switch, audit log) |
 | `orchestrator/` | Temporal workflows, activities, worker |
 | `gateway/`, `slackbot/` | webhook + incident API + SSE + demo launcher endpoints (`/demo/*`); Slack approval messages and signature check |
@@ -213,6 +213,8 @@ permissions, the simulator and the live chaos CLI share one fault definition, an
   (launch a scenario -> live plan and agents -> approve -> resolved -> answer key), with both the offline policy and `gpt-6-luna`.
 * Written but **not executed in the authoring environment** (no Go toolchain, Docker daemon not running): the Go services and stand-ins, `docker-compose.yml`, and the observability
   configs. CI compiles and vets the Go code and validates the compose file; expect a small fix or two on first `make demo`. `make go-check` compiles the Go services in a container.
+* Human approval is exercised through the **dashboard**. The Slack approval path (Block Kit messages, signature verification, replay protection) is implemented and unit-tested but has never been tried in a real Slack workspace.
+* Real-model evidence is one model (`gpt-6-luna`) with at most 3 repeats, prompts tuned on the dev split; held-out failures were inspected after the fact, so the `v3` held-out numbers are lightly contaminated (`v2` held-out is the clean one). A multi-agent accuracy advantage over a single agent is not demonstrated.
 * The C++ load balancer and the Foreman scheduler are deliberately not included yet. `target/stubs/` contains stand-ins with the same config keys and metric names, so the real ones
   drop in as compose services `lb` and `scheduler` without changing alerts, dashboards, faults or agents.
 
