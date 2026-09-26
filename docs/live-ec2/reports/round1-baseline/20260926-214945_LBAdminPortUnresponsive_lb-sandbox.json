@@ -1,0 +1,275 @@
+{
+ "alert": {
+  "fingerprint": "LBAdminPortUnresponsive-lb-sandbox-1790459290",
+  "name": "LBAdminPortUnresponsive",
+  "service": "lb-sandbox",
+  "severity": "warning",
+  "started_at": 1790459290.418971,
+  "labels": {
+   "alertname": "LBAdminPortUnresponsive",
+   "service": "lb-sandbox",
+   "severity": "warning"
+  },
+  "annotations": {
+   "summary": "admin/stats endpoint not answering probes"
+  }
+ },
+ "timings": {
+  "fired_at": 1790459290.418971,
+  "detected_at": 1790459350.6556432,
+  "reported_at": 1790459385.1105464,
+  "investigation_s": 34.450467109680176
+ },
+ "incident_id": "inc-LBAdminPortUnresponsive-lb-sandbox-1790459290",
+ "mode": "multi",
+ "report": {
+  "root_cause": "lb-sandbox's stats/admin listener can become unresponsive when its single stats thread blocks indefinitely reading an idle or incomplete client; the code defect is established, but the evidence does not establish when or how it was triggered.",
+  "service": "lb",
+  "category": "healthcheck_misconfig",
+  "confidence": 0.34,
+  "evidence": [
+   "ev_101",
+   "ev_102",
+   "ev_111",
+   "ev_112",
+   "ev_118"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host/sandbox resource contention prevented the admin probe from being served.",
+    "evidence": [
+     "ev_114",
+     "ev_115"
+    ]
+   },
+   {
+    "hypothesis": "A code deploy introduced the failure immediately before the alert.",
+    "evidence": [
+     "ev_88",
+     "ev_106"
+    ]
+   },
+   {
+    "hypothesis": "The backend pool config changes directly caused the stats-thread blocking-read defect.",
+    "evidence": [
+     "ev_89",
+     "ev_90",
+     "ev_108",
+     "ev_109"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Single-threaded LB stats/admin request handling can hang indefinitely on an idle/incomplete client read; no incident-specific trigger is confirmed.",
+    "service": "lb",
+    "category": "healthcheck_misconfig",
+    "confidence": 0.34
+   },
+   {
+    "root_cause": "Sandbox backend pool configuration change may have contributed to service errors, but there is no demonstrated link to the admin listener failure.",
+    "service": "lb",
+    "category": "config_change",
+    "confidence": 0.12
+   }
+  ],
+  "proposed_action": {
+   "type": "none",
+   "target": "",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 91374,
+   "output_tokens": 6756,
+   "cost_usd": 0.012516,
+   "llm_calls": 31,
+   "tool_calls": 44,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "none",
+  "target": "",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 91374,
+  "output_tokens": 6756,
+  "cost_usd": 0.012516,
+  "llm_calls": 31,
+  "tool_calls": 44,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "Around alert_started_at 1790459290, did probes on sandbox admin :8091 fail while data :8090 remained healthy, and did host CPU/memory or process signals change before onset?",
+   "summary": "Around alert_started_at 1790459290, the sandbox admin probe did not fail until the sampled onset 1790459310: admin_port_up fell from 1 to 0 and probe duration rose from about 0.0004s to about 4.0s. That supports a sandbox-specific failure around the alert, while the lb/data-side admin_port_up series was already 0 throughout the observed window, so these metrics cannot establish that data :8090 remained healthy. Host CPU showed no sustained pre-onset increase (no detected onset; values remained low), and memory rose modestly before the probe failure (baseline ratio 1.24, onset 1790458726); no process-signal metrics were obtained. Overall inconclusive for the full comparison requested.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_92",
+    "ev_93",
+    "ev_94",
+    "ev_95",
+    "ev_96",
+    "ev_97"
+   ],
+   "usage": {
+    "input_tokens": 6634,
+    "output_tokens": 1050,
+    "cost_usd": 0.001189,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What sandbox LB log events immediately precede 1790459290, particularly listener errors, crashes, or resource symptoms?",
+   "summary": "Inconclusive: the sandbox-lb error clustering, error search, and tail returned no events, so I cannot identify listener errors, crashes, or resource symptoms immediately before timestamp 1790459290. The requested timestamp cutoff could not be applied because the clustering tool rejected the absolute end value; these results therefore do not establish what occurred at that historical time. [log service=sandbox-lb level=error count=0 first_seen=unknown sig=\"no matching error events\"] [log service=sandbox-lb level=unknown count=0 first_seen=unknown sig=\"empty service tail\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_98",
+    "ev_99",
+    "ev_100"
+   ],
+   "usage": {
+    "input_tokens": 4546,
+    "output_tokens": 400,
+    "cost_usd": 0.000655,
+    "llm_calls": 5,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "changes",
+   "question": "Was there a sandbox deploy or sandbox.conf change before 1790459290 that altered admin listener behavior or its port?",
+   "summary": "No sandbox deploy is listed in the queried window (call_1). Yes: sandbox.conf was changed before 1790459290 to move the upstream backend ports from 8093\u20138095 to 9991\u20139993 at 1790459043, then reverted to 8093\u20138095 at 1790459202. Both occurred shortly before the queried cutoff. The listener port itself remained 8090 in the diffs, so the observed change affected backend ports, not the admin listener port/behavior. [change kind=config service=sandbox sha=d74bfb5f ts=1790459043 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=sandbox sha=591ce10f ts=1790459202 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_88",
+    "ev_89",
+    "ev_90",
+    "ev_91"
+   ],
+   "usage": {
+    "input_tokens": 4190,
+    "output_tokens": 861,
+    "cost_usd": 0.000849,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Does the current sandbox LB code contain a defect or coupling that can make the admin/stats endpoint unresponsive while the data listener remains available?",
+   "summary": "Yes. The stats endpoint is served synchronously by one stats thread: after accept it performs a blocking read from the client before generating a response. A client that connects and sends no request (or sends an incomplete request) can hold that thread indefinitely, so subsequent admin/stats requests stop being serviced while the separate data accept loop remains active. The endpoint also shares connection_mutex_ with data-path backend selection/counters, so stats snapshot generation can wait behind data-path activity; that is coupling, though the blocking request read is the direct unresponsive-endpoint defect. I would bound the request read with a timeout/nonblocking parser or handle requests concurrently, and avoid holding shared state locks longer than needed. Tests could not run because Go is not installed; this is a C++ project and the attempted generic Go test command therefore does not validate it.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_101",
+    "ev_102",
+    "ev_103",
+    "ev_104",
+    "ev_105"
+   ],
+   "usage": {
+    "input_tokens": 47976,
+    "output_tokens": 713,
+    "cost_usd": 0.005154,
+    "llm_calls": 6,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "Before or at 1790459296, is there evidence of an idle/incomplete client connected to the sandbox LB stats/admin listener that could block its sole stats thread?",
+   "summary": "Inconclusive: available logs before or at 1790459296 do not show an idle or incomplete client connected to the sandbox LB stats/admin listener, nor do they establish that its sole stats thread was blocked. The only relevant evidence is two informational messages saying the stats endpoint was listening on port 8091; the admin search, error search, and tail returned no records. [log service=lb-sandbox level=info count=2 first_seen=1790458431 sig=\"Stats endpoint listening on port 8091\"] (call_2, call_3, call_4, call_5, call_6)",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_117",
+    "ev_118"
+   ],
+   "usage": {
+    "input_tokens": 4069,
+    "output_tokens": 551,
+    "cost_usd": 0.000682,
+    "llm_calls": 4,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Is there a code/config rollout or first introduction of the blocking stats-thread read defect before the sandbox admin probe failure at 1790459296?",
+   "summary": "Inconclusive on whether a code/config rollout or first introduction of the blocking stats-thread read defect preceded the sandbox admin probe failure: there were no code deploys in the retrieved window, and the available config changes only concern the sandbox backend pool, not a stats-thread read defect. The pool was changed at 1790459043, 253 seconds before the failure timestamp, then reverted at 1790459202, 94 seconds before it; these are temporally prior config candidates but the evidence does not connect them to the blocking-read defect. [change kind=config service=sandbox sha=d74bfb5f ts=1790459043 key=backends old='8093, 8094, 8095' new='9991, 9992, 9993' msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=sandbox sha=591ce10f ts=1790459202 key=backends old='9991, 9992, 9993' new='8093, 8094, 8095' msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"] [change kind=config service=sandbox sha=1bc832bc ts=1790458431 key=sandbox.conf old=absent new='port=8090; backends=8093,8094,8095; algo=lc; threads=16' msg=\"initial sandbox lb config\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_106",
+    "ev_107",
+    "ev_108",
+    "ev_109"
+   ],
+   "usage": {
+    "input_tokens": 4187,
+    "output_tokens": 702,
+    "cost_usd": 0.000769,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "Do connection counts, thread saturation, or data-plane availability show a sandbox-specific stats-thread stall around 1790459296, while excluding host contention?",
+   "summary": "Inconclusive for the specific connection-count/thread-saturation/data-plane question: the available metric inventory does not expose connection counts or thread-saturation series, and the observed availability/admin anomaly begins at 1790459310, substantially later than 1790459296. Around that later onset, sandbox admin probe latency rises from roughly 0.0004\u20130.0005 seconds to about 4 seconds (approximately 8,000\u201310,000x from the observed immediate pre-anomaly value), and admin_port_up falls from 1 to 0. Host CPU remains low (~0.015\u20130.029) and does not show contention; host memory is elevated versus the top-anomaly baseline but changes gradually and is only ~0.123 around the onset. The evidence therefore supports a later sandbox-specific admin/availability issue, not a demonstrated stats-thread stall around 1790459296, while host contention is not apparent. [metric name=admin_probe_seconds service=lb-sandbox ratio=~8000-10000 onset=1790459310] [metric name=admin_port_up service=lb-sandbox ratio=0 onset=1790459310] [metric name=host_cpu_ratio service=host ratio=low/no-spike onset=1790459310] [metric name=host_memory_used_ratio service=host ratio=1.24 onset=1790458740]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_110",
+    "ev_111",
+    "ev_112",
+    "ev_113",
+    "ev_114",
+    "ev_115",
+    "ev_116"
+   ],
+   "usage": {
+    "input_tokens": 6560,
+    "output_tokens": 1369,
+    "cost_usd": 0.001341,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}

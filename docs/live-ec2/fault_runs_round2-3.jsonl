@@ -1,0 +1,8 @@
+{"fault":"crashed_backend","round":1,"t_inject":1790460240,"alert_fired_after_s":42,"report_after_s":108,"alerts":"LBBackendUnhealthy","reports":"20260926-220548_LBBackendUnhealthy_lb-sandbox.json"}
+{"fault":"config_break","round":1,"t_inject":1790460414,"alert_fired_after_s":57,"report_after_s":123,"alerts":"LBDataPathErrors","reports":"20260926-220855_LBDataPathErrors_lb-sandbox.json"}
+{"fault":"idle_client_stats","round":1,"t_inject":1790460642,"alert_fired_after_s":90,"report_after_s":165,"alerts":"LBAdminPortUnresponsive","reports":"20260926-221325_LBAdminPortUnresponsive_lb-sandbox.json"}
+{"fault":"service_stopped","round":1,"t_inject":1790460872,"alert_fired_after_s":40,"report_after_s":115,"alerts":"LBUnitDown","reports":"20260926-221627_LBBackendUnhealthy+LBUnitDown+LBDataPathErrors_lb-sandbox.json"}
+{"fault":"crashed_backend","round":2,"t_inject":1790461092,"alert_fired_after_s":51,"report_after_s":129,"alerts":"LBBackendUnhealthy","reports":"20260926-222019_LBBackendUnhealthy_lb-sandbox.json"}
+{"fault":"config_break","round":2,"t_inject":1790461287,"alert_fired_after_s":54,"report_after_s":132,"alerts":"LBDataPathErrors","reports":"20260926-222338_LBDataPathErrors_lb-sandbox.json"}
+{"fault":"idle_client_stats","round":2,"t_inject":1790461533,"alert_fired_after_s":90,"report_after_s":138,"alerts":"LBAdminPortUnresponsive","reports":"20260926-222751_LBAdminPortUnresponsive_lb-sandbox.json"}
+{"fault":"service_stopped","round":2,"t_inject":1790461736,"alert_fired_after_s":46,"report_after_s":118,"alerts":"LBBackendUnhealthy,LBUnitDown","reports":"20260926-223054_LBBackendUnhealthy+LBDataPathErrors+LBUnitDown_lb-sandbox.json"}

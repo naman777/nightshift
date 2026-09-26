@@ -1,0 +1,333 @@
+{
+ "alert": {
+  "fingerprint": "LBDataPathErrors-lb-sandbox-1790459070",
+  "name": "LBDataPathErrors",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790459070.418971,
+  "labels": {
+   "alertname": "LBDataPathErrors",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "more than 30% of data-path probes failing"
+  }
+ },
+ "timings": {
+  "fired_at": 1790459070.418971,
+  "detected_at": 1790459102.7976696,
+  "reported_at": 1790459155.101617,
+  "investigation_s": 52.299593925476074
+ },
+ "incident_id": "inc-LBDataPathErrors-lb-sandbox-1790459070",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The lb-sandbox data-path failure is most consistent with an effective backend-list mismatch or unavailable backends after sandbox.conf commit d74bfb5f switched ports 8093\u20138095 to 9991\u20139993, but runtime adoption and port health are unverified.",
+  "service": "lb",
+  "category": "dependency_outage",
+  "confidence": 0.34,
+  "evidence": [
+   "ev_77",
+   "ev_78",
+   "ev_79",
+   "ev_80",
+   "ev_70",
+   "ev_73",
+   "ev_83"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host-level resource contention or exhaustion impaired the data path.",
+    "evidence": [
+     "ev_64",
+     "ev_65",
+     "ev_66"
+    ]
+   },
+   {
+    "hypothesis": "A recent lb-sandbox deployment introduced a code regression.",
+    "evidence": [
+     "ev_53",
+     "ev_60"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Backend outage/unavailability affecting lb-sandbox data-path probes; port-specific runtime reachability is not available to confirm.",
+    "service": "lb",
+    "category": "dependency_outage",
+    "confidence": 0.34
+   },
+   {
+    "root_cause": "Backend-list configuration change d74bfb5f caused a mismatch if loaded by lb-sandbox, directing traffic from ports 8093\u20138095 to 9991\u20139993.",
+    "service": "lb",
+    "category": "healthcheck_misconfig",
+    "confidence": 0.32
+   },
+   {
+    "root_cause": "A load-balancer code defect caused failed or truncated data-path requests; available source shows possible failure paths but no incident-specific regression evidence.",
+    "service": "lb",
+    "category": "bad_deploy",
+    "confidence": 0.12
+   }
+  ],
+  "proposed_action": {
+   "type": "none",
+   "target": "",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 121875,
+   "output_tokens": 9260,
+   "cost_usd": 0.016818,
+   "llm_calls": 43,
+   "tool_calls": 56,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 3,
+  "degraded": false
+ },
+ "action": {
+  "type": "none",
+  "target": "",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 121875,
+  "output_tokens": 9260,
+  "cost_usd": 0.016818,
+  "llm_calls": 43,
+  "tool_calls": 56,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At what exact time did lb-sandbox data-path probe failures begin, and what changed first in probes or host CPU/memory/disk around 1790459070?",
+   "summary": "lb-sandbox data-path errors began at 1790459060 in the queried series; the anomaly detector reports 1790459078. At 1790459070, error_rate was 0.3333 after zero beforehand. Probe duration, p99 latency, host CPU, and disk showed no contemporaneous step in the sampled data. Host memory's elevated level was reported as an earlier anomaly starting at 1790458718 (1.24x baseline), but it was nearly flat around the failures. Comparisons did not yield usable evidence, so the strongest precise temporal evidence is the queried samples and onset values.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_62",
+    "ev_63",
+    "ev_64",
+    "ev_65",
+    "ev_66",
+    "ev_67"
+   ],
+   "usage": {
+    "input_tokens": 16470,
+    "output_tokens": 1981,
+    "cost_usd": 0.002637,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What lb-sandbox and backend errors are logged immediately before and during the probe-failure onset at 1790459070?",
+   "summary": "Inconclusive: the available cluster-error queries returned no error clusters, so I cannot identify the lb-sandbox or backend errors immediately before or during probe-failure onset at 1790459070. The timestamped query also failed because the tool rejected ISO-formatted timestamps. [log service=unknown level=unknown count=0 first_seen=unknown sig=\"no error clusters returned\"] (call_1, call_3); [log service=unknown level=unknown count=unknown first_seen=unknown sig=\"timestamp query rejected ISO format\"] (call_2).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_55",
+    "ev_56"
+   ],
+   "usage": {
+    "input_tokens": 3275,
+    "output_tokens": 367,
+    "cost_usd": 0.000511,
+    "llm_calls": 4,
+    "tool_calls": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Was lb-sandbox code or sandbox.conf changed shortly before 1790459070, and what exact change and timestamp?",
+   "summary": "No lb-sandbox code deploy appears in the queried window. sandbox.conf did change shortly before 1790459070: at Unix timestamp 1790459043 (27 seconds earlier), its backends changed from 8093, 8094, 8095 to 9991, 9992, 9993. [change kind=config service=lb-sandbox sha=d74bfb5f ts=1790459043 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_53",
+    "ev_54"
+   ],
+   "usage": {
+    "input_tokens": 1879,
+    "output_tokens": 413,
+    "cost_usd": 0.000394,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Which code paths in the deployed sandbox balancer could produce >30% data-path probe failures, and what evidence distinguishes a code regression from backend failure?",
+   "summary": "[code file=load-balancer/LoadBalancer.cpp smell=timeout tests=fail] Multiple deployed code paths could plausibly drive data-path failures above 30%, but the available evidence does not quantify deployed incidence or establish whether the underlying event is a code regression or backend fault. Health probing sends an unchecked HTTP request, performs one blocking recv with no read timeout, and treats short/no-response reads as healthy; HTTP responses outside a 2xx prefix mark the backend unhealthy (calls call_7 and call_9). Thus a slow or non-2xx backend may be excluded, while a raw TCP backend may be marked healthy despite not speaking HTTP. Actual routing connects synchronously without the probe's 2-second timeout; failed connects mark a selected backend unhealthy, retry another, and drop the client if no selection/connect succeeds (call_8). The proxy loop itself ends on select timeout or read/send failure, so idle/slow clients and transport errors can cut data paths (call_9). Distinguishing code regression from backend failure would require contemporaneous per-backend probe response/latency and connect/error data, plus comparison against direct backend reachability and deployed version/config; the code excerpts alone cannot make that attribution. Tests are unverified: requested Go suite did not run because Go is unavailable (call_3); no C++ test result was collected.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_57",
+    "ev_58",
+    "ev_59",
+    "ev_60",
+    "ev_61"
+   ],
+   "usage": {
+    "input_tokens": 23730,
+    "output_tokens": 1039,
+    "cost_usd": 0.002892,
+    "llm_calls": 4,
+    "tool_calls": 10,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "At Unix times 1790459040\u20131790459100, do lb-sandbox logs or backend probes show connection refused/timeouts or failed HTTP health checks for ports 9991\u20139993 versus 8093\u20138095?",
+   "summary": "Inconclusive: the requested log search could not be performed because `logs__cluster_errors` rejected both the Unix-style and ISO timestamp inputs. No evidence was obtained about connection refused/timeouts or HTTP health-check failures for ports 9991\u20139993 versus 8093\u20138095. [log service=lb-sandbox level=unknown count=0 first_seen=1790459040 sig=\"no log samples retrieved\"] [call_1, call_2, call_3]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_68",
+    "ev_69"
+   ],
+   "usage": {
+    "input_tokens": 2528,
+    "output_tokens": 357,
+    "cost_usd": 0.000431,
+    "llm_calls": 3,
+    "tool_calls": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "metrics",
+   "question": "Around 1790459040\u20131790459100, what per-backend probe success, connect failures, or backend latency is observed for lb-sandbox ports 9991\u20139993 versus 8093\u20138095?",
+   "summary": "The available metrics are service-level aggregates and do not expose per-backend or port labels, so a direct comparison of lb-sandbox ports 9991\u20139993 versus 8093\u20138095 cannot be established. In the observed interval 1790459040\u20131790459100, aggregate upstream health stayed at 3 and aggregate p99 latency stayed around 0.0005\u20130.0006 seconds, while service error rate began rising at 1790459060 and reached 0.8333 by 1790459100. Queries specifically for the requested port labels returned no series.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_73",
+    "ev_74",
+    "ev_75",
+    "ev_76",
+    "ev_77"
+   ],
+   "usage": {
+    "input_tokens": 8330,
+    "output_tokens": 1007,
+    "cost_usd": 0.001337,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "What evidence identifies whether services were listening and healthy on ports 9991\u20139993 at 1790459070, and whether sandbox.conf change d74bfb5f was intended/applied successfully?",
+   "summary": "The available change evidence does not establish whether anything was listening or healthy on ports 9991\u20139993 at Unix time 1790459070: these tools provide deploy/config history, not runtime listener or health checks. They do show sandbox.conf commit d74bfb5f at 1790459043 (27 seconds before that time) changing the sandbox backend list from 8093\u20138095 to 9991\u20139993, with a message saying it was a rollout. The diff proves the config change was recorded, but not that it was loaded or applied successfully. The file itself describes a sandbox copy and says the live LB is untouched.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_70",
+    "ev_71",
+    "ev_72"
+   ],
+   "usage": {
+    "input_tokens": 3350,
+    "output_tokens": 632,
+    "cost_usd": 0.000651,
+    "llm_calls": 3,
+    "tool_calls": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "changes",
+   "question": "Can the sandbox configuration/runtime or rollout evidence establish whether lb-sandbox loaded sandbox.conf commit d74bfb5f before 1790459060, and identify the effective backend ports at onset?",
+   "summary": "Inconclusive: the config history establishes that sandbox.conf commit d74bfb5f changed the backend list to 9991, 9992, 9993 at 1790459043, which is shortly before the questioned cutoff of 1790459060. But the available rollout evidence shows no lb-sandbox deploys, so it does not establish whether lb-sandbox had loaded that commit by the cutoff. The effective backend ports at onset therefore cannot be established: the config had changed from 8093, 8094, 8095 to 9991, 9992, 9993, but runtime adoption is unobserved.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_78",
+    "ev_79",
+    "ev_80"
+   ],
+   "usage": {
+    "input_tokens": 1909,
+    "output_tokens": 652,
+    "cost_usd": 0.000517,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "At 1790459060\u20131790459100, do any available per-backend listener/port-up metrics show availability differences between ports 9991\u20139993 and 8093\u20138095, beyond the existing aggregate upstream_healthy series?",
+   "summary": "No available per-backend or per-port listener/up metric series are exposed: the only related series found is service-level admin_port_up, with no backend or port labels. In the requested 1790459060\u20131790459100 interval, admin_port_up is 1 throughout for lb-sandbox and 0 throughout for lb, while aggregate upstream_healthy for lb-sandbox is 3 throughout. Thus these metrics do not resolve any availability differences between ports 9991\u20139993 and 8093\u20138095 beyond the aggregate; port-specific conclusion is inconclusive. [metric name=admin_port_up service=lb-sandbox ratio=1.0 onset=1790459060] [metric name=admin_port_up service=lb ratio=0.0 onset=1790459060] [metric name=upstream_healthy service=lb-sandbox ratio=1.0 onset=1790459060]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_81",
+    "ev_82",
+    "ev_83"
+   ],
+   "usage": {
+    "input_tokens": 10757,
+    "output_tokens": 700,
+    "cost_usd": 0.001426,
+    "llm_calls": 5,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Does the available code/test evidence establish whether the new 9991\u20139993 backend ports are compatible with the load balancer's probe/data-path behavior, or can it only show general failure modes?",
+   "summary": "[code file=load-balancer/LoadBalancer.cpp smell=none tests=fail] The available evidence shows the load balancer accepts configurable backend ports and probes them with HTTP HEAD, while its client path forwards TCP data; however, no code or test evidence specifically identifies ports 9991\u20139993 or demonstrates those services' protocol/probe responses. It therefore supports only general behavior and failure modes, not compatibility of the new ports. The attempted test invocation was rejected as not allow-listed, so no tests ran.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_84",
+    "ev_85",
+    "ev_86",
+    "ev_87"
+   ],
+   "usage": {
+    "input_tokens": 31723,
+    "output_tokens": 741,
+    "cost_usd": 0.003545,
+    "llm_calls": 6,
+    "tool_calls": 10,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}

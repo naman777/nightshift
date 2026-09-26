@@ -1,0 +1,212 @@
+{
+ "alert": {
+  "fingerprint": "LBBackendUnhealthy-lb-sandbox-1790459460",
+  "name": "LBBackendUnhealthy",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790459460.418971,
+  "labels": {
+   "alertname": "LBBackendUnhealthy",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "fewer than 3 upstream backends accepting connections"
+  }
+ },
+ "timings": {
+  "fired_at": 1790459460.418971,
+  "detected_at": 1790459495.3652933,
+  "reported_at": 1790459517.5014596,
+  "investigation_s": 22.13163709640503
+ },
+ "incident_id": "inc-LBBackendUnhealthy-lb-sandbox-1790459460",
+ "mode": "multi",
+ "report": {
+  "root_cause": "lb-sandbox's health-check implementation misclassifies reachable backends returning non-2xx responses as unhealthy (code evidence ev_130); the temporary backend-port config change d74bfb5f was reverted before probe failures began and is not established as the cause (ev_119, ev_120, ev_122).",
+  "service": "lb",
+  "category": "healthcheck_misconfig",
+  "confidence": 0.68,
+  "evidence": [
+   "ev_130",
+   "ev_122",
+   "ev_123",
+   "ev_119",
+   "ev_120",
+   "ev_124",
+   "ev_129"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "The temporary backend-port config change directly caused the observed probe failure.",
+    "evidence": [
+     "ev_119",
+     "ev_120",
+     "ev_122"
+    ]
+   },
+   {
+    "hypothesis": "Host CPU or memory pressure caused probe failures.",
+    "evidence": [
+     "ev_124",
+     "ev_125"
+    ]
+   },
+   {
+    "hypothesis": "A lb-sandbox binary deployment introduced the regression.",
+    "evidence": [
+     "ev_121"
+    ]
+   },
+   {
+    "hypothesis": "Backend connection refusals are established as the cause.",
+    "evidence": [
+     "ev_127",
+     "ev_128",
+     "ev_129"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "lb-sandbox health-check implementation marks reachable backends unhealthy when they return non-2xx HTTP statuses.",
+    "service": "lb",
+    "category": "healthcheck_misconfig",
+    "confidence": 0.68
+   },
+   {
+    "root_cause": "A backend outage or refusal may have reduced the healthy backend count, but available logs and aggregate metrics do not identify failed ports or connection outcomes.",
+    "service": "lb",
+    "category": "dependency_outage",
+    "confidence": 0.19
+   }
+  ],
+  "proposed_action": {
+   "type": "none",
+   "target": "",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 84242,
+   "output_tokens": 3918,
+   "cost_usd": 0.010382,
+   "llm_calls": 25,
+   "tool_calls": 30,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 1,
+  "degraded": false
+ },
+ "action": {
+  "type": "none",
+  "target": "lb-sandbox",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 84242,
+  "output_tokens": 3918,
+  "cost_usd": 0.010382,
+  "llm_calls": 25,
+  "tool_calls": 30,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "Since alert_started_at 1790459460, which probes on lb-sandbox ports 8093-8095 failed, and did host CPU or memory pressure precede those failures?",
+   "summary": "Metrics show lb-sandbox probe failure onset at 1790459290, with aggregate admin_port_up dropping from 1 to 0 and probe duration spiking at the same time; however the available series are not labeled by port, so I cannot identify which of ports 8093\u20138095 failed. Neither host CPU nor memory shows clear pressure preceding the failures: CPU's recorded onset is 1790459390 (after failure began) and a brief peak at 1790459410, while memory rose modestly from about 0.108\u20130.109 to about 0.12 before failures but remained around 0.123, with no strong evidence of pressure. [metric name=admin_port_up service=lb-sandbox ratio=0.13 onset=1790459290] [metric name=admin_probe_seconds service=lb-sandbox ratio=1000 onset=1790459290] [metric name=host_cpu_ratio service=host ratio=1.0 onset=1790459390] [metric name=host_memory_used_ratio service=host ratio=1.23 onset=1790458780]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_122",
+    "ev_123",
+    "ev_124",
+    "ev_125",
+    "ev_126"
+   ],
+   "usage": {
+    "input_tokens": 14225,
+    "output_tokens": 1079,
+    "cost_usd": 0.001961,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What lb-sandbox/journald errors occur around 1790459460, and do they identify refused backend connections or health-check failures?",
+   "summary": "Inconclusive: the requested epoch-time interval could not be queried successfully. The initial cluster-errors call rejected '@1790459160' as an invalid timestamp, and the subsequent relative-window queries found no error clusters or matching error lines for lb-sandbox or journald; these results do not establish whether backend connections were refused or health checks failed. [log service=lb-sandbox level=error count=0 first_seen=unknown sig=\"no error lines returned\"] [log service=journald level=error count=0 first_seen=unknown sig=\"no error lines returned\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_127",
+    "ev_128",
+    "ev_129"
+   ],
+   "usage": {
+    "input_tokens": 6775,
+    "output_tokens": 475,
+    "cost_usd": 0.000916,
+    "llm_calls": 7,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Was sandbox.conf or the lb-sandbox binary/deployment changed shortly before 1790459460, and what exact change was made?",
+   "summary": "Yes\u2014sandbox.conf changed shortly before 1790459460: at 1790459043 the backend pool changed from 8093, 8094, 8095 to 9991, 9992, 9993, then was reverted at 1790459202 to the original pool, both shortly before the reference time. No lb-sandbox deployment appears in the queried deploy results, so there is no observed binary/deployment change. [change kind=config service=lb-sandbox sha=d74bfb5f ts=1790459043 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=591ce10f ts=1790459202 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_119",
+    "ev_120",
+    "ev_121"
+   ],
+   "usage": {
+    "input_tokens": 4203,
+    "output_tokens": 768,
+    "cost_usd": 0.000804,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Does the balancer's backend health-check logic/config have a defect that could mark accepting backends unhealthy, and what evidence supports it?",
+   "summary": "[code file=load-balancer/LoadBalancer.cpp smell=health-check-misclassification tests=fail] Yes. The probe sends HEAD / and marks any response that is not recognized as HTTP/1.x with a '2' at status-code position unhealthy, so an accepting HTTP backend returning a non-2xx response (for example 3xx/4xx/5xx) will be marked unhealthy and excluded from routing; a failed/short response instead falls through as healthy. I would make status parsing explicit and align accepted statuses/configurable endpoint and policy with the intended health contract; do not treat a live HTTP backend as healthy solely because it is non-HTTP. The tests could not be run because the attempted ctest command was not allow-listed. [code file=load-balancer/LoadBalancer.cpp smell=health-check-misclassification tests=fail]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_130",
+    "ev_131",
+    "ev_132"
+   ],
+   "usage": {
+    "input_tokens": 51276,
+    "output_tokens": 739,
+    "cost_usd": 0.005496,
+    "llm_calls": 7,
+    "tool_calls": 10,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}

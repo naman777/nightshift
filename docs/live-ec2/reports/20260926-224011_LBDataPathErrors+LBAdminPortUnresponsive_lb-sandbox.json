@@ -1,0 +1,276 @@
+{
+ "alert": {
+  "fingerprint": "LBDataPathErrors+LBAdminPortUnresponsive-lb-sandbox-1790462250",
+  "name": "LBDataPathErrors+LBAdminPortUnresponsive",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790462250.418971,
+  "labels": {
+   "alertname": "LBDataPathErrors+LBAdminPortUnresponsive",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "LBDataPathErrors: more than 30% of data-path probes failing; LBAdminPortUnresponsive: admin/stats endpoint not answering probes"
+  }
+ },
+ "timings": {
+  "fired_at": 1790462250.418971,
+  "detected_at": 1790462376.6781013,
+  "reported_at": 1790462411.911623,
+  "investigation_s": 35.22911047935486
+ },
+ "incident_id": "inc-LBDataPathErrors+LBAdminPortUnresponsive-lb-sandbox-1790462250",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The lb-sandbox incident is not conclusively attributable from available pre-alert evidence; the best-supported mechanism is intermittent backend unavailability in lb-sandbox, previously associated with the temporary backend-pool config change (1aea6206), but its reversion (d081661e) preceded recovered samples and does not explain the alert conclusively.",
+  "service": "lb",
+  "category": "dependency_outage",
+  "confidence": 0.18,
+  "evidence": [
+   "ev_591",
+   "ev_592",
+   "ev_606",
+   "ev_611",
+   "ev_612",
+   "ev_613",
+   "ev_615",
+   "ev_617",
+   "ev_599",
+   "ev_598"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "The temporary backend target change directly caused the alert at 1790462250; it had been reverted and all indicators sampled at 1790462190 were healthy.",
+    "evidence": [
+     "ev_591",
+     "ev_592",
+     "ev_615"
+    ]
+   },
+   {
+    "hypothesis": "Host CPU contention caused the alert; the recorded CPU anomaly began after alert start.",
+    "evidence": [
+     "ev_598"
+    ]
+   },
+   {
+    "hypothesis": "A newly deployed lb-sandbox build caused the failure; no deployment evidence was returned, although query coverage is incomplete.",
+    "evidence": [
+     "ev_594",
+     "ev_610"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Intermittent backend unavailability in lb-sandbox, with earlier backend-unreachable logs; recurrence as the cause of the alert is not demonstrated in the pre-alert samples.",
+    "service": "lb",
+    "category": "dependency_outage",
+    "confidence": 0.18
+   },
+   {
+    "root_cause": "Intermittent lb-sandbox process or listener responsiveness issue; admin and unit indicators degraded in the comparison interval, but recovered in the final pre-alert sample and logs do not establish listener failure.",
+    "service": "lb",
+    "category": "healthcheck_misconfig",
+    "confidence": 0.12
+   }
+  ],
+  "proposed_action": {
+   "type": "none",
+   "target": "",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 101729,
+   "output_tokens": 7550,
+   "cost_usd": 0.013949,
+   "llm_calls": 31,
+   "tool_calls": 49,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "lb-sandbox backend dependency",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 101729,
+  "output_tokens": 7550,
+  "cost_usd": 0.013949,
+  "llm_calls": 31,
+  "tool_calls": 49,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "Around alert start 1790462250, when did lb-sandbox data/admin probe failures begin relative to host CPU, memory, and process availability changes?",
+   "summary": "lb-sandbox data/admin probe failures were already occurring well before alert start 1790462250: backend availability and unit-active anomalies began around 1790460912\u20131790460960, and admin probe timeouts/port-down began by 1790460720. Host memory rose later (anomaly onset 1790461272; queried increase is visible by 1790461440), while host CPU anomaly began at 1790462322, after the alert start. Thus probe/backend/process disruptions predate the memory rise and CPU change; near the alert start, the service again became unavailable at 1790462280. Evidence does not include a clean baseline ratio for individual admin probes, so ratio is given where reported or as unavailable.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_595",
+    "ev_596",
+    "ev_597",
+    "ev_598",
+    "ev_599",
+    "ev_600"
+   ],
+   "usage": {
+    "input_tokens": 7523,
+    "output_tokens": 1099,
+    "cost_usd": 0.001302,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What lb-sandbox or nsbox-lb.service log events immediately precede 1790462250, and do they indicate process failure, backend errors, or admin-listener failure?",
+   "summary": "Inconclusive regarding the events immediately preceding Unix timestamp 1790462250. The observed lb-sandbox error signature is repeated \u201cAll backends unreachable \u2014 dropping connection,\u201d beginning at 1790460419 and last seen at 1790461464 (1105 clustered errors), which indicates backend errors during that earlier interval, not evidence of process failure or admin-listener failure. No nsbox-lb.service error clusters were returned. Available samples do not reach 1790462250, so they cannot establish which events immediately preceded that timestamp. The benign-noise and injection checks are not established by these samples.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_606",
+    "ev_607",
+    "ev_608"
+   ],
+   "usage": {
+    "input_tokens": 13715,
+    "output_tokens": 683,
+    "cost_usd": 0.001712,
+    "llm_calls": 4,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "What sandbox.conf or lb-sandbox deployment/code changes occurred shortly before 1790462250, and what exact values or build changed?",
+   "summary": "No lb-sandbox deployment was listed in the recent-deploy query. The sandbox.conf history shows repeated backend-pool changes shortly before 1790462250: most immediately, at 1790461287 backends changed from 8093, 8094, 8095 to 9991, 9992, 9993, then at 1790461464 reverted to 8093, 8094, 8095. Earlier identical flip/revert pairs occurred at 1790460414/1790460582. [change kind=config service=lb-sandbox sha=1aea6206 ts=1790461287 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=d081661e ts=1790461464 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"] [change kind=config service=lb-sandbox sha=d364187f ts=1790460414 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=025974df ts=1790460582 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_591",
+    "ev_592",
+    "ev_593",
+    "ev_594"
+   ],
+   "usage": {
+    "input_tokens": 5886,
+    "output_tokens": 1122,
+    "cost_usd": 0.00115,
+    "llm_calls": 3,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "code",
+   "question": "Does the current lb-sandbox code/config path contain a defect capable of making both data-path and admin endpoints unresponsive, and what mechanism would it require?",
+   "summary": "[code file=load-balancer/LoadBalancer.cpp smell=blocking-io tests=fail] Evidence supports a possible mechanism that could leave the proxy's data path and its stats/admin endpoint unresponsive: worker handlers perform blocking upstream/proxy reads and writes, and the stats listener accepts and reads requests synchronously. If incoming connections stall these operations, all 16 configured pool workers could be occupied; stats processing can also stall on an incomplete request. This would require enough slow/stalled clients or backends to exhaust the shared data-path worker pool and/or block the single stats-loop thread, rather than being demonstrated as a defect caused by the current lb.conf. The configuration shown has 16 threads and ordinary backend ports, and does not establish that such exhaustion occurs. Tests were attempted but could not run because Go is not installed (and the requested test runner target reported that). The specific lb-sandbox path was not found, so the conclusion remains inconclusive. [code file=lb.conf smell=none tests=fail]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_601",
+    "ev_602",
+    "ev_603",
+    "ev_604",
+    "ev_605"
+   ],
+   "usage": {
+    "input_tokens": 34252,
+    "output_tokens": 863,
+    "cost_usd": 0.003858,
+    "llm_calls": 6,
+    "tool_calls": 10,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "metrics",
+   "question": "Across 1790460000\u20131790462400, do backend_up, admin_port_up, and unit_active recover after the 1790461464 backend-pool revert, and do failures recur before the 1790462250 alert? Provide exact timestamps and ratios.",
+   "summary": "For the lb-sandbox series, all three measures were healthy at the revert boundary (1790461470) but did not remain recovered through the pre-alert window: backend_up and unit_active were 1 at 1790461470, 1790461560, and 1790461680, fell to 0 at 1790461770 and 1790461890, recovered at 1790461980/1790462100/1790462190, then failed again at 1790462310 (the last sample before the 1790462250 alert is actually 1790462190; 1790462310 is after it). admin_port_up was healthy at 1790461470 and failed from 1790461560 through 1790461890, recovered at 1790461980/2100/2190, and failed again at 1790462310 after the alert. Window averages after revert, relative to the 1.0 pre-revert baseline, were 0.778 for backend_up, 0.556 for admin_port_up, and 0.778 for unit_active. The lb service backend_up remained 1.0 throughout. Thus services recovered briefly after revert but failures recurred before the 1790462250 alert, beginning at 1790461560 for admin_port_up and 1790461770 for backend_up/unit_active; no post-alert sample should be treated as pre-alert evidence.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_611",
+    "ev_612",
+    "ev_613",
+    "ev_614",
+    "ev_615",
+    "ev_616"
+   ],
+   "usage": {
+    "input_tokens": 13152,
+    "output_tokens": 1351,
+    "cost_usd": 0.001991,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "For lb-sandbox around 1790461464\u20131790462280, are there timestamped errors indicating whether restored backends on 8093\u20138095 are unreachable, or whether the LB process/admin listener itself fails?",
+   "summary": "The available logs show timestamped errors for all backends being unreachable at Unix timestamp 1790461464 (four occurrences), which points to backend connectivity failures at that time, not evidence that the LB process or admin listener failed. The queried interval has no error or warning lines mentioning listen/admin failure; however, this is not enough to establish the state of the restored backends on ports 8093\u20138095 throughout the full interval or conclusively rule out an LB/admin failure. Benign startup/listening and backend connection-closed info messages were observed and are not errors. [log service=lb-sandbox level=error count=4 first_seen=1790461464 sig=\"All backends unreachable \u2014 dropping connection.\"] (Evidence: call_1, call_2, call_4, call_5, call_6, call_7.)",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_617",
+    "ev_618",
+    "ev_619"
+   ],
+   "usage": {
+    "input_tokens": 11784,
+    "output_tokens": 781,
+    "cost_usd": 0.001569,
+    "llm_calls": 5,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Were there any lb-sandbox config, runtime, or backend target changes after the 1790461464 revert and before 1790462250, including healthcheck/admin settings?",
+   "summary": "Inconclusive: the available queries returned no lb-sandbox config/flag commits or deploys, but they did not provide a complete time-bounded history from 1790461464 through 1790462250, so I cannot establish whether runtime or backend-target changes\u2014including healthcheck/admin settings\u2014occurred in that interval. [change kind=config service=lb-sandbox sha=unknown ts=unknown key=unknown old=unknown new=unknown msg=\"No matching config commits returned\"] [change kind=deploy service=lb-sandbox sha=unknown ts=unknown key=unknown old=unknown new=unknown msg=\"No matching deploys returned\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_609",
+    "ev_610"
+   ],
+   "usage": {
+    "input_tokens": 1540,
+    "output_tokens": 413,
+    "cost_usd": 0.000361,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}
