@@ -1,0 +1,5 @@
+{"fault":"crashed_backend","round":1,"t_inject":1790458614,"alert_fired_after_s":48,"report_after_s":102,"alerts":"LBBackendUnhealthy","reports":"20260926-213836_LBBackendUnhealthy_lb-sandbox.json"}
+{"fault":"hung_backend","round":1,"t_inject":1790458782,"alert_fired_after_s":null,"report_after_s":null,"alerts":"","reports":""}
+{"fault":"config_break","round":1,"t_inject":1790459043,"alert_fired_after_s":57,"report_after_s":114,"alerts":"LBDataPathErrors","reports":"20260926-214555_LBDataPathErrors_lb-sandbox.json"}
+{"fault":"idle_client_stats","round":1,"t_inject":1790459261,"alert_fired_after_s":91,"report_after_s":124,"alerts":"LBAdminPortUnresponsive","reports":"20260926-214945_LBAdminPortUnresponsive_lb-sandbox.json"}
+{"fault":"service_stopped","round":1,"t_inject":1790459450,"alert_fired_after_s":42,"report_after_s":165,"alerts":"LBBackendUnhealthy","reports":"20260926-215313_LBAdminPortUnresponsive_lb-sandbox.json,20260926-215223_LBDataPathErrors_lb-sandbox.json,20260926-215157_LBBackendUnhealthy_lb-sandbox.json"}

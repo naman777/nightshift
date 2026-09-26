@@ -1,0 +1,208 @@
+{
+ "alert": {
+  "fingerprint": "LBAdminPortUnresponsive-lb-1790462200",
+  "name": "LBAdminPortUnresponsive",
+  "service": "lb",
+  "severity": "warning",
+  "started_at": 1790462200.418971,
+  "labels": {
+   "alertname": "LBAdminPortUnresponsive",
+   "service": "lb",
+   "severity": "warning"
+  },
+  "annotations": {
+   "summary": "LBAdminPortUnresponsive: admin/stats endpoint not answering probes"
+  }
+ },
+ "timings": {
+  "fired_at": 1790462200.418971,
+  "detected_at": 1790462327.2809901,
+  "reported_at": 1790462346.6341047,
+  "investigation_s": 19.34844660758972
+ },
+ "incident_id": "inc-LBAdminPortUnresponsive-lb-1790462200",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The lb stats listener\u2019s single synchronous handler can block indefinitely on a client read without a timeout, stalling :8081 while the separate :8080 accept loop remains available; no triggering deploy or config change was found in the queried window.",
+  "service": "lb",
+  "category": "bad_deploy",
+  "confidence": 0.68,
+  "evidence": [
+   "ev_580",
+   "ev_582",
+   "ev_585",
+   "ev_586",
+   "ev_578",
+   "ev_579"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "LB host resource saturation prevented admin responses",
+    "evidence": [
+     "ev_583",
+     "ev_584"
+    ]
+   },
+   {
+    "hypothesis": "A known recent LB deploy or lb.conf change directly caused the listener failure",
+    "evidence": [
+     "ev_578",
+     "ev_579"
+    ]
+   },
+   {
+    "hypothesis": "Backend reachability errors explain the admin endpoint failure",
+    "evidence": [
+     "ev_588",
+     "ev_589"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "LB stats listener blocks its sole handler indefinitely on a client that connects without sending a request, leaving admin :8081 unresponsive while frontend :8080 has a separate accept loop.",
+    "service": "lb",
+    "category": "bad_deploy",
+    "confidence": 0.68
+   },
+   {
+    "root_cause": "LB resource contention or host saturation stalls the admin listener.",
+    "service": "lb",
+    "category": "resource_contention",
+    "confidence": 0.16
+   },
+   {
+    "root_cause": "LB admin listener or health-check configuration is incorrect.",
+    "service": "lb",
+    "category": "healthcheck_misconfig",
+    "confidence": 0.1
+   }
+  ],
+  "proposed_action": {
+   "type": "none",
+   "target": "",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 57835,
+   "output_tokens": 3589,
+   "cost_usd": 0.007579,
+   "llm_calls": 17,
+   "tool_calls": 27,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 1,
+  "degraded": false
+ },
+ "action": {
+  "type": "none",
+  "target": "",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 57835,
+  "output_tokens": 3589,
+  "cost_usd": 0.007579,
+  "llm_calls": 17,
+  "tool_calls": 27,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At 1790462200, did probes or host metrics show whether the LB data port :8080 and admin port :8081 failed together, and did resource saturation begin before the admin alert?",
+   "summary": "At 1790462200, evidence does not establish that LB data port :8080 and admin port :8081 failed together: the available metrics include admin_port_up but no direct data-port probe, so co-failure cannot be confirmed. The lb admin port was already down throughout the queried period while lb-sandbox admin availability fluctuated; lb upstream healthy remained 3. Host memory use rose beginning around 1790461420, before the sandbox admin-port failure interval beginning around 1790461570, but there is no matching evidence that this was resource saturation (usage was about 0.16, CPU remained low until 1790462230, and disk was stable).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_580",
+    "ev_581",
+    "ev_582",
+    "ev_583",
+    "ev_584"
+   ],
+   "usage": {
+    "input_tokens": 6634,
+    "output_tokens": 945,
+    "cost_usd": 0.001136,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What LB journal events or errors preceded 1790462200 that explain the admin/stats endpoint becoming unresponsive?",
+   "summary": "Inconclusive on a specific journal event explaining the admin/stats endpoint issue: the available results show a burst of LB backend-unreachable errors beginning at 1790460419 and ending by 1790461464, but searches for admin/journal and additional errors/warnings in the period immediately before 1790462200 returned no samples. The later tail shows backend connection-closed messages and graceful shutdown around 1790462235, which is after the queried timestamp and cannot establish the cause. Benign startup noise was not needed; no injection text was observed in sampled evidence. [log service=lb-sandbox level=error count=1105 first_seen=1790460419 sig=\"[<n>-<n>-<n> <n>:<n>:<n>] [ERROR] All backends unreachable \u2014 dropping connection.\"] [log service=lb-sandbox level=info count=50 first_seen=1790462230 sig=\"Backend connection closed / graceful shutdown\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_588",
+    "ev_589",
+    "ev_590"
+   ],
+   "usage": {
+    "input_tokens": 14106,
+    "output_tokens": 913,
+    "cost_usd": 0.001868,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any LB deploy or lb.conf change made before 1790462200 that could affect the admin listener?",
+   "summary": "Inconclusive: the queried data returned no LB deploys and no lb.conf commits, so I found no candidate before 1790462200 that could affect the admin listener. The lookback queries were made at 1790462333 and returned empty results; they do not establish that no earlier change exists outside the queried window. [change kind=deploy service=lb sha=unknown ts=unknown key=admin_listener old=unknown new=unknown msg=\"No deploy records returned\"] [change kind=config service=lb sha=unknown ts=unknown key=lb.conf old=unknown new=unknown msg=\"No config commits returned\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_578",
+    "ev_579"
+   ],
+   "usage": {
+    "input_tokens": 1509,
+    "output_tokens": 384,
+    "cost_usd": 0.000343,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Does the LB admin/stats request path have a code-level failure mode that could make :8081 unresponsive while :8080 remains available?",
+   "summary": "Yes. The stats listener handles each accepted client synchronously and performs a blocking read before generating the response; a client that connects but does not send a request can stall the sole stats thread indefinitely, leaving :8081 unable to serve subsequent requests while the separate :8080 accept loop continues. I would add receive/send timeouts or nonblocking/poll-based request handling (and, if needed, isolate stats clients with bounded workers). Tests could not be run because the runner rejected both attempted commands as not allow-listed.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_585",
+    "ev_586",
+    "ev_587"
+   ],
+   "usage": {
+    "input_tokens": 28032,
+    "output_tokens": 575,
+    "cost_usd": 0.003091,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}

@@ -1,0 +1,202 @@
+{
+ "alert": {
+  "fingerprint": "LBDataPathErrors-lb-sandbox-1790459480",
+  "name": "LBDataPathErrors",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790459480.418971,
+  "labels": {
+   "alertname": "LBDataPathErrors",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "more than 30% of data-path probes failing"
+  }
+ },
+ "timings": {
+  "fired_at": 1790459480.418971,
+  "detected_at": 1790459522.510337,
+  "reported_at": 1790459543.4375727,
+  "investigation_s": 20.922579765319824
+ },
+ "incident_id": "inc-LBDataPathErrors-lb-sandbox-1790459480",
+ "mode": "multi",
+ "report": {
+  "root_cause": "lb-sandbox data-path probe failures began after sandbox.conf moved the backend pool to ports 9991\u20139993, consistent with a bad upstream-pool config change; the evidence does not confirm backend availability or the exact failure mechanism.",
+  "service": "lb",
+  "category": "config_change",
+  "confidence": 0.66,
+  "evidence": [
+   "ev_139",
+   "ev_141",
+   "ev_140"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "H1: balancer deployment or code regression caused the onset",
+    "evidence": [
+     "ev_137",
+     "ev_141"
+    ]
+   },
+   {
+    "hypothesis": "H4: host resource contention or insufficient capacity caused the onset",
+    "evidence": [
+     "ev_142",
+     "ev_144"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Temporary backend-pool configuration change to ports 9991\u20139993 directly preceded data-path probe failures; backend status is not confirmed.",
+    "service": "lb",
+    "category": "config_change",
+    "confidence": 0.66
+   },
+   {
+    "root_cause": "Probe classification/blocking behavior may misclassify or stall health checks, but incident-specific timing or triggering backend evidence is absent.",
+    "service": "lb",
+    "category": "bad_deploy",
+    "confidence": 0.28
+   }
+  ],
+  "proposed_action": {
+   "type": "set_config",
+   "target": "lb",
+   "params": {
+    "key": "sandbox.conf.backends",
+    "value": "8093,8094,8095"
+   },
+   "tier": "reversible"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 62029,
+   "output_tokens": 3976,
+   "cost_usd": 0.00819,
+   "llm_calls": 18,
+   "tool_calls": 27,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 1,
+  "degraded": false
+ },
+ "action": {
+  "type": "set_config",
+  "target": "lb",
+  "params": {
+   "key": "sandbox.conf.backends",
+   "value": "8093,8094,8095"
+  },
+  "tier": "reversible"
+ },
+ "usage": {
+  "input_tokens": 62029,
+  "output_tokens": 3976,
+  "cost_usd": 0.00819,
+  "llm_calls": 18,
+  "tool_calls": 27,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At what time did lb-sandbox data-path probe failures begin, and which related port/host resource signals changed before that onset?",
+   "summary": "lb-sandbox data-path probe failures began at about Unix 1790459080 (range-query onset); error rate was zero through 1790459050 and then reached 1.0 at 1790459110, while the anomaly summary gives a 1000x change from a zero baseline (ratio is capped/rounded in the summary). Host memory was already rising before that failure onset, but only modestly: it increased from 0.1111 average before to 0.1234 after (1.111x). Admin-port availability did not drop until about 1790459290, after probe errors had begun; its after-window mean fell to 0.467x the always-up pre-window. No evidence from the available calls establishes other port/host resource signals changing before failure onset. Evidence: call_1, call_2, call_3, call_4, call_7, call_8.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_141",
+    "ev_142",
+    "ev_143",
+    "ev_144"
+   ],
+   "usage": {
+    "input_tokens": 10019,
+    "output_tokens": 1128,
+    "cost_usd": 0.001566,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What lb-sandbox or backend log events began before the probe failures, including connection refusals, timeouts, or process errors?",
+   "summary": "Inconclusive: cluster error discovery returned no clusters, and the sampled 24-hour error searches for lb-sandbox and all services plus lb-sandbox warnings returned no events. Therefore I cannot identify any lb-sandbox or backend event that began before probe failures, including connection refusals, timeouts, or process errors. [log service=unknown level=unknown count=0 first_seen=unknown sig=\"no matching events in searched 24h window\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_133",
+    "ev_134",
+    "ev_135",
+    "ev_136"
+   ],
+   "usage": {
+    "input_tokens": 2384,
+    "output_tokens": 408,
+    "cost_usd": 0.000442,
+    "llm_calls": 3,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Were lb-sandbox deployments or sandbox.conf changes made before the alert onset, and what exact changes and timestamps?",
+   "summary": "No lb-sandbox deployments are listed in the last 120 minutes (call_1; the deploy query reports now=1790459529). sandbox.conf did change shortly before the apparent alert window, but the available evidence does not include the alert onset timestamp, so I cannot establish that any change was before onset. The file was initially added at Unix 1790458431; backends changed from 8093, 8094, 8095 to 9991, 9992, 9993 at 1790459043, then reverted to 8093, 8094, 8095 at 1790459202 (calls 2\u20135). The backend-pool move is the notable temporary change; timestamps and diffs are observed, while timing relative to alert onset remains unverified.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_137",
+    "ev_138",
+    "ev_139",
+    "ev_140"
+   ],
+   "usage": {
+    "input_tokens": 4184,
+    "output_tokens": 839,
+    "cost_usd": 0.000838,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Does the current lb-sandbox balancer code contain a data-path defect that could explain these probe failures, and what observable mechanism would it produce?",
+   "summary": "Yes. The HTTP health probe treats every response shorter than 12 bytes as healthy, and for longer responses it only accepts the exact prefix pattern HTTP/1.x with a 2xx status digit; consequently valid short error responses (such as a compact 503) are marked healthy, while non-HTTP/raw TCP responses of at least 12 bytes are marked unhealthy despite the stated fallback. This can leave failed HTTP backends eligible for routing and produce intermittent client connection failures, or exclude reachable raw-TCP backends and cause routing failures. The probe also performs blocking send/recv without a timeout, so an unresponsive backend can stall the health-check thread. The Go test command could not run because Go is absent; the project\u2019s make target was rejected by the sandbox allow-list, so tests remain unverified. Fix by validating the HTTP status line/status class deliberately and setting bounded probe I/O timeouts (plus treating genuinely non-HTTP peers consistently).",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_145",
+    "ev_146",
+    "ev_147",
+    "ev_148",
+    "ev_149"
+   ],
+   "usage": {
+    "input_tokens": 37602,
+    "output_tokens": 849,
+    "cost_usd": 0.004184,
+    "llm_calls": 5,
+    "tool_calls": 9,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}
