@@ -74,3 +74,6 @@ Legend: [x] done · [~] in progress · [ ] todo
 
 ## Deferred (user will provide)
 - Foreman (Go scheduler), C++ load balancer (sim uses generic `scheduler` / `lb` names)
+
+## Decisions
+- Slack approval is out of scope for now (code kept, unit-tested only, not tried in a real workspace); approvals go through the dashboard.
