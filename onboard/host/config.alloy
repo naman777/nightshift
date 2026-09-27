@@ -1,0 +1,36 @@
+// Ships each monitored unit's journald logs to Loki, labelled with the Nightshift service name.
+loki.write "local" {
+  endpoint {
+    url = "http://127.0.0.1:3100/loki/api/v1/push"
+  }
+}
+
+loki.source.journal "lb" {
+  matches    = "_SYSTEMD_UNIT=lb.service"
+  labels     = {service = "lb", unit = "lb.service"}
+  max_age    = "72h"
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.source.journal "lb_sandbox" {
+  matches    = "_SYSTEMD_UNIT=nsbox-lb.service"
+  labels     = {service = "lb-sandbox", unit = "nsbox-lb.service"}
+  max_age    = "72h"
+  forward_to = [loki.write.local.receiver]
+}
+
+// systemd's own lifecycle lines ("Stopping ...", "Stopped ...", "Started ...", "Failed with result ...") are logged by PID 1, not by
+// the unit, so they need their own match on the UNIT field. They are what tells an on-call engineer that a service was stopped or restarted.
+loki.source.journal "lb_lifecycle" {
+  matches    = "UNIT=lb.service"
+  labels     = {service = "lb", unit = "lb.service", source = "systemd"}
+  max_age    = "72h"
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.source.journal "lb_sandbox_lifecycle" {
+  matches    = "UNIT=nsbox-lb.service"
+  labels     = {service = "lb-sandbox", unit = "nsbox-lb.service", source = "systemd"}
+  max_age    = "72h"
+  forward_to = [loki.write.local.receiver]
+}

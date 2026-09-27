@@ -67,7 +67,15 @@ class LiveChaos:
         for r in reversed(records):
             kind = r["undo"]
             if kind == "revert":
-                self.repo.revert(r["sha"])
+                try:
+                    self.repo.revert(r["sha"])
+                except RuntimeError:
+                    # already undone or superseded (e.g. the agent's approved remediation fixed it first): leave the tree clean and carry on
+                    try:
+                        self.repo.git("revert", "--abort")
+                    except RuntimeError:
+                        pass
+                    print(f"note: {r['sha']} ({r.get('note', '')}) was already superseded; skipped", file=__import__('sys').stderr)
             elif kind == "toxic":
                 httpx.delete(f"{TOXIPROXY}/proxies/{r['proxy']}/toxics/{r['toxic']}", timeout=10)
             elif kind == "start":

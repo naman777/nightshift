@@ -1,0 +1,212 @@
+{
+ "alert": {
+  "fingerprint": "LBAdminPortUnresponsive-lb-sandbox-1790461560",
+  "name": "LBAdminPortUnresponsive",
+  "service": "lb-sandbox",
+  "severity": "warning",
+  "started_at": 1790461560.418971,
+  "labels": {
+   "alertname": "LBAdminPortUnresponsive",
+   "service": "lb-sandbox",
+   "severity": "warning"
+  },
+  "annotations": {
+   "summary": "LBAdminPortUnresponsive: admin/stats endpoint not answering probes"
+  }
+ },
+ "timings": {
+  "fired_at": 1790461560.418971,
+  "detected_at": 1790461648.9770625,
+  "reported_at": 1790461671.4119618,
+  "investigation_s": 22.430148601531982
+ },
+ "incident_id": "inc-LBAdminPortUnresponsive-lb-sandbox-1790461560",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The lb-sandbox admin/stats listener is vulnerable to a blocking-read handler defect: a silent or incomplete client can monopolize its single stats thread and leave later probes unserved; no deployment/build change was observed in the queried window.",
+  "service": "lb",
+  "category": "bad_deploy",
+  "confidence": 0.78,
+  "evidence": [
+   "ev_462",
+   "ev_457",
+   "ev_456",
+   "ev_465",
+   "ev_459",
+   "ev_467"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "H2: sandbox backend-pool config change caused the admin endpoint failure",
+    "evidence": [
+     "ev_454",
+     "ev_455",
+     "ev_457"
+    ]
+   },
+   {
+    "hypothesis": "H3: host resource contention prevented admin responses",
+    "evidence": [
+     "ev_459",
+     "ev_457"
+    ]
+   },
+   {
+    "hypothesis": "H4: process/listener outage caused the endpoint failure",
+    "evidence": [
+     "ev_461",
+     "ev_465",
+     "ev_466"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "The lb-sandbox stats handler can block indefinitely reading one client on its sole listener thread, starving subsequent admin requests; code defect, with no corresponding deploy observed.",
+    "service": "lb",
+    "category": "bad_deploy",
+    "confidence": 0.78
+   },
+   {
+    "root_cause": "The stats handler can wait for the shared connection mutex while backend connection paths hold it, delaying admin responses.",
+    "service": "lb",
+    "category": "resource_contention",
+    "confidence": 0.48
+   },
+   {
+    "root_cause": "Temporary backend-pool configuration change may have affected balancer behavior, but evidence does not link it to the admin listener and it was reverted before alert start.",
+    "service": "lb",
+    "category": "config_change",
+    "confidence": 0.2
+   }
+  ],
+  "proposed_action": {
+   "type": "none",
+   "target": "",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 86656,
+   "output_tokens": 4035,
+   "cost_usd": 0.010683,
+   "llm_calls": 22,
+   "tool_calls": 28,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 1,
+  "degraded": false
+ },
+ "action": {
+  "type": "none",
+  "target": "",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 86656,
+  "output_tokens": 4035,
+  "cost_usd": 0.010683,
+  "llm_calls": 22,
+  "tool_calls": 28,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At and before alert start 1790461560, were lb-sandbox admin :8091 and data :8090 probes failing, and what do host/process resource signals show?",
+   "summary": "At the alert start 1790461560, available metrics establish that lb-sandbox admin :8091 was responding normally: admin_port_up was 1 and admin_probe_seconds ~0.0004s at 1790461500, after intermittent failures beginning around 1790460690. It failed again at 1790461590, after the alert start. No metric for the data :8090 probe was queried or observed, so its state at/before the alert start is inconclusive. Host CPU stayed low (average 0.0388, sampled maximum 0.2287) and disk use was nearly flat (0.2145 to 0.2158); memory rose from 0.1083 to 0.1547, with reported onset 1790461440, roughly 1.29x the initial value by the last sample. Process/service activity was active at the alert time sample 1790461500; it had briefly gone inactive earlier. Evidence: call_1 through call_8.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_457",
+    "ev_458",
+    "ev_459",
+    "ev_460",
+    "ev_461"
+   ],
+   "usage": {
+    "input_tokens": 7079,
+    "output_tokens": 1068,
+    "cost_usd": 0.001242,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What lb-sandbox journal entries immediately before and after 1790461560 indicate about process health, admin listener, or request handling?",
+   "summary": "Around Unix time 1790461560, lb-sandbox entries show repeated informational backend connection-closed events for ports 8093\u20138095, with active counts usually 0 and occasionally briefly 1; entries continue immediately afterward. No error-level entries were found in the narrow interval, so the samples show ongoing request/backend connection handling without a visible process failure. These entries do not report admin-listener status, so that aspect cannot be determined from the evidence. [log service=lb-sandbox level=info count=50 first_seen=1790461555 sig=\"Backend connection closed; Active count varies\"] (call_4) [log service=lb-sandbox level=error count=0 first_seen=1790461558 sig=\"No error entries returned in queried interval\"] (call_6)",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_465",
+    "ev_466",
+    "ev_467"
+   ],
+   "usage": {
+    "input_tokens": 30477,
+    "output_tokens": 570,
+    "cost_usd": 0.003331,
+    "llm_calls": 7,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "changes",
+   "question": "Was sandbox.conf or the lb-sandbox deployment changed before 1790461560, and what exact values or build changed?",
+   "summary": "Yes. sandbox.conf changed repeatedly before 1790461560, including a backend-pool change at 1790461287 that was reverted at 1790461464; both are shortly before the cutoff. The deploy query showed no lb-sandbox deploys in the queried window, so there is no evidence here of a deployment/build change. [change kind=config service=sandbox sha=1aea6206 ts=1790461287 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=sandbox sha=d081661e ts=1790461464 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_453",
+    "ev_454",
+    "ev_455",
+    "ev_456"
+   ],
+   "usage": {
+    "input_tokens": 5884,
+    "output_tokens": 980,
+    "cost_usd": 0.001078,
+    "llm_calls": 3,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "code",
+   "question": "Does the current balancer code reveal a defect or blocking behavior in the admin/stats handler that could make :8091 unresponsive while the process remains up?",
+   "summary": "Yes. The stats listener is a single-threaded, blocking request loop: after accept it performs an unbounded blocking read before responding, so a client that connects to :8091 and sends no data (or an incomplete request) can pin the only stats thread and leave later stats/admin requests unserved while the balancer process remains running. The same thread also takes the shared connection mutex while generating JSON, so it can wait behind that lock. I would add read deadlines/nonblocking request parsing and dispatch/respond without allowing one client to monopolize the listener; tests could not run because Go is unavailable in the sandbox.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_462",
+    "ev_463",
+    "ev_464"
+   ],
+   "usage": {
+    "input_tokens": 35258,
+    "output_tokens": 558,
+    "cost_usd": 0.003806,
+    "llm_calls": 6,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}

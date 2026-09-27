@@ -17,6 +17,9 @@ PRICES: dict[str, tuple[float, float]] = {
     "claude-haiku-4-5": (1.0, 5.0),
     "gpt-4o": (2.5, 10.0),
     "gpt-4o-mini": (0.15, 0.6),
+    "gpt-6-astra": (10.0, 50.0),
+    "gpt-6-sol": (2.0, 10.0),
+    "gpt-6-luna": (0.10, 0.50),  # short-context standard rates
     "mock-strong": (5.0, 25.0),
     "mock-cheap": (1.0, 5.0),
 }

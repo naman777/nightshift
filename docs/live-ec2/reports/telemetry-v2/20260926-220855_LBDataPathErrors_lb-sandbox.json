@@ -1,0 +1,275 @@
+{
+ "alert": {
+  "fingerprint": "LBDataPathErrors-lb-sandbox-1790460440",
+  "name": "LBDataPathErrors",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790460440.418971,
+  "labels": {
+   "alertname": "LBDataPathErrors",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "LBDataPathErrors: more than 30% of data-path probes failing"
+  }
+ },
+ "timings": {
+  "fired_at": 1790460440.418971,
+  "detected_at": 1790460499.0143192,
+  "reported_at": 1790460535.8135424,
+  "investigation_s": 36.79477000236511
+ },
+ "incident_id": "inc-LBDataPathErrors-lb-sandbox-1790460440",
+ "mode": "multi",
+ "report": {
+  "root_cause": "lb-sandbox data-path probes failed after config change d364187f switched the backend pool to 9991\u20139993, leaving the balancer with no reachable backends; the logs confirm the resulting all-backends-unreachable errors, though destination-port failures were not independently established.",
+  "service": "lb",
+  "category": "dependency_outage",
+  "confidence": 0.79,
+  "evidence": [
+   "ev_255",
+   "ev_262",
+   "ev_263",
+   "ev_271",
+   "ev_272",
+   "ev_273",
+   "ev_274"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host resource contention caused the data-path probe failures.",
+    "evidence": [
+     "ev_260",
+     "ev_261"
+    ]
+   },
+   {
+    "hypothesis": "Admin-listener failure caused the data-path alert.",
+    "evidence": [
+     "ev_259"
+    ]
+   },
+   {
+    "hypothesis": "A deployed code defect is established as the incident cause.",
+    "evidence": [
+     "ev_256",
+     "ev_265",
+     "ev_266",
+     "ev_268"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "lb-sandbox configured to route to 9991\u20139993 by d364187f, resulting in no reachable backends",
+    "service": "lb",
+    "category": "dependency_outage",
+    "confidence": 0.79
+   },
+   {
+    "root_cause": "lb-sandbox probe implementation defect involving blocking or incorrect health-check response handling; code risks are identified but not tied to this alert",
+    "service": "lb",
+    "category": "bad_deploy",
+    "confidence": 0.18
+   }
+  ],
+  "proposed_action": {
+   "type": "set_config",
+   "target": "lb",
+   "params": {
+    "key": "backends",
+    "value": "8093,8094,8095"
+   },
+   "tier": "reversible"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 141639,
+   "output_tokens": 6125,
+   "cost_usd": 0.017227,
+   "llm_calls": 33,
+   "tool_calls": 40,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "set_config",
+  "target": "lb",
+  "params": {
+   "key": "backends",
+   "value": "8093,8094,8095"
+  },
+  "tier": "reversible"
+ },
+ "usage": {
+  "input_tokens": 141639,
+  "output_tokens": 6125,
+  "cost_usd": 0.017227,
+  "llm_calls": 33,
+  "tool_calls": 40,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At alert start 1790460440, which lb-sandbox data/admin/backend probe and host resource signals first changed, and what was their timing?",
+   "summary": "Around alert start 1790460440, the clearest probe change close to the alert was a transient loss of backend_healthy for port 8094 beginning at 1790460260 (180 seconds before alert start), while backend ports 8093 and 8095 stayed healthy. The aggregate upstream_healthy dipped from 3 to 2 by 1790460290 (150 seconds before alert start), then was back to 3 at 1790460440; admin_port_up and admin_probe_seconds were normal at the alert timestamp, though both had a short earlier failure/latency spike at 1790459330. Host memory began changing at 1790459900, while CPU was intermittently elevated without a clean sustained onset and disk usage was essentially stable. Exact ratios for these onset/timing comparisons were not fully determined from the available calls, and backend_up was not retrieved.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_257",
+    "ev_258",
+    "ev_259",
+    "ev_260",
+    "ev_261"
+   ],
+   "usage": {
+    "input_tokens": 7532,
+    "output_tokens": 1144,
+    "cost_usd": 0.001325,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What lb-sandbox or backend log events occurred immediately before and after 1790460440 that explain data-path probe failures?",
+   "summary": "The evidence shows lb-sandbox repeatedly logged \u201cAll backends unreachable \u2014 dropping connection\u201d beginning at Unix 1790460419, continuing across 1790460440 (samples at 1790460439\u20131790460445), and still seen through 1790460504 in the cluster summary. This directly accounts for probes failing at the load-balancer layer, but available samples do not establish the backend-side cause or show a distinct event exactly at 1790460440. The earlier lb-sandbox samples also show repeated backend connection-closed events on :8093 and :8095 with Active: 0, consistent with the loss of usable backend connections. No 404/startup noise is material here.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_262",
+    "ev_263",
+    "ev_264"
+   ],
+   "usage": {
+    "input_tokens": 34694,
+    "output_tokens": 693,
+    "cost_usd": 0.003816,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "What sandbox.conf or lb-sandbox deployment changes occurred before 1790460440, and which could affect data-path routing?",
+   "summary": "Before 1790460440, sandbox.conf changed three times. The only observed lb-sandbox deploy query returned no deploys; it does not establish whether there were deploys under other service names. The upstream-pool edits could affect data-path routing because they change backend destinations. The latest such edit was just 26 seconds before the cutoff, and the earlier move was reverted. [change kind=config service=lb-sandbox sha=1bc832bc ts=1790458431 key=backends old=<unset> new=\"8093, 8094, 8095\" msg=\"initial sandbox lb config\"] [change kind=config service=lb-sandbox sha=d74bfb5f ts=1790459043 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=591ce10f ts=1790459202 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"] [change kind=config service=lb-sandbox sha=d364187f ts=1790460414 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_252",
+    "ev_253",
+    "ev_254",
+    "ev_255",
+    "ev_256"
+   ],
+   "usage": {
+    "input_tokens": 2272,
+    "output_tokens": 730,
+    "cost_usd": 0.000592,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Which code paths can cause lb-sandbox data-path probes to fail, and is there a relevant defect consistent with the observed alert?",
+   "summary": "[code file=load-balancer/LoadBalancer.cpp smell=probe-path tests=fail] Probe failures can arise when the loopback connection fails/times out (2-second connect; socket/connect errors), or when an HTTP backend rejects HEAD / or returns a non-2xx status. The health checker sends HEAD / and treats only HTTP/1.x responses with a 2 in status position as healthy; a data-path endpoint that requires a different path/method can therefore be marked DOWN despite serving its actual data path. The most concrete relevant defect is that recv() is blocking with no response timeout after a successful connect, so a backend that accepts but does not respond can hang the health-check thread and stop subsequent probes. recv() also treats short/no response as healthy, while send() errors and partial writes are ignored, making probe classifications unreliable. This is consistent with a probe-related alert, but the alert itself was not present in inspected evidence, so causal attribution is not confirmed. Proposed fix: configure a bounded read/write timeout, handle partial send and socket errors, and probe the actual configured data path/method (or make probe path configurable). Test execution was inconclusive: both attempted commands were rejected as not allow-listed, not as failing tests.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_265",
+    "ev_266",
+    "ev_267",
+    "ev_268"
+   ],
+   "usage": {
+    "input_tokens": 63542,
+    "output_tokens": 846,
+    "cost_usd": 0.006778,
+    "llm_calls": 8,
+    "tool_calls": 9,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "At 1790460414\u20131790460504, what were backend_up/backend_healthy and upstream_healthy for ports 9991\u20139993 versus 8093\u20138095, and did the pool change coincide with probe failures?",
+   "summary": "Inconclusive: I could not determine backend_up/backend_healthy or upstream_healthy for ports 9991\u20139993 versus 8093\u20138095, nor whether the pool change coincided with probe failures. The required metrics exploration could not proceed because metrics__top_anomalies returned errors for both attempts (call_1 and call_2).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_269",
+    "ev_270"
+   ],
+   "usage": {
+    "input_tokens": 2425,
+    "output_tokens": 271,
+    "cost_usd": 0.000378,
+    "llm_calls": 3,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "logs",
+   "question": "Between 1790460414 and 1790460504, do lb-sandbox logs identify connection refusals/timeouts or unreachable destinations specifically for 9991\u20139993, versus 8093\u20138095?",
+   "summary": "In the specified interval, lb-sandbox logged a generic \u201cAll backends unreachable \u2014 dropping connection\u201d error (278 occurrences, first at 1790460419), but the searched samples do not identify backend ports: searches for 999, 809, refused, and timeout returned no matches. Thus the logs do not establish connection refusals/timeouts or unreachable destinations specifically for 9991\u20139993 versus 8093\u20138095. No instruction-like log content was observed. [log service=lb-sandbox level=error count=278 first_seen=1790460419 sig=\"All backends unreachable \u2014 dropping connection\"] (evidence: call_1, call_2, call_3, call_4, call_5, call_6)",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_273",
+    "ev_274",
+    "ev_275"
+   ],
+   "usage": {
+    "input_tokens": 14237,
+    "output_tokens": 623,
+    "cost_usd": 0.001735,
+    "llm_calls": 5,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "changes",
+   "question": "Is there evidence that 9991\u20139993 were valid/live configured backends at 1790460414, or that the d364187f backends change was reverted after the alert?",
+   "summary": "There is evidence that 9991\u20139993 were present in the sandbox config at the alert timestamp, but not that they were valid/live production backends: the config explicitly says this is a sandbox copy and that the live LB is untouched. The d364187f change occurred at 1790460414; the recorded revert was earlier, at 1790459202, so d364187f itself was not shown as reverted after the alert. [change kind=config service=sandbox sha=d364187f ts=1790460414 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=sandbox sha=591ce10f ts=1790459202 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_271",
+    "ev_272"
+   ],
+   "usage": {
+    "input_tokens": 4122,
+    "output_tokens": 715,
+    "cost_usd": 0.00077,
+    "llm_calls": 3,
+    "tool_calls": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}

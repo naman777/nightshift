@@ -38,7 +38,7 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] 10 fault modules (simulated form + declarative live steps), 6 red-herring types, config git repo (external git dir), deploy log, chaos CLI
 - [x] Go services: orders-svc, payments-svc (real fault hooks: hot-reloaded config, flags, bad-deploy build arg), stand-ins for LB + Foreman (same contract)
 - [x] docker-compose (target + Prometheus/Alertmanager/Loki/Promtail/Grafana/Jaeger + Temporal + gateway + worker + dashboard), recording + alert rules
-- [ ] NOT executed here (no Go toolchain, docker daemon off): compile/vet in CI (`make go-check`), first `make demo` will likely need small fixes
+- [x] Docker stack executed 2026-09-26: Go compiles/vets in a container, all 19 containers run, live fault -> alert -> incident -> real-LLM diagnosis -> approval -> recovery, worker kill/resume verified (docs/live-stack.md)
 
 ## Phase 6 — Benchmark
 - [x] 40 scenarios (10 faults x 4), 13 with red herrings, 1 prompt-injection, 25 dev / 15 held-out, 10 smoke
@@ -63,10 +63,19 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Dashboard redesign for demos: scenario launcher (50 scenarios, agent setup, offline vs real LLM), live stepper + "happening now / next", plan, agent cards, answer-key verdict, evidence / safety audit / activity tabs. Gateway `/demo/*` endpoints; commander plan/decision steps are now emitted. Fixed: launcher alerts use the scenario's clock; single-agent report no longer rejected for invented ruled-out evidence ids.
 
 ## Remaining ideas
-- [~] Real-LLM benchmark: first smoke run (10 scenarios) on gpt-6-luna via `python -m bench.real_llm` (single 50%, multi 60% exact). Still to do: fix ~2 rate-limit-degraded runs, dev/heldout splits, README table
+- [x] Real-LLM benchmark (`gpt-6-luna`): smoke, dev (v1 and v2), held-out (v2, 3 repeats), hard (v2); README table via `python -m bench.real_report --write`.
+      Held-out single 96% / multi 76%, 0% unsafe, 100% grounded. Prompt v2 (category definitions) roughly doubled dev accuracy. Single agent beat the team.
+      Prompt v3 (commit to a mechanism, no `unknown` hedging) dev single 96% / multi 88%; held-out single 96% / multi 96% (lightly contaminated: v2 held-out failures had been inspected); held-out failures were inspected, so held-out is lightly contaminated.
+- [x] `gpt-6-*` prices added to `agents/core/llm.py`; stored real-run costs recomputed from token counts
+- [x] Tag-contract tests (`tests/test_tag_contract.py`) guard the scripted-policy tag interface (typed evidence schema deliberately not done)
 - [x] kubectl MCP server (stretch; read verbs + gated writes, fake-backend tested, not run against a real cluster)
 - [x] Voice paging summary + pluggable webhook (stretch)
 - [ ] Swap in the real Foreman + C++ LB (user will provide) -> delete `target/stubs`, keep the contract
 
 ## Deferred (user will provide)
 - Foreman (Go scheduler), C++ load balancer (sim uses generic `scheduler` / `lb` names)
+
+## Decisions
+- Slack approval is out of scope for now (code kept, unit-tested only, not tried in a real workspace); approvals go through the dashboard.
+- [x] Real Foreman (TypeScript) and real C++ load balancer cloned to `external/`, tested, patched (LB) and wired in as an opt-in overlay `docker-compose.real.yml` (`make demo-real`); one live fault verified end to end on each with the real model (docs/live-stack.md). Other faults on the real components implemented but not exercised; `bench/live.py` not run.
+- [x] Host onboarding on a real EC2 box (2026-09-26): `onboard/` (probe/node/journald collectors as systemd units, shadow-mode watcher, systemd runtime backend, sandbox fault kit) run against the author's live C++ LB with the real model. Results, failure modes and what is NOT verified: `docs/onboarding.md`, raw reports in `docs/live-ec2/`. 7 correct / 3 partial / 8 wrong of 18 scored investigations; no auto-discovery yet (per-customer config is hand-written); single host, own service, no Temporal/Alertmanager path.

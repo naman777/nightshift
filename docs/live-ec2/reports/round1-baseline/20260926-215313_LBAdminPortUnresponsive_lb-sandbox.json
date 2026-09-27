@@ -1,0 +1,349 @@
+{
+ "alert": {
+  "fingerprint": "LBAdminPortUnresponsive-lb-sandbox-1790459460",
+  "name": "LBAdminPortUnresponsive",
+  "service": "lb-sandbox",
+  "severity": "warning",
+  "started_at": 1790459460.418971,
+  "labels": {
+   "alertname": "LBAdminPortUnresponsive",
+   "service": "lb-sandbox",
+   "severity": "warning"
+  },
+  "annotations": {
+   "summary": "admin/stats endpoint not answering probes"
+  }
+ },
+ "timings": {
+  "fired_at": 1790459460.418971,
+  "detected_at": 1790459543.4381745,
+  "reported_at": 1790459593.8538122,
+  "investigation_s": 50.41091871261597
+ },
+ "incident_id": "inc-LBAdminPortUnresponsive-lb-sandbox-1790459460",
+ "mode": "multi",
+ "report": {
+  "root_cause": "lb-sandbox's stats handler can become unresponsive when a client holds its sole stats thread in a blocking read without sending a request; this code-path defect is supported, but no specific incident client or triggering deploy is identified.",
+  "service": "lb",
+  "category": "bad_deploy",
+  "confidence": 0.65,
+  "evidence": [
+   "ev_173",
+   "ev_174",
+   "ev_157",
+   "ev_170",
+   "ev_183",
+   "ev_184",
+   "ev_175",
+   "ev_163",
+   "ev_164",
+   "ev_165",
+   "ev_179",
+   "ev_180",
+   "ev_181"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host resource exhaustion/contention caused the initial admin failure.",
+    "evidence": [
+     "ev_175",
+     "ev_176"
+    ]
+   },
+   {
+    "hypothesis": "The backend-pool configuration change directly disabled the admin listener.",
+    "evidence": [
+     "ev_163",
+     "ev_164",
+     "ev_165"
+    ]
+   },
+   {
+    "hypothesis": "A recent sandbox deploy introduced the defect.",
+    "evidence": [
+     "ev_152",
+     "ev_184"
+    ]
+   },
+   {
+    "hypothesis": "A binding/port change caused the probe mismatch.",
+    "evidence": [
+     "ev_163",
+     "ev_164",
+     "ev_167"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "A stats client may block lb-sandbox's single stats handler in an unbounded read, preventing later admin probes from being served; direct observation of a stalled client is absent.",
+    "service": "lb",
+    "category": "bad_deploy",
+    "confidence": 0.65
+   },
+   {
+    "root_cause": "An unobserved admin listener or process fault; available logs do not identify one.",
+    "service": "lb",
+    "category": "unknown",
+    "confidence": 0.18
+   }
+  ],
+  "proposed_action": {
+   "type": "none",
+   "target": "",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 132900,
+   "output_tokens": 8033,
+   "cost_usd": 0.017303,
+   "llm_calls": 49,
+   "tool_calls": 55,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 3,
+  "degraded": false
+ },
+ "action": {
+  "type": "none",
+  "target": "",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 132900,
+  "output_tokens": 8033,
+  "cost_usd": 0.017303,
+  "llm_calls": 49,
+  "tool_calls": 55,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "Since alert start, what are the probe results for lb-sandbox admin port 8091 versus data port 8090, and did host CPU/memory/disk pressure begin before the admin failures?",
+   "summary": "Inconclusive: metrics__top_anomalies failed for both attempted windows (60 and 30 minutes) with \u201cexpected a positive input, got 0.0\u201d, so I cannot determine the lb-sandbox probe results on ports 8091 versus 8090, or whether host CPU, memory, or disk pressure started before the admin failures.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_150",
+    "ev_151"
+   ],
+   "usage": {
+    "input_tokens": 2398,
+    "output_tokens": 229,
+    "cost_usd": 0.000354,
+    "llm_calls": 3,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "logs",
+   "question": "What lb-sandbox/journald events occur immediately before and during the first failed admin/stats probe, including process/listener errors?",
+   "summary": "Inconclusive: the available lb-sandbox tail shows startup/listener messages and repeated backend connection-closed events, but no failed admin/stats probe or corresponding journald events. The searches for admin/stats and error-level lb-sandbox entries returned no matches, and journald yielded no entries. Benign-noise note: no 404 favicon/robots or startup-related errors were observed; startup info messages themselves are not evidence of a failure. [log service=lb-sandbox level=info count=1 first_seen=1790459450 sig=\"Stats endpoint listening on port 8091\"] [log service=lb-sandbox level=info count=1 first_seen=1790459450 sig=\"Listening on port 8090 with 3 backends\"] [log service=lb-sandbox level=info count=26 first_seen=1790459450 sig=\"Backend :8093 connection closed. Active: 0\"] [log service=journald level=unknown count=0 first_seen=unknown sig=\"no matching events returned\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_159",
+    "ev_160",
+    "ev_161",
+    "ev_162"
+   ],
+   "usage": {
+    "input_tokens": 7885,
+    "output_tokens": 618,
+    "cost_usd": 0.001097,
+    "llm_calls": 5,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Were sandbox deploys or sandbox.conf changes made before the first admin/stats probe failure, and what changed?",
+   "summary": "No sandbox deploys are listed in the 120-minute window (call_1). sandbox.conf did change: it was initially added at 1790458431 with port 8090, backends 8093/8094/8095, algo lc, and 16 threads; then at 1790459043 the backends changed to 9991/9992/9993; that change was reverted at 1790459202 to 8093/8094/8095 (calls call_2\u2013call_5). These changes occurred before the first admin/stats probe failure only if that failure began after their timestamps; the failure timestamp was not provided or observed, so timing relative to the failure cannot be established. The config comment says this is a sandbox copy and live LB is untouched, which is evidence in the diff, not independent verification.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_152",
+    "ev_153",
+    "ev_154",
+    "ev_155"
+   ],
+   "usage": {
+    "input_tokens": 4180,
+    "output_tokens": 817,
+    "cost_usd": 0.000826,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "In the current balancer code, what conditions could leave the admin/stats listener unresponsive while the data listener remains available?",
+   "summary": "The admin/stats listener can be unavailable independently of the data listener if creating its socket fails, or if binding/listening on listen_port + 1 fails (for example, the port is occupied); stats_loop logs a warning, disables/returns, while start continues serving the data port. Once running, the stats thread handles each request serially and performs a blocking read for request bytes before generating a response. A client that connects but does not send data can therefore stall the stats thread and prevent subsequent stats requests from being handled, while the separate data accept loop remains available. Tests could not be run because Go is not installed in the sandbox; the inspected project is C++.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_156",
+    "ev_157",
+    "ev_158"
+   ],
+   "usage": {
+    "input_tokens": 22711,
+    "output_tokens": 592,
+    "cost_usd": 0.002567,
+    "llm_calls": 4,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "For lb-sandbox, establish the first timestamp the 8091 admin/stats probe failed and compare 8091 with data-port 8090 probe results and host CPU/memory pressure immediately before and after onset.",
+   "summary": "For lb-sandbox, the first observed 8091 admin/stats failure is at Unix 1790459294 (admin_port_up first changes from 1 to 0 and admin_probe_seconds jumps from ~0.0004\u20130.0005s to ~4.0s); this is about 4.0s / >1000x its preceding probe latency, while the port-up ratio drops 1.0\u21920. The closest available data-port 8090 indicator, upstream_healthy, remains 3 through that onset and falls to 0 only at 1790459474, so it was healthy immediately after the admin failure. Host CPU is low immediately around onset (~0.015\u20130.016 ratio) and shows a later isolated peak 0.1249 at 1790459414; memory rises gradually from ~0.1205 before onset to ~0.1233 just after, without a sharp onset jump. The separate lb service's admin probe was already ~4s throughout the sampled window. The requested before/after compare-window calls could not run because the tool budget was exhausted, so attribution and precise window aggregates are inconclusive.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_173",
+    "ev_174",
+    "ev_175",
+    "ev_176",
+    "ev_177",
+    "ev_178"
+   ],
+   "usage": {
+    "input_tokens": 11151,
+    "output_tokens": 1396,
+    "cost_usd": 0.001813,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "Find lb-sandbox logs or socket/process evidence around the first 8091 probe failure indicating stats bind/listen failure or a connected admin client stalled without sending a request; report timestamps.",
+   "summary": "Inconclusive on a failed 8091 probe or a stalled admin client: lb-sandbox shows stats-listener startup messages at 21:24:11, 21:33:52, and 21:46:46 on 2026-09-26, and the last run also reports the main listener coming up at 21:46:46 and graceful shutdown at 21:50:50. No error/warn signatures were clustered in the last 24 hours, and the available samples do not show a stats bind/listen failure or an accepted admin connection waiting without a request. Backend :8093 connection-closed messages are present in the last run; they do not establish an admin-client stall. [log service=lb-sandbox level=info count=3 first_seen=1790458431 sig=\"Stats endpoint listening on port 8091\"] [log service=lb-sandbox level=info count=1 first_seen=1790459450 sig=\"Listening on port 8090 with 3 backends\"] [log service=lb-sandbox level=info count=1 first_seen=1790459450 sig=\"Shutting down gracefully...\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_166",
+    "ev_167",
+    "ev_168"
+   ],
+   "usage": {
+    "input_tokens": 5385,
+    "output_tokens": 560,
+    "cost_usd": 0.000819,
+    "llm_calls": 4,
+    "tool_calls": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "changes",
+   "question": "Determine whether sandbox.conf changes at 1790459043 or 1790459202 altered the admin listen port/binding or otherwise plausibly caused 8091 probe failure, using the alert onset if available.",
+   "summary": "The two sandbox.conf changes did not alter the admin/listen port or binding: both diffs keep port=8090 and change only the backend pool. The first change at 1790459043 switched backends from 8093\u20138095 to 9991\u20139993, and the revert at 1790459202 restored 8093\u20138095. No deploys were listed. The supplied evidence contains no 8091 probe alert onset, so I cannot establish that either change happened shortly before the probe failure; the upstream change could plausibly affect backend traffic, but does not explain an admin listener on 8091 failing based on this diff alone.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_163",
+    "ev_164",
+    "ev_165"
+   ],
+   "usage": {
+    "input_tokens": 2106,
+    "output_tokens": 641,
+    "cost_usd": 0.000531,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Inspect runtime/request handling evidence or code around stats listener for any timeout/nonblocking behavior that rules in/out a stalled client as the actual cause; provide relevant evidence and mechanism.",
+   "summary": "The stats listener has a one-second select timeout only while waiting for new connections; after accepting one client, it performs a blocking read and then a blocking send, with no per-client deadline or nonblocking setup. A client that connects but does not send data can therefore stall the single stats thread (and prevent it from serving other stats requests) until the peer closes or sends data. This is a plausible cause of a stalled stats endpoint, though it does not establish that a particular observed stall was caused by a client. Tests could not run because Go is unavailable in the sandbox.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_169",
+    "ev_170",
+    "ev_171",
+    "ev_172"
+   ],
+   "usage": {
+    "input_tokens": 20196,
+    "output_tokens": 680,
+    "cost_usd": 0.002359,
+    "llm_calls": 4,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "Around Unix 1790459292\u20131790459474, are there logs showing an accepted connection on port 8091, client close, listener restart, or process replacement that correlates with the admin probe failure?",
+   "summary": "Inconclusive: within the requested Unix interval, the only matching port-8091 entry is an informational message that the stats endpoint was listening; searches found no admin, warning, or error entries. There is no evidence in these results of an accepted connection, client close, listener restart, or process replacement correlating with the admin probe failure. The initial cluster-error query failed because the time syntax was invalid; the fallback cluster query returned no clusters. Benign startup/listener messages are not evidence of a restart. [log service=lb-sandbox level=info count=1 first_seen=1790459450 sig=\"Stats endpoint listening on port 8091\"] (call_3); no matching admin entries (call_4), warnings (call_5), or errors (call_6); cluster errors none in fallback query (call_2).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_179",
+    "ev_180",
+    "ev_181",
+    "ev_182"
+   ],
+   "usage": {
+    "input_tokens": 7092,
+    "output_tokens": 544,
+    "cost_usd": 0.000981,
+    "llm_calls": 7,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "code",
+   "question": "Does the inspected stats listener accept a connection and block its sole handler indefinitely if the client sends no request, and is there any evidence tying that behavior to the 1790459292 incident window?",
+   "summary": "[code file=load-balancer/LoadBalancer.cpp smell=blocking-read tests=fail] Yes: stats_loop accepts one client synchronously and immediately performs a blocking read with no timeout; if the peer sends no bytes, the sole stats thread stays at that read and does not accept or serve another stats connection until the read returns. I found no evidence tying this behavior to the 1790459292 incident window in the inspected source search. Tests were not executed because both attempted test commands were rejected as not allow-listed; no fix was applied (I would add a bounded read timeout or nonblocking/request deadline, and handle a timeout by closing the client).",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_183",
+    "ev_184",
+    "ev_185"
+   ],
+   "usage": {
+    "input_tokens": 32025,
+    "output_tokens": 541,
+    "cost_usd": 0.003471,
+    "llm_calls": 8,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}

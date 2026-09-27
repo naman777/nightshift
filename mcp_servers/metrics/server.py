@@ -50,7 +50,8 @@ def build(backend: MetricsBackend) -> Server:
                     found.append({"metric": metric, "service": svc, "baseline_avg": base["avg"], "recent_avg": recent["avg"],
                                   "change_ratio": round(ratio, 2), "started_at": int(o)})
         found.sort(key=lambda d: abs(math.log(d["change_ratio"])), reverse=True)
-        return {"now": int(now), "anomalies": found[:10]}
+        # known_metrics tells the model which metric names/services exist, so it queries recorded names instead of guessing raw ones
+        return {"now": int(now), "anomalies": found[:10], "known_metrics": b.catalogue()}
 
     @srv.tool("compare_windows", "Compare a metric's average/max between two windows (e.g. before vs after a suspected change time).",
               schema({"query": ("string", "metric selector"), "a_start": ("string", ""), "a_end": ("string", ""),

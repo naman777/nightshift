@@ -1,0 +1,14 @@
+[Unit]
+Description=Nightshift shadow-mode watcher
+After=network.target nightshift-prometheus.service nightshift-loki.service
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/nightshift-run/nightshift
+# secrets (OPENAI_API_KEY, ...) live only in .env; everything else in watch.env
+EnvironmentFile=/home/ubuntu/nightshift-run/nightshift/.env
+EnvironmentFile=/home/ubuntu/nightshift-run/host/watch.env
+ExecStart=/home/ubuntu/nightshift-run/venv/bin/python -m onboard.watch
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

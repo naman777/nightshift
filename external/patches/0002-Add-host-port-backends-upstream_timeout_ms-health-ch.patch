@@ -1,0 +1,1101 @@
+From 0c8aa5c58fe06a1dca02b3401a0d70a4f50174b6 Mon Sep 17 00:00:00 2001
+From: Naman Kundra <namankundra6@gmail.com>
+Date: Sat, 26 Sep 2026 16:45:34 +0530
+Subject: [PATCH 2/3] Add host:port backends, upstream_timeout_ms, health-check
+ settings, Prometheus /metrics, JSON logs, 502/504 responses; fix SIGHUP
+ killing the process
+
+---
+ load-balancer/LoadBalancer.cpp | 249 ++++++++++++++++++++++++---------
+ load-balancer/LoadBalancer.h   |  15 ++
+ load-balancer/config.h         | 105 ++++++++++----
+ load-balancer/logger.h         |  55 ++++++++
+ load-balancer/main.cpp         |  77 ++++++----
+ load-balancer/metrics.h        | 108 ++++++++++++++
+ scripts/test.sh                |  40 ++++++
+ tests/test_lb.cpp              | 111 ++++++++++++++-
+ 8 files changed, 636 insertions(+), 124 deletions(-)
+ create mode 100644 load-balancer/metrics.h
+
+diff --git a/load-balancer/LoadBalancer.cpp b/load-balancer/LoadBalancer.cpp
+index 156e7a8..029110f 100644
+--- a/load-balancer/LoadBalancer.cpp
++++ b/load-balancer/LoadBalancer.cpp
+@@ -7,8 +7,12 @@
+ #include <cerrno>
+ #include <chrono>
+ #include <climits>
++#include <cstdlib>
+ #include <cstring>
+ #include <fcntl.h>
++#include <netdb.h>
++#include <netinet/in.h>
++#include <string>
+ #include <sys/select.h>
+ #include <sys/socket.h>
+ #include <unistd.h>
+@@ -97,45 +101,62 @@ static std::string inject_connection_close(const char* data, ssize_t len) {
+     return headers + "\r\nConnection: close" + body_and_end;
+ }
+ 
++// Resolves "host" (dotted quad or DNS name; "" = 127.0.0.1) into an IPv4 sockaddr.
++static bool resolve_addr(const std::string& host, int port, sockaddr_in& out) {
++    out = {};
++    out.sin_family = AF_INET;
++    out.sin_port   = htons(static_cast<uint16_t>(port));
++    const std::string h = host.empty() ? "127.0.0.1" : host;
++    if (inet_pton(AF_INET, h.c_str(), &out.sin_addr) == 1) return true;
++    addrinfo hints{}, *res = nullptr;
++    hints.ai_family   = AF_INET;
++    hints.ai_socktype = SOCK_STREAM;
++    if (getaddrinfo(h.c_str(), nullptr, &hints, &res) != 0 || !res) return false;
++    out.sin_addr = reinterpret_cast<sockaddr_in*>(res->ai_addr)->sin_addr;
++    freeaddrinfo(res);
++    return true;
++}
++
+ // Connects with a 2-second timeout (non-blocking connect + select).
+ // Returns the connected fd on success, -1 on failure.
+-static int connect_with_timeout(int port) {
++static int connect_with_timeout(const std::string& host, int port) {
++    sockaddr_in addr{};
++    if (!resolve_addr(host, port, addr)) return -1;
++
+     int sock = socket(AF_INET, SOCK_STREAM, 0);
+     if (sock < 0) return -1;
+ 
+-    fcntl(sock, F_SETFL, O_NONBLOCK);
+-
+-    sockaddr_in addr{};
+-    addr.sin_family = AF_INET;
+-    addr.sin_port   = htons(port);
+-    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
++    int flags = fcntl(sock, F_GETFL, 0);
++    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+ 
+     int ret = connect(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+-    if (ret == 0) return sock; // connected immediately
+-    if (errno != EINPROGRESS) { close(sock); return -1; }
+-
+-    fd_set wfds;
+-    FD_ZERO(&wfds);
+-    FD_SET(sock, &wfds);
+-    struct timeval tv{2, 0};
+-    if (select(sock + 1, nullptr, &wfds, nullptr, &tv) <= 0) { close(sock); return -1; }
+-
+-    int error = 0;
+-    socklen_t slen = sizeof(error);
+-    getsockopt(sock, SOL_SOCKET, SO_ERROR, &error, &slen);
+-    if (error != 0) { close(sock); return -1; }
++    if (ret != 0 && errno != EINPROGRESS) { close(sock); return -1; }
++    if (ret != 0) {
++        fd_set wfds;
++        FD_ZERO(&wfds);
++        FD_SET(sock, &wfds);
++        struct timeval tv{2, 0};
++        if (select(sock + 1, nullptr, &wfds, nullptr, &tv) <= 0) { close(sock); return -1; }
++        int error = 0;
++        socklen_t slen = sizeof(error);
++        getsockopt(sock, SOL_SOCKET, SO_ERROR, &error, &slen);
++        if (error != 0) { close(sock); return -1; }
++    }
++    fcntl(sock, F_SETFL, flags);   // back to blocking for the proxy loop
+     return sock;
+ }
+ 
+ // Sends an HTTP HEAD request and checks for a 2xx response.
+ // Falls back to "healthy" on connection success if no HTTP response is received
+ // (e.g., raw TCP backend), so this gracefully handles non-HTTP backends too.
+-static bool http_probe(int port) {
+-    int sock = connect_with_timeout(port);
++static bool http_probe(const std::string& host, int port, const std::string& path) {
++    int sock = connect_with_timeout(host, port);
+     if (sock < 0) return false;
+ 
+-    const char* req = "HEAD / HTTP/1.0\r\nHost: localhost\r\n\r\n";
+-    send(sock, req, strlen(req), MSG_NOSIGNAL);
++    struct timeval rt{2, 0};
++    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &rt, sizeof(rt));
++    const std::string req = "HEAD " + path + " HTTP/1.0\r\nHost: localhost\r\n\r\n";
++    send(sock, req.data(), req.size(), MSG_NOSIGNAL);
+ 
+     char buf[64] = {};
+     ssize_t n = recv(sock, buf, sizeof(buf) - 1, 0);
+@@ -163,6 +184,7 @@ LoadBalancer::LoadBalancer(int listen_port, const std::vector<int>& ports,
+                            std::vector<int> weights, int max_conn)
+     : listen_port_(listen_port),
+       backend_ports_(ports),
++      backend_hosts_(ports.size(), ""),
+       backend_weights_(weights.empty() ? std::vector<int>(ports.size(), 1)
+                                        : std::move(weights)),
+       active_connections_(ports.size(), 0),
+@@ -198,6 +220,38 @@ void LoadBalancer::set_weights(const std::vector<int>& w) {
+     log_info("Backend weights updated.");
+ }
+ 
++void LoadBalancer::set_max_conn(int mc) {
++    std::lock_guard<std::mutex> lock(connection_mutex_);
++    max_conn_per_backend_ = mc;
++    log_info("Max connections per backend set to " + std::to_string(mc));
++}
++
++void LoadBalancer::set_health_check(int interval_ms, const std::string& path) {
++    health_interval_ms_.store(interval_ms > 0 ? interval_ms : 5000);
++    std::lock_guard<std::mutex> lock(connection_mutex_);
++    if (!path.empty()) health_path_ = path;
++}
++
++void LoadBalancer::set_backend_hosts(const std::vector<std::string>& hosts) {
++    if (hosts.size() != backend_ports_.size()) {
++        log_warn("set_backend_hosts: size mismatch — ignored.");
++        return;
++    }
++    backend_hosts_ = hosts;
++}
++
++std::string LoadBalancer::backend_name(size_t i) const {
++    return (backend_hosts_[i].empty() ? std::string("127.0.0.1") : backend_hosts_[i]) + ":" + std::to_string(backend_ports_[i]);
++}
++
++std::vector<Metrics::Upstream> LoadBalancer::upstream_snapshot() {
++    std::lock_guard<std::mutex> lock(connection_mutex_);
++    std::vector<Metrics::Upstream> out;
++    for (size_t i = 0; i < backend_ports_.size(); ++i)
++        out.push_back({backend_hosts_[i].empty() ? std::to_string(backend_ports_[i]) : backend_hosts_[i], backend_healthy_[i], active_connections_[i]});
++    return out;
++}
++
+ LoadBalancer::~LoadBalancer() {
+     stop();
+ }
+@@ -224,46 +278,62 @@ int LoadBalancer::select_and_reserve_backend(uint32_t client_ip) {
+     return idx;
+ }
+ 
++static bool conn_log_enabled() {
++    static const bool on = [] { const char* v = std::getenv("LB_LOG_CONN"); return v && std::string(v) == "1"; }();
++    return on;
++}
++
++static void send_status(int fd, int status) {
++    const char* reason = status == 504 ? "Gateway Timeout" : status == 503 ? "Service Unavailable" : "Bad Gateway";
++    const std::string resp = "HTTP/1.1 " + std::to_string(status) + " " + reason +
++                             "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
++    send_all(fd, resp.data(), static_cast<ssize_t>(resp.size()));
++}
++
+ void LoadBalancer::handle_client(int client_socket) {
++    const auto t0 = std::chrono::steady_clock::now();
++    auto elapsed = [&] { return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(); };
++
+     sockaddr_in peer{};
+     socklen_t peer_len = sizeof(peer);
+     getpeername(client_socket, reinterpret_cast<sockaddr*>(&peer), &peer_len);
+-
+     uint32_t client_ip = ntohl(peer.sin_addr.s_addr);
+ 
++    // Read the first request before choosing a backend, so 502/504 responses and metrics can name the path.
++    char buffer[4096];
++    ssize_t first_n = 0;
++    {
++        fd_set rfds;
++        FD_ZERO(&rfds);
++        FD_SET(client_socket, &rfds);
++        struct timeval tv{10, 0};
++        if (select(client_socket + 1, &rfds, nullptr, nullptr, &tv) <= 0 ||
++            (first_n = read(client_socket, buffer, sizeof(buffer))) <= 0) {
++            close(client_socket);   // idle or empty connection: not a request, not counted
++            return;
++        }
++    }
++    const std::string path = Metrics::path_label(std::string(buffer, static_cast<size_t>(first_n)));
++
+     // Retry across backends: if connect() fails, mark that backend unhealthy
+     // and try the next available one (up to all backends before giving up).
+     int index = -1;
+     int backend_socket = -1;
+-    int backend_port = -1;
++    bool no_backend_available = false;
+ 
+     for (size_t attempt = 0; attempt < backend_ports_.size(); ++attempt) {
+         index = select_and_reserve_backend(client_ip);
+-        if (index < 0) break; // no healthy backend at all
++        if (index < 0) { no_backend_available = true; break; } // no healthy backend at all
+ 
+-        backend_port = backend_ports_[index];
+-        int bsock = socket(AF_INET, SOCK_STREAM, 0);
+-        if (bsock < 0) {
+-            log_err("socket() failed: " + std::string(strerror(errno)));
+-            std::lock_guard<std::mutex> lock(connection_mutex_);
+-            active_connections_[index]--;
+-            break; // local resource issue — stop retrying
+-        }
+-
+-        sockaddr_in baddr{};
+-        baddr.sin_family = AF_INET;
+-        baddr.sin_port   = htons(backend_port);
+-        inet_pton(AF_INET, "127.0.0.1", &baddr.sin_addr);
+-
+-        if (connect(bsock, reinterpret_cast<sockaddr*>(&baddr), sizeof(baddr)) == 0) {
++        int bsock = connect_with_timeout(backend_hosts_[index], backend_ports_[index]);
++        if (bsock >= 0) {
+             backend_socket = bsock;
+             break; // connected — proceed with this backend
+         }
+ 
+         // Connect failed: mark unhealthy and retry with the next backend.
+-        close(bsock);
+-        log_warn("Backend :" + std::to_string(backend_port) +
+-                 " unreachable — trying next.");
++        log_err("connect() failed (111: Connection refused) while connecting to upstream " + backend_name(index) +
++                " path=" + path + " - trying next.");
+         {
+             std::lock_guard<std::mutex> lock(connection_mutex_);
+             active_connections_[index]--;
+@@ -272,48 +342,77 @@ void LoadBalancer::handle_client(int client_socket) {
+     }
+ 
+     if (backend_socket < 0) {
+-        log_err("All backends unreachable — dropping connection.");
++        const int status = no_backend_available ? 503 : 502;
++        log_err(no_backend_available ? "no healthy upstream available - answering 503 path=" + path
++                                     : "all upstreams unreachable - answering 502 path=" + path);
++        send_status(client_socket, status);
+         close(client_socket);
++        metrics_.observe(path, status, elapsed());
+         return;
+     }
+ 
+-    // Bidirectional forwarding via select() — 30-second idle timeout.
+-    // On the first client→backend read we inject "Connection: close" so the
+-    // backend terminates the connection after its response, giving us a clean
+-    // end-of-response signal without parsing Content-Length or chunked encoding.
+-    char buffer[4096];
++    // Forward the first request. "Connection: close" is injected so the backend terminates the connection after
++    // its response, giving a clean end-of-response signal without parsing Content-Length or chunked encoding.
++    {
++        std::string modified = inject_connection_close(buffer, first_n);
++        if (!send_all(backend_socket, modified.data(), static_cast<ssize_t>(modified.size()))) {
++            close(client_socket);
++            close(backend_socket);
++            std::lock_guard<std::mutex> lock(connection_mutex_);
++            active_connections_[index]--;
++            return;
++        }
++    }
++
++    // Bidirectional forwarding via select(). The timeout is upstream_timeout_ms: if the upstream sends nothing for
++    // that long before its first response byte, answer 504 (this is what a too-low timeout looks like in production).
+     int maxfd = std::max(client_socket, backend_socket) + 1;
+-    bool first_client_read = true;
++    bool got_backend_bytes = false;
++    bool timed_out = false;
++    int status = 0;
+ 
+     while (true) {
+         fd_set read_fds;
+         FD_ZERO(&read_fds);
+         FD_SET(client_socket, &read_fds);
+         FD_SET(backend_socket, &read_fds);
+-        struct timeval timeout{30, 0};
++        const int tmo_ms = std::max(1, upstream_timeout_ms_.load());
++        struct timeval timeout{tmo_ms / 1000, (tmo_ms % 1000) * 1000};
+ 
+         int ready = select(maxfd, &read_fds, nullptr, nullptr, &timeout);
+-        if (ready <= 0) break;
++        if (ready < 0 && errno == EINTR) continue;
++        if (ready <= 0) { timed_out = !got_backend_bytes; break; }
+ 
+         if (FD_ISSET(client_socket, &read_fds)) {
+             ssize_t n = read(client_socket, buffer, sizeof(buffer));
+             if (n <= 0) break;
+-            if (first_client_read) {
+-                std::string modified = inject_connection_close(buffer, n);
+-                if (!send_all(backend_socket, modified.data(),
+-                              static_cast<ssize_t>(modified.size()))) break;
+-                first_client_read = false;
+-            } else {
+-                if (!send_all(backend_socket, buffer, n)) break;
+-            }
++            if (!send_all(backend_socket, buffer, n)) break;
+         }
+         if (FD_ISSET(backend_socket, &read_fds)) {
+             ssize_t n = read(backend_socket, buffer, sizeof(buffer));
+             if (n <= 0) break;
++            if (!got_backend_bytes) {
++                got_backend_bytes = true;
++                // "HTTP/1.x NNN ..." -> upstream status
++                if (n >= 12 && std::strncmp(buffer, "HTTP/1.", 7) == 0) status = std::atoi(buffer + 9);
++            }
+             if (!send_all(client_socket, buffer, n)) break;
+         }
+     }
+ 
++    if (timed_out) {
++        status = 504;
++        log_err("upstream timed out (" + std::to_string(upstream_timeout_ms_.load()) + "ms) while reading response from upstream " +
++                backend_name(index) + " path=" + path);
++        send_status(client_socket, 504);
++    } else if (!got_backend_bytes) {
++        status = 502;
++        log_err("upstream " + backend_name(index) + " closed the connection without a response path=" + path);
++        send_status(client_socket, 502);
++    } else if (status == 0) {
++        status = 200;   // upstream did not speak HTTP: count the proxied connection as a success
++    }
++
+     close(client_socket);
+     close(backend_socket);
+ 
+@@ -323,24 +422,27 @@ void LoadBalancer::handle_client(int client_socket) {
+         active_connections_[index]--;
+         remaining = active_connections_[index];
+     }
+-    log_info("Backend :" + std::to_string(backend_port) +
+-             " connection closed. Active: " + std::to_string(remaining));
++    metrics_.observe(path, status, elapsed());
++    if (conn_log_enabled())
++        log_info("Backend " + backend_name(index) + " connection closed. Active: " + std::to_string(remaining));
+ }
+ 
+ void LoadBalancer::health_check_loop() {
+     while (!stop_flag_) {
+         for (size_t i = 0; i < backend_ports_.size(); ++i) {
+             if (stop_flag_) return;
+-            bool healthy = http_probe(backend_ports_[i]);
++            std::string hpath;
++            { std::lock_guard<std::mutex> lock(connection_mutex_); hpath = health_path_; }
++            bool healthy = http_probe(backend_hosts_[i], backend_ports_[i], hpath);
+             std::lock_guard<std::mutex> lock(connection_mutex_);
+             if (backend_healthy_[i] != healthy) {
+-                log_info("Backend :" + std::to_string(backend_ports_[i]) +
+-                         (healthy ? " is UP" : " is DOWN"));
++                log_info("Backend " + backend_name(i) + (healthy ? " is UP" : " is DOWN"));
+             }
+             backend_healthy_[i] = healthy;
+         }
+-        for (int i = 0; i < 5 && !stop_flag_; ++i)
+-            std::this_thread::sleep_for(std::chrono::seconds(1));
++        // Sleep the (runtime-updatable) interval in 100 ms slices so stop and SIGHUP take effect quickly.
++        for (int waited = 0; waited < health_interval_ms_.load() && !stop_flag_; waited += 100)
++            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+     }
+ }
+ 
+@@ -402,6 +504,15 @@ void LoadBalancer::stats_loop() {
+             continue;
+         }
+ 
++        if (req_str.rfind("GET /metrics", 0) == 0) {
++            const std::string text = metrics_.render(upstream_snapshot());
++            std::string resp = "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nContent-Length: " +
++                               std::to_string(text.size()) + "\r\nConnection: close\r\n\r\n" + text;
++            send(client, resp.data(), resp.size(), MSG_NOSIGNAL);
++            close(client);
++            continue;
++        }
++
+         std::string body;
+         {
+             std::lock_guard<std::mutex> lock(connection_mutex_);
+diff --git a/load-balancer/LoadBalancer.h b/load-balancer/LoadBalancer.h
+index d74033b..22912a4 100644
+--- a/load-balancer/LoadBalancer.h
++++ b/load-balancer/LoadBalancer.h
+@@ -6,9 +6,12 @@
+ #include <functional>
+ #include <mutex>
+ #include <queue>
++#include <string>
+ #include <thread>
+ #include <vector>
+ 
++#include "metrics.h"
++
+ enum class Algorithm {
+     LEAST_CONNECTIONS,
+     ROUND_ROBIN,
+@@ -44,10 +47,16 @@ public:
+     // Runtime-updatable settings (safe to call from any thread).
+     void set_algorithm(Algorithm a);
+     void set_weights(const std::vector<int>& w); // rebuilds weighted-RR sequence
++    void set_max_conn(int mc);
++    void set_upstream_timeout_ms(int ms) { upstream_timeout_ms_.store(ms); }
++    void set_health_check(int interval_ms, const std::string& path);
++    // Backend hostnames parallel to the ports given at construction ("" = 127.0.0.1). Call before start().
++    void set_backend_hosts(const std::vector<std::string>& hosts);
+ 
+ private:
+     int listen_port_;
+     std::vector<int> backend_ports_;
++    std::vector<std::string> backend_hosts_;   // "" = 127.0.0.1
+     std::vector<int> backend_weights_;
+     std::vector<int> rr_sequence_;      // pre-expanded for weighted round-robin
+     std::vector<int> active_connections_;
+@@ -57,6 +66,10 @@ private:
+     int rr_index_              = 0;
+     int max_conn_per_backend_  = 0;     // 0 = unlimited
+     std::atomic<Algorithm> algorithm_;
++    std::atomic<int> upstream_timeout_ms_{30000};
++    std::atomic<int> health_interval_ms_{5000};
++    std::string health_path_ = "/";           // guarded by connection_mutex_
++    Metrics metrics_;
+     ThreadPool thread_pool_;
+     std::thread health_check_thread_;
+     std::thread stats_thread_;
+@@ -68,6 +81,8 @@ private:
+     void handle_client(int client_socket);
+     void health_check_loop();
+     void stats_loop();
++    std::string backend_name(size_t i) const;   // "host:port"
++    std::vector<Metrics::Upstream> upstream_snapshot();
+ };
+ 
+ #endif // LOADBALANCER_H
+diff --git a/load-balancer/config.h b/load-balancer/config.h
+index 17ea446..ac48701 100644
+--- a/load-balancer/config.h
++++ b/load-balancer/config.h
+@@ -3,6 +3,7 @@
+ #include <algorithm>
+ #include <cctype>
+ #include <fstream>
++#include <map>
+ #include <sstream>
+ #include <stdexcept>
+ #include <string>
+@@ -10,15 +11,52 @@
+ 
+ struct LBConfig {
+     int port                  = 8080;
+-    std::vector<int> backends = {8001, 8002, 8003};
++    std::vector<int> backends = {8001, 8002, 8003};   // ports
++    std::vector<std::string> backend_hosts = {};      // parallel to `backends`; empty entry = 127.0.0.1
+     std::vector<int> weights  = {};  // empty = all weight 1
++    std::map<int, int> weights_by_index = {};         // from upstream_weight_orders_<n> (1-based)
+     Algorithm algo            = Algorithm::LEAST_CONNECTIONS;
+     size_t threads            = 16;
+     int max_conn              = 0;   // 0 = unlimited
++    int upstream_timeout_ms   = 30000;   // wait for the upstream this long before answering 504
++    int health_check_interval_ms = 5000;
++    std::string health_check_path = "/";
+ };
+ 
+-// Parses a simple "key = value" config file.
+-// Blank lines and lines starting with '#' are ignored.
++// Parses "host:port,host:port,port" into parallel host/port vectors ("" host = 127.0.0.1).
++inline void parse_backends(const std::string& s, std::vector<int>& ports, std::vector<std::string>& hosts) {
++    ports.clear();
++    hosts.clear();
++    std::stringstream ss(s);
++    std::string tok;
++    while (std::getline(ss, tok, ',')) {
++        auto not_space = [](unsigned char c) { return !std::isspace(c); };
++        tok.erase(tok.begin(), std::find_if(tok.begin(), tok.end(), not_space));
++        tok.erase(std::find_if(tok.rbegin(), tok.rend(), not_space).base(), tok.end());
++        if (tok.empty()) continue;
++        auto colon = tok.rfind(':');
++        if (colon == std::string::npos) {
++            hosts.push_back("");
++            ports.push_back(std::stoi(tok));
++        } else {
++            hosts.push_back(tok.substr(0, colon));
++            ports.push_back(std::stoi(tok.substr(colon + 1)));
++        }
++    }
++}
++
++// Weights for `n` backends: explicit `weights` win, otherwise upstream_weight_orders_<i> keys (default 1).
++inline std::vector<int> effective_weights(const LBConfig& c, size_t n) {
++    if (!c.weights.empty()) return c.weights;
++    if (c.weights_by_index.empty()) return {};
++    std::vector<int> w(n, 1);
++    for (const auto& [idx, val] : c.weights_by_index)
++        if (idx >= 1 && static_cast<size_t>(idx) <= n && val > 0) w[idx - 1] = val;
++    return w;
++}
++
++// Parses a simple config file. Accepts both "key = value" and YAML-style "key: value" lines.
++// Blank lines and text after '#' are ignored.
+ inline LBConfig load_config(const std::string& path) {
+     std::ifstream f(path);
+     if (!f.is_open()) throw std::runtime_error("Cannot open config: " + path);
+@@ -37,36 +75,47 @@ inline LBConfig load_config(const std::string& path) {
+         line = trim(line);
+         if (line.empty()) continue;
+ 
+-        auto eq = line.find('=');
++        auto eq = line.find_first_of("=:");   // whichever separator comes first ("backends = a:8080" -> '=')
+         if (eq == std::string::npos) continue;
+ 
+         std::string key = trim(line.substr(0, eq));
+         std::string val = trim(line.substr(eq + 1));
++        if (val.size() >= 2 && (val.front() == '"' || val.front() == '\'') && val.back() == val.front())
++            val = val.substr(1, val.size() - 2);
+ 
+-        if (key == "port") {
+-            cfg.port = std::stoi(val);
+-        } else if (key == "backends") {
+-            cfg.backends.clear();
+-            std::stringstream ss(val);
+-            std::string tok;
+-            while (std::getline(ss, tok, ','))
+-                cfg.backends.push_back(std::stoi(trim(tok)));
+-        } else if (key == "algo") {
+-            if (val == "rr")      cfg.algo = Algorithm::ROUND_ROBIN;
+-            else if (val == "ih") cfg.algo = Algorithm::IP_HASH;
+-            else if (val == "rh") cfg.algo = Algorithm::RENDEZVOUS;
+-            else if (val == "lc") cfg.algo = Algorithm::LEAST_CONNECTIONS;
+-            else throw std::runtime_error("Unknown algo in config: " + val);
+-        } else if (key == "weights") {
+-            cfg.weights.clear();
+-            std::stringstream ss(val);
+-            std::string tok;
+-            while (std::getline(ss, tok, ','))
+-                cfg.weights.push_back(std::stoi(trim(tok)));
+-        } else if (key == "threads") {
+-            cfg.threads = static_cast<size_t>(std::stoi(val));
+-        } else if (key == "max_conn") {
+-            cfg.max_conn = std::stoi(val);
++        try {
++            if (key == "port") {
++                cfg.port = std::stoi(val);
++            } else if (key == "backends") {
++                parse_backends(val, cfg.backends, cfg.backend_hosts);
++            } else if (key == "algo") {
++                if (val == "rr")      cfg.algo = Algorithm::ROUND_ROBIN;
++                else if (val == "ih") cfg.algo = Algorithm::IP_HASH;
++                else if (val == "rh") cfg.algo = Algorithm::RENDEZVOUS;
++                else if (val == "lc") cfg.algo = Algorithm::LEAST_CONNECTIONS;
++                else throw std::runtime_error("Unknown algo in config: " + val);
++            } else if (key == "weights") {
++                cfg.weights.clear();
++                std::stringstream ss(val);
++                std::string tok;
++                while (std::getline(ss, tok, ','))
++                    cfg.weights.push_back(std::stoi(trim(tok)));
++            } else if (key.rfind("upstream_weight_orders_", 0) == 0) {
++                cfg.weights_by_index[std::stoi(key.substr(std::string("upstream_weight_orders_").size()))] = std::stoi(val);
++            } else if (key == "threads") {
++                cfg.threads = static_cast<size_t>(std::stoi(val));
++            } else if (key == "max_conn") {
++                cfg.max_conn = std::stoi(val);
++            } else if (key == "upstream_timeout_ms") {
++                cfg.upstream_timeout_ms = std::stoi(val);
++            } else if (key == "health_check_interval_ms") {
++                cfg.health_check_interval_ms = std::stoi(val);
++            } else if (key == "health_check_path") {
++                cfg.health_check_path = val;
++            }
++            // unknown keys (e.g. log_level) are ignored so one shared config file can serve several components
++        } catch (const std::invalid_argument&) {
++            throw std::runtime_error("Bad value for '" + key + "' in config: " + val);
+         }
+     }
+     return cfg;
+diff --git a/load-balancer/logger.h b/load-balancer/logger.h
+index 9765b25..6a9d733 100644
+--- a/load-balancer/logger.h
++++ b/load-balancer/logger.h
+@@ -1,10 +1,65 @@
+ #pragma once
++#include <atomic>
++#include <cctype>
+ #include <chrono>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
+ #include <ctime>
+ #include <iostream>
+ #include <string>
+ 
++// Total log lines emitted (exported as log_lines_total by /metrics).
++inline std::atomic<uint64_t>& log_line_counter() {
++    static std::atomic<uint64_t> n{0};
++    return n;
++}
++
++// LB_LOG_FORMAT=json emits one JSON object per line ({"ts","level","service","replica","msg"}) so a log shipper
++// such as Promtail can label lines without a custom parser. Default is the original human-readable format.
++inline bool log_json() {
++    static const bool on = [] {
++        const char* f = std::getenv("LB_LOG_FORMAT");
++        return f && std::string(f) == "json";
++    }();
++    return on;
++}
++
++inline std::string json_escape(const std::string& s) {
++    std::string out;
++    out.reserve(s.size() + 8);
++    for (unsigned char c : s) {
++        switch (c) {
++            case '"':  out += "\\\""; break;
++            case '\\': out += "\\\\"; break;
++            case '\n': out += "\\n";  break;
++            case '\r': out += "\\r";  break;
++            case '\t': out += "\\t";  break;
++            default:
++                if (c < 0x20) { char b[8]; std::snprintf(b, sizeof(b), "\\u%04x", c); out += b; }
++                else out += static_cast<char>(c);
++        }
++    }
++    return out;
++}
++
+ inline void log(const char* level, const std::string& msg) {
++    log_line_counter().fetch_add(1, std::memory_order_relaxed);
++    if (log_json()) {
++        static const char* svc = std::getenv("LB_SERVICE") ? std::getenv("LB_SERVICE") : "lb";
++        static const char* rep = std::getenv("LB_REPLICA") ? std::getenv("LB_REPLICA") : "lb-1";
++        std::string lvl(level);
++        while (!lvl.empty() && lvl.back() == ' ') lvl.pop_back();
++        for (auto& c : lvl) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
++        auto now = std::chrono::system_clock::now();
++        std::time_t t = std::chrono::system_clock::to_time_t(now);
++        char ts[32];
++        std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&t));
++        std::cout << "{\"ts\":\"" << ts << "\",\"level\":\"" << lvl << "\",\"service\":\"" << json_escape(svc)
++                  << "\",\"replica\":\"" << json_escape(rep) << "\",\"msg\":\"" << json_escape(msg) << "\"}\n"
++                  << std::flush;
++        return;
++    }
+     auto now = std::chrono::system_clock::now();
+     std::time_t t = std::chrono::system_clock::to_time_t(now);
+     char ts[20];
+diff --git a/load-balancer/main.cpp b/load-balancer/main.cpp
+index e56004a..58be397 100644
+--- a/load-balancer/main.cpp
++++ b/load-balancer/main.cpp
+@@ -18,26 +18,30 @@ static void signal_handler(int) {
+     if (g_lb) g_lb->stop();
+ }
+ 
+-static std::vector<int> parse_ports(const std::string& s) {
+-    std::vector<int> ports;
++static std::vector<int> parse_ints(const std::string& s) {
++    std::vector<int> v;
+     std::stringstream ss(s);
+     std::string token;
+     while (std::getline(ss, token, ','))
+-        ports.push_back(std::stoi(token));
+-    return ports;
++        v.push_back(std::stoi(token));
++    return v;
+ }
+ 
+ static void print_usage(const char* prog) {
+     std::cout << "Usage: " << prog << " [options]\n"
+-              << "  --config <file>     Load settings from config file\n"
+-              << "  --port <n>          Listen port (default: 8080)\n"
+-              << "  --backends <p,...>  Comma-separated backend ports (default: 8001,8002,8003)\n"
+-              << "  --weights <w,...>   Per-backend weights, same order as --backends\n"
+-              << "  --algo <lc|rr|ih|rh> Algorithm: least-conn | round-robin | ip-hash | rendezvous (default: lc)\n"
+-              << "  --threads <n>       Thread pool size (default: 16)\n"
+-              << "  --max-conn <n>      Max concurrent connections per backend; 0=unlimited (default: 0)\n"
+-              << "  --help              Show this message\n"
+-              << "\nSend SIGHUP to reload algo and weights from the config file without restarting.\n";
++              << "  --config <file>          Load settings from config file (\"key = value\" or \"key: value\")\n"
++              << "  --port <n>               Listen port (default: 8080); stats and /metrics are on port+1\n"
++              << "  --backends <b,...>       Comma-separated backends: port or host:port (default: 8001,8002,8003)\n"
++              << "  --weights <w,...>        Per-backend weights, same order as --backends\n"
++              << "  --algo <lc|rr|ih|rh>     Algorithm: least-conn | round-robin | ip-hash | rendezvous (default: lc)\n"
++              << "  --threads <n>            Thread pool size (default: 16)\n"
++              << "  --max-conn <n>           Max concurrent connections per backend; 0=unlimited (default: 0)\n"
++              << "  --upstream-timeout-ms <n> Answer 504 if the upstream sends nothing this long (default: 30000)\n"
++              << "  --health-interval-ms <n> Health-check interval (default: 5000)\n"
++              << "  --health-path <path>     Path probed with HEAD by the health check (default: /)\n"
++              << "  --help                   Show this message\n"
++              << "\nSend SIGHUP to reload algo, weights, max_conn, upstream_timeout_ms and health-check settings from the config file.\n"
++              << "Environment: LB_LOG_FORMAT=json (structured logs), LB_LOG_CONN=1 (log every closed connection).\n";
+ }
+ 
+ int main(int argc, char* argv[]) {
+@@ -60,14 +64,18 @@ int main(int argc, char* argv[]) {
+     }
+ 
+     // Second pass: CLI flags override config file values.
++    bool backends_from_cli = false;
+     for (int i = 1; i < argc; ++i) {
+         std::string arg = argv[i];
+         if (arg == "--config") { ++i; continue; }
+         else if (arg == "--port"     && i + 1 < argc) cfg.port    = std::stoi(argv[++i]);
+-        else if (arg == "--backends" && i + 1 < argc) cfg.backends = parse_ports(argv[++i]);
+-        else if (arg == "--weights"  && i + 1 < argc) cfg.weights  = parse_ports(argv[++i]);
++        else if (arg == "--backends" && i + 1 < argc) { parse_backends(argv[++i], cfg.backends, cfg.backend_hosts); backends_from_cli = true; }
++        else if (arg == "--weights"  && i + 1 < argc) cfg.weights  = parse_ints(argv[++i]);
+         else if (arg == "--threads"  && i + 1 < argc) cfg.threads   = static_cast<size_t>(std::stoi(argv[++i]));
+         else if (arg == "--max-conn" && i + 1 < argc) cfg.max_conn  = std::stoi(argv[++i]);
++        else if (arg == "--upstream-timeout-ms" && i + 1 < argc) cfg.upstream_timeout_ms = std::stoi(argv[++i]);
++        else if (arg == "--health-interval-ms"  && i + 1 < argc) cfg.health_check_interval_ms = std::stoi(argv[++i]);
++        else if (arg == "--health-path"         && i + 1 < argc) cfg.health_check_path = argv[++i];
+         else if (arg == "--algo"     && i + 1 < argc) {
+             std::string a = argv[++i];
+             if      (a == "rr") cfg.algo = Algorithm::ROUND_ROBIN;
+@@ -81,25 +89,36 @@ int main(int argc, char* argv[]) {
+             return 1;
+         }
+     }
++    (void)backends_from_cli;
+ 
+     if (cfg.backends.empty()) { std::cerr << "At least one backend is required.\n"; return 1; }
++    if (cfg.backend_hosts.size() != cfg.backends.size()) cfg.backend_hosts.assign(cfg.backends.size(), "");
++
++    // Block SIGHUP BEFORE the LoadBalancer (and its thread pool) is constructed: threads inherit the signal mask of
++    // their creator, so blocking it afterwards leaves the pool threads exposed and the default action (terminate)
++    // kills the whole process on SIGHUP.
++    sigset_t hup_mask;
++    sigemptyset(&hup_mask);
++    sigaddset(&hup_mask, SIGHUP);
++    if (!config_path.empty()) pthread_sigmask(SIG_BLOCK, &hup_mask, nullptr);
+ 
+     LoadBalancer lb(cfg.port, cfg.backends, cfg.algo, cfg.threads,
+-                    cfg.weights, cfg.max_conn);
++                    effective_weights(cfg, cfg.backends.size()), cfg.max_conn);
++    lb.set_backend_hosts(cfg.backend_hosts);
++    lb.set_upstream_timeout_ms(cfg.upstream_timeout_ms);
++    lb.set_health_check(cfg.health_check_interval_ms, cfg.health_check_path);
+     g_lb = &lb;
+ 
+-    // SIGHUP: reload algorithm and weights from config file without restarting.
++    // SIGHUP: reload settings from the config file without restarting.
+     // SIGHUP is blocked in all threads and consumed exclusively via sigwait() —
+     // the only signal-safe way to call arbitrary C++ from a signal context.
+     if (!config_path.empty()) {
+-        sigset_t mask;
+-        sigemptyset(&mask);
+-        sigaddset(&mask, SIGHUP);
+-        pthread_sigmask(SIG_BLOCK, &mask, nullptr);
++        const sigset_t mask = hup_mask;
+ 
+-        std::vector<int> initial_backends = cfg.backends;
++        const std::vector<int> initial_backends = cfg.backends;
++        const bool backends_pinned_by_cli = backends_from_cli;
+ 
+-        std::thread([mask, config_path, &lb, initial_backends] {
++        std::thread([mask, config_path, &lb, initial_backends, backends_pinned_by_cli] {
+             sigset_t m = mask;
+             while (true) {
+                 int sig;
+@@ -107,10 +126,16 @@ int main(int argc, char* argv[]) {
+                 try {
+                     auto nc = load_config(config_path);
+                     lb.set_algorithm(nc.algo);
+-                    if (!nc.weights.empty()) lb.set_weights(nc.weights);
+-                    if (nc.backends != initial_backends)
++                    auto w = effective_weights(nc, initial_backends.size());
++                    if (!w.empty()) lb.set_weights(w);
++                    lb.set_max_conn(nc.max_conn);
++                    lb.set_upstream_timeout_ms(nc.upstream_timeout_ms);
++                    lb.set_health_check(nc.health_check_interval_ms, nc.health_check_path);
++                    if (!backends_pinned_by_cli && nc.backends != initial_backends)
+                         log_warn("SIGHUP: backend list changes require restart — ignored.");
+-                    log_info("SIGHUP: config reloaded from " + config_path);
++                    log_info("SIGHUP: config reloaded from " + config_path +
++                             " (upstream_timeout_ms=" + std::to_string(nc.upstream_timeout_ms) +
++                             ", health_check_interval_ms=" + std::to_string(nc.health_check_interval_ms) + ")");
+                 } catch (const std::exception& e) {
+                     log_err("SIGHUP reload failed: " + std::string(e.what()));
+                 }
+diff --git a/load-balancer/metrics.h b/load-balancer/metrics.h
+new file mode 100644
+index 0000000..e5b9f4f
+--- /dev/null
++++ b/load-balancer/metrics.h
+@@ -0,0 +1,108 @@
++#pragma once
++// Prometheus text-format metrics for the load balancer (no external library).
++//
++// Exposed at GET /metrics on the stats port (listen_port + 1):
++//   http_requests_total{path,status}          requests proxied, by first path segment and upstream status (502/504 are LB-generated)
++//   http_request_duration_seconds_*           end-to-end latency histogram (accept -> connection closed)
++//   upstream_healthy                          number of healthy upstreams
++//   upstream_up{upstream}, upstream_active_connections{upstream}
++//   process_resident_memory_bytes, process_cpu_seconds_total, process_start_time_seconds, log_lines_total
++#include "logger.h"
++#include <algorithm>
++#include <array>
++#include <cstdio>
++#include <fstream>
++#include <map>
++#include <mutex>
++#include <sstream>
++#include <string>
++#include <sys/resource.h>
++#include <unistd.h>
++#include <utility>
++#include <vector>
++
++class Metrics {
++public:
++    static constexpr std::array<double, 11> kBuckets = {0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0};
++
++    Metrics() : start_time_(static_cast<double>(std::time(nullptr))) {}
++
++    // First path segment only ("/orders/42?x=1" -> "/orders"), capped at 16 distinct values to bound cardinality.
++    static std::string path_label(const std::string& request_head) {
++        auto sp1 = request_head.find(' ');
++        if (sp1 == std::string::npos) return "other";
++        auto sp2 = request_head.find(' ', sp1 + 1);
++        std::string target = request_head.substr(sp1 + 1, sp2 == std::string::npos ? std::string::npos : sp2 - sp1 - 1);
++        target = target.substr(0, target.find_first_of("?#"));
++        if (target.empty() || target[0] != '/') return "other";
++        auto slash = target.find('/', 1);
++        return slash == std::string::npos ? target : target.substr(0, slash);
++    }
++
++    void observe(const std::string& path, int status, double seconds) {
++        std::lock_guard<std::mutex> lock(mutex_);
++        std::string p = path;
++        if (!paths_.count(p)) {
++            if (paths_.size() >= 16) p = "other";
++            else paths_[p] = true;
++        }
++        requests_[{p, status}]++;
++        for (size_t i = 0; i < kBuckets.size(); ++i)
++            if (seconds <= kBuckets[i]) buckets_[i]++;
++        count_++;
++        sum_ += seconds;
++    }
++
++    // `upstreams`: (name, healthy, active_connections)
++    struct Upstream { std::string name; bool healthy; int active; };
++
++    std::string render(const std::vector<Upstream>& upstreams) const {
++        std::ostringstream o;
++        {
++            std::lock_guard<std::mutex> lock(mutex_);
++            o << "# HELP http_requests_total Requests proxied by the load balancer.\n# TYPE http_requests_total counter\n";
++            for (const auto& [k, v] : requests_)
++                o << "http_requests_total{path=\"" << k.first << "\",status=\"" << k.second << "\"} " << v << "\n";
++            o << "# HELP http_request_duration_seconds Request latency, accept to close.\n# TYPE http_request_duration_seconds histogram\n";
++            for (size_t i = 0; i < kBuckets.size(); ++i)
++                o << "http_request_duration_seconds_bucket{le=\"" << kBuckets[i] << "\"} " << buckets_[i] << "\n";
++            o << "http_request_duration_seconds_bucket{le=\"+Inf\"} " << count_ << "\n"
++              << "http_request_duration_seconds_sum " << sum_ << "\n"
++              << "http_request_duration_seconds_count " << count_ << "\n";
++        }
++        int healthy = 0;
++        for (const auto& u : upstreams) healthy += u.healthy ? 1 : 0;
++        o << "# TYPE upstream_healthy gauge\nupstream_healthy " << healthy << "\n";
++        o << "# TYPE upstream_up gauge\n";
++        for (const auto& u : upstreams) o << "upstream_up{upstream=\"" << u.name << "\"} " << (u.healthy ? 1 : 0) << "\n";
++        o << "# TYPE upstream_active_connections gauge\n";
++        for (const auto& u : upstreams) o << "upstream_active_connections{upstream=\"" << u.name << "\"} " << u.active << "\n";
++        o << "# TYPE process_resident_memory_bytes gauge\nprocess_resident_memory_bytes " << resident_bytes() << "\n"
++          << "# TYPE process_cpu_seconds_total counter\nprocess_cpu_seconds_total " << cpu_seconds() << "\n"
++          << "# TYPE process_start_time_seconds gauge\nprocess_start_time_seconds " << start_time_ << "\n"
++          << "# TYPE log_lines_total counter\nlog_lines_total " << log_line_counter().load() << "\n";
++        return o.str();
++    }
++
++private:
++    static double resident_bytes() {
++        std::ifstream f("/proc/self/statm");
++        long size = 0, rss = 0;
++        if (f >> size >> rss) return static_cast<double>(rss) * static_cast<double>(sysconf(_SC_PAGESIZE));
++        return 0;
++    }
++    static double cpu_seconds() {
++        rusage ru{};
++        getrusage(RUSAGE_SELF, &ru);
++        return static_cast<double>(ru.ru_utime.tv_sec + ru.ru_stime.tv_sec) +
++               static_cast<double>(ru.ru_utime.tv_usec + ru.ru_stime.tv_usec) / 1e6;
++    }
++
++    mutable std::mutex mutex_;
++    std::map<std::pair<std::string, int>, unsigned long long> requests_;
++    std::map<std::string, bool> paths_;
++    std::array<unsigned long long, kBuckets.size()> buckets_{};
++    unsigned long long count_ = 0;
++    double sum_ = 0;
++    double start_time_;
++};
+diff --git a/scripts/test.sh b/scripts/test.sh
+index 29bd66d..f512e43 100644
+--- a/scripts/test.sh
++++ b/scripts/test.sh
+@@ -69,6 +69,46 @@ else
+     fail "Load distribution" "all 9 requests went to the same backend"
+ fi
+ 
++# ── Config-driven instance: hostnames, /metrics, upstream timeout, SIGHUP reload ─
++CONF=$(mktemp)
++printf 'backends = localhost:8001, localhost:8002\nalgo: rr\nupstream_timeout_ms: 50\nhealth_check_path: /\n' > "$CONF"
++LB_LOG_FORMAT=json "$ROOT/load-balancer/load_balancer" --config "$CONF" --port 9080 --threads 8 > /tmp/lb_cfg.log 2>&1 &
++LBPID=$!
++sleep 0.6
++
++CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:9080/orders/1")
++if [ "$CODE" = "200" ]; then pass "host:port backends resolve via DNS (localhost)"; else fail "hostname backend" "got HTTP $CODE"; fi
++
++CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:9080/orders/1?delay=300")
++if [ "$CODE" = "504" ]; then pass "slow upstream past upstream_timeout_ms=50 -> 504"; else fail "upstream timeout" "expected 504, got $CODE"; fi
++
++METRICS=$(curl -sf http://localhost:9081/metrics || true)
++if echo "$METRICS" | grep -q 'http_requests_total{path="/orders",status="504"} 1' \
++   && echo "$METRICS" | grep -q 'http_requests_total{path="/orders",status="200"} 1' \
++   && echo "$METRICS" | grep -q '^upstream_healthy 2'; then
++    pass "/metrics reports 200/504 counters and upstream_healthy=2"
++else
++    fail "/metrics" "unexpected body: $(echo "$METRICS" | grep -E 'http_requests_total|upstream_healthy' | tr '\n' ' ')"
++fi
++
++if grep -q '"level":"error".*upstream timed out (50ms) while reading response from upstream localhost:800' /tmp/lb_cfg.log; then
++    pass "structured JSON error log names the timeout and the upstream"
++else
++    fail "json log" "$(tail -3 /tmp/lb_cfg.log)"
++fi
++
++printf 'backends = localhost:8001, localhost:8002\nalgo: rr\nupstream_timeout_ms: 5000\n' > "$CONF"
++kill -HUP "$LBPID"; sleep 0.5
++CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:9080/orders/1?delay=300")
++if [ "$CODE" = "200" ]; then pass "SIGHUP reload raises upstream_timeout_ms; slow request now succeeds"; else fail "SIGHUP reload" "expected 200, got $CODE"; fi
++
++# Kill one backend: the LB must fail over (no error visible to the client).
++pkill -f "echo_server 8002" 2>/dev/null || true
++sleep 0.3
++BAD=0; for _ in $(seq 6); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:9080/x"); [ "$c" = "200" ] || BAD=$((BAD+1)); done
++if [ "$BAD" -eq 0 ]; then pass "failover: dead backend is skipped, all 6 requests succeed"; else fail "failover" "$BAD of 6 requests failed"; fi
++kill "$LBPID" 2>/dev/null || true; rm -f "$CONF"
++
+ # ── Summary ────────────────────────────────────────────────────────────────────
+ echo ""
+ echo "Results: $PASS passed, $FAIL failed."
+diff --git a/tests/test_lb.cpp b/tests/test_lb.cpp
+index 06e7e3f..8925acd 100644
+--- a/tests/test_lb.cpp
++++ b/tests/test_lb.cpp
+@@ -1,5 +1,9 @@
+ #include "../load-balancer/LoadBalancer.h"
+ #include "../load-balancer/backend_selector.h"
++#include "../load-balancer/config.h"
++#include "../load-balancer/metrics.h"
++#include <cstdio>
++#include <fstream>
+ #include <atomic>
+ #include <cassert>
+ #include <iostream>
+@@ -278,6 +282,102 @@ void test_threadpool_empty_is_safe() {
+     std::cout << "PASS  threadpool_empty_is_safe\n";
+ }
+ 
++// ── Config: YAML-style keys, host:port backends, weights, timeouts ────────────
++
++static std::string write_tmp(const std::string& name, const std::string& body) {
++    std::string path = "/tmp/" + name;
++    std::ofstream(path) << body;
++    return path;
++}
++
++void test_config_yaml_style_keys() {
++    auto path = write_tmp("lb_test_yaml.conf",
++        "# shared with other components\n"
++        "upstream_timeout_ms: 50\n"
++        "health_check_interval_ms: 250   # inline comment\n"
++        "upstream_weight_orders_1: 50\n"
++        "upstream_weight_orders_2: 1\n"
++        "log_level: info\n"
++        "algo: rr\n");
++    LBConfig c = load_config(path);
++    assert(c.upstream_timeout_ms == 50);
++    assert(c.health_check_interval_ms == 250);
++    assert(c.algo == Algorithm::ROUND_ROBIN);
++    auto w = effective_weights(c, 2);
++    assert(w.size() == 2 && w[0] == 50 && w[1] == 1);
++    std::cout << "PASS  config_yaml_style_keys\n";
++}
++
++void test_config_backends_host_port() {
++    auto path = write_tmp("lb_test_backends.conf", "backends = orders-svc-1:8080, 127.0.0.1:9000, 8003\nmax_conn = 7\n");
++    LBConfig c = load_config(path);
++    assert(c.backends.size() == 3 && c.backends[0] == 8080 && c.backends[1] == 9000 && c.backends[2] == 8003);
++    assert(c.backend_hosts[0] == "orders-svc-1" && c.backend_hosts[1] == "127.0.0.1" && c.backend_hosts[2].empty());
++    assert(c.max_conn == 7);
++    std::cout << "PASS  config_backends_host_port\n";
++}
++
++void test_config_defaults_and_unknown_keys() {
++    auto path = write_tmp("lb_test_defaults.conf", "totally_unknown_key: 1\n");
++    LBConfig c = load_config(path);
++    assert(c.upstream_timeout_ms == 30000 && c.health_check_interval_ms == 5000 && c.health_check_path == "/");
++    assert(effective_weights(c, 3).empty());   // no weights configured -> all equal
++    std::cout << "PASS  config_defaults_and_unknown_keys\n";
++}
++
++void test_config_bad_value_throws() {
++    auto path = write_tmp("lb_test_bad.conf", "upstream_timeout_ms: fast\n");
++    bool threw = false;
++    try { load_config(path); } catch (const std::runtime_error&) { threw = true; }
++    assert(threw);
++    std::cout << "PASS  config_bad_value_throws\n";
++}
++
++// ── Metrics ───────────────────────────────────────────────────────────────────
++
++void test_metrics_path_label() {
++    assert(Metrics::path_label("GET /orders/42?x=1 HTTP/1.1\r\n") == "/orders");
++    assert(Metrics::path_label("POST /charge HTTP/1.1\r\n") == "/charge");
++    assert(Metrics::path_label("GET / HTTP/1.1\r\n") == "/");
++    assert(Metrics::path_label("garbage") == "other");
++    std::cout << "PASS  metrics_path_label\n";
++}
++
++void test_metrics_render_counts_and_histogram() {
++    Metrics m;
++    m.observe("/orders", 200, 0.02);
++    m.observe("/orders", 200, 0.30);
++    m.observe("/orders", 504, 0.05);
++    std::string out = m.render({{"orders-svc-1", true, 2}, {"orders-svc-2", false, 0}});
++    auto has = [&](const std::string& needle) { return out.find(needle) != std::string::npos; };
++    assert(has("http_requests_total{path=\"/orders\",status=\"200\"} 2"));
++    assert(has("http_requests_total{path=\"/orders\",status=\"504\"} 1"));
++    assert(has("http_request_duration_seconds_bucket{le=\"0.05\"} 2"));   // 0.02 and 0.05
++    assert(has("http_request_duration_seconds_bucket{le=\"+Inf\"} 3"));
++    assert(has("http_request_duration_seconds_count 3"));
++    assert(has("upstream_healthy 1"));
++    assert(has("upstream_up{upstream=\"orders-svc-2\"} 0"));
++    assert(has("upstream_active_connections{upstream=\"orders-svc-1\"} 2"));
++    assert(has("process_resident_memory_bytes"));
++    assert(has("process_cpu_seconds_total"));
++    assert(has("process_start_time_seconds"));
++    assert(has("log_lines_total"));
++    std::cout << "PASS  metrics_render_counts_and_histogram\n";
++}
++
++void test_metrics_path_cardinality_capped() {
++    Metrics m;
++    for (int i = 0; i < 40; ++i) m.observe("/p" + std::to_string(i), 200, 0.01);
++    std::string out = m.render({});
++    assert(out.find("path=\"other\"") != std::string::npos);
++    std::cout << "PASS  metrics_path_cardinality_capped\n";
++}
++
++void test_logger_json_escape() {
++    assert(json_escape("a\"b\\c\n") == "a\\\"b\\\\c\\n");
++    std::cout << "PASS  logger_json_escape\n";
++}
++
+ int main() {
+     test_lc_picks_minimum();
+     test_lc_skips_unhealthy();
+@@ -313,6 +413,15 @@ int main() {
+     test_threadpool_indexed_slots();
+     test_threadpool_empty_is_safe();
+ 
+-    std::cout << "\nAll 26 tests passed.\n";
++    test_config_yaml_style_keys();
++    test_config_backends_host_port();
++    test_config_defaults_and_unknown_keys();
++    test_config_bad_value_throws();
++    test_metrics_path_label();
++    test_metrics_render_counts_and_histogram();
++    test_metrics_path_cardinality_capped();
++    test_logger_json_escape();
++
++    std::cout << "\nAll 34 tests passed.\n";
+     return 0;
+ }
+-- 
+2.43.0.windows.1
+

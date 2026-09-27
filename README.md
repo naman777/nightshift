@@ -1,6 +1,6 @@
 # Nightshift: an AI on-call engineer that survives its own crashes
 
-> A multi-agent incident investigator that resumes after worker crashes, never acts without permission, and is scored on a public benchmark of 40 injected production failures.
+> A multi-agent incident investigator that resumes after worker crashes, never acts without permission, and is scored on a public benchmark of 40 injected production failures (plus a 10-scenario hard set).
 
 When an alert fires, a commander agent plans hypotheses and hands one precise question to each of four specialists (metrics, logs, changes, code). They investigate in parallel, write
 claims to an evidence board, and the commander converges on a ranked root cause where **every claim cites evidence**. Anything risky goes through a trust gate: read-only steps run,
@@ -8,6 +8,29 @@ reversible actions need one click, destructive actions need a typed confirmation
 Temporal workflow, so killing the worker mid-incident just resumes it, with no repeated LLM calls.
 
 ![results](docs/results.svg)
+
+## Try it from the dashboard
+
+The quickest way to see what this does (no docker, no API keys):
+
+```bash
+pip install -e ".[dev]"
+python start.py            # starts the gateway + dashboard, opens http://localhost:3001; Ctrl+C stops both
+```
+
+On Windows you can also double-click `start.bat`. Options: `--no-browser`, `--fresh` (empty incident history), `--port`, `--dashboard-port`. The first run installs the dashboard's
+npm packages (needs Node 18+); logs go to `.run/`. To run the two pieces by hand: `python -m gateway.demo` and `cd dashboard && npm run dev`.
+
+Open http://localhost:3001, pick one of the 50 scenarios (or a suggested demo), choose a team of specialists or a single agent, and press **Run investigation**. The incident page updates live:
+
+* a progress bar (alert, plan, investigate, diagnose, approval, resolved) with a plain-English **happening now / next** banner
+* the commander's **plan**: hypotheses under test and which specialist checks what
+* one card per agent with its current activity and full step trail
+* the cited **root cause**, what was ruled out, and the proposed fix with its trust tier; **Approve** executes it (simulated), **Reject** leaves everything untouched
+* an **answer key** revealed after diagnosis (misses are shown, not hidden), plus tabs for the evidence behind every claim, the safety audit of every tool call, and a timestamped activity log
+
+The model can be the offline reference policy (free, instant, *not* a language model) or a real LLM: put `OPENAI_API_KEY` in `.env` and the real-model option is enabled
+(default `gpt-6-luna`; override with `NIGHTSHIFT_DEMO_MODEL`).
 
 ## Results
 
@@ -65,7 +88,45 @@ Invalid scenarios (expected alert never fired): 0.
 API keys), not by a language model. It scores near 100% on the simulated world because it was written by someone who knows that world. What the table demonstrates is that the harness works,
 that the benchmark separates a real investigation from a rule of thumb (the two naive baselines land at 5-20%), and that the safety properties hold: 0% unsafe actions, 100% evidence grounding,
 and a planted prompt injection is ignored. A 10-scenario **hard stress set** (decoy changes, concurrent faults, telemetry outages) is included precisely because the reference policy does not ace it (30%); the stretch-goal **incident memory** lifts it to 90% on repeat-style faults (see the benchmark doc for why that is a best case). The single-vs-multi-agent comparison only becomes meaningful with real models: run `make bench` with `NIGHTSHIFT_LLM_PROVIDER=anthropic` and
-report that table instead. Full methodology, splits, judge calibration and limitations: [docs/benchmark.md](docs/benchmark.md). Time to diagnosis is *modelled* (see the doc).
+report that table instead (real-model runs are in the next section). Full methodology, splits, judge calibration and limitations: [docs/benchmark.md](docs/benchmark.md). Time to diagnosis is *modelled* (see the doc).
+
+## Real-LLM results (`gpt-6-luna`)
+
+<!-- REAL:START -->
+Real model: `gpt-6-luna` (same simulated worlds, scoring and benchmark mode as the offline table; invalid runs excluded).
+
+| Split | Prompts | Config | Runs | Root-cause acc. | Top-3 | Service | Remediation | Unsafe | Grounding | Red-herring acc. | Cost / incident* | Wall time |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| smoke (10 sc. x 1) | v1 | single | 10 | 60% | 60% | 90% | 80% | 0% | 100% | 83% | $0.002 | 13s |
+| smoke (10 sc. x 1) | v1 | multi | 10 | 20% | 50% | 60% | 60% | 0% | 100% | 33% | $0.008 | 32s |
+| dev (25 sc. x 1) | v1 | single | 25 | 32% | 44% | 76% | 72% | 0% | 100% | 50% | $0.002 | 14s |
+| dev (25 sc. x 1) | v1 | multi | 25 | 44% | 52% | 88% | 68% | 0% | 100% | 40% | $0.009 | 51s |
+| dev (25 sc. x 1) | v2 | single | 25 | 76% | 80% | 84% | 64% | 0% | 100% | 90% | $0.002 | 17s |
+| dev (25 sc. x 1) | v2 | multi | 25 | 72% | 84% | 76% | 72% | 0% | 100% | 60% | $0.008 | 55s |
+| dev (25 sc. x 1) | v3 | single | 25 | 96% | 96% | 100% | 68% | 0% | 100% | 100% | $0.002 | 11s |
+| dev (25 sc. x 1) | v3 | multi | 25 | 88% | 88% | 92% | 88% | 0% | 100% | 100% | $0.009 | 58s |
+| heldout (15 sc. x 3) | v2 | single | 45 | 96% | 96% | 98% | 71% | 0% | 100% | 100% | $0.002 | 14s |
+| heldout (15 sc. x 3) | v2 | multi | 45 | 76% | 84% | 87% | 80% | 0% | 100% | 100% | $0.010 | 64s |
+| heldout (15 sc. x 3) | v3 | single | 45 | 96% | 96% | 98% | 73% | 0% | 100% | 100% | $0.002 | 12s |
+| heldout (15 sc. x 3) | v3 | multi | 45 | 96% | 96% | 98% | 87% | 0% | 100% | 100% | $0.009 | 58s |
+| hard (10 sc. x 1) | v2 | single | 10 | 70% | 70% | 80% | 20% | 0% | 100% | 50% | $0.002 | 14s |
+| hard (10 sc. x 1) | v2 | multi | 10 | 60% | 60% | 70% | 60% | 0% | 100% | 50% | $0.010 | 63s |
+
+\*Cost is computed from token counts at the model's standard short-context rates. Wall time is real, not modelled.
+<!-- REAL:END -->
+
+How to read this (same simulated worlds, scoring and benchmark mode as the offline table; results live in `bench/results/real-llm/` and are never mixed into it):
+
+* **Prompt `v1` -> `v2` mattered more than architecture.** With `v1` the model often named the right service and fix but labelled the *trigger* (`config_change`) instead of the failure
+  *mechanism* (`resource_leak`, `log_flood`, `capacity`). `v2` adds category definitions and roughly doubled dev accuracy (single 32% -> 76%, multi 44% -> 72%). `v1` is kept so the comparison is reproducible.
+* **Dev is the split the prompt was tuned on; held-out (15 scenarios x 3 repeats) is the number to quote.** I looked at held-out failures after the fact to diagnose the multi-agent gap, so treat it as
+  lightly contaminated and do not tune against it further.
+* **Under `v2` the single agent beat the multi-agent team** (held-out 96% vs 76%, about 5x cheaper and 4x faster): the commander often hedged with `unknown` on dependency faults.
+  Under `v3` the two tie on accuracy (held-out 96% vs 96%) and multi-agent is better on remediation (87% vs 73%), but it still costs about 5x more and takes 4-5x longer. A multi-agent accuracy advantage is not demonstrated.
+* **`v3`** tells the commander to commit to the best-supported mechanism instead of hedging with `unknown` (dev: single 96%, multi 88%; held-out: single 96%, multi 96%). It was written from dev failures, but I had already seen `v2` held-out failures, so the `v3` held-out numbers are lightly contaminated and are not a clean generalisation result.
+* Held constant across every real run: **0% unsafe actions and 100% evidence grounding**.
+* One model, one prompt family, at most 3 repeats: enough to see large effects, not small ones.
+* Reproduce (swap `v2` for `v3` or `v1` to compare): `python -m bench.real_llm --model gpt-6-luna --split heldout --config single,multi --repeats 3 --prompt-version v2`, then `python -m bench.real_report --write`. Needs `OPENAI_API_KEY` in `.env`; a full held-out run costs well under a dollar at gpt-6-luna prices ($0.10 in / $0.50 out per 1M tokens).
 
 ## Beyond the reactive loop
 
@@ -77,16 +138,19 @@ report that table instead. Full methodology, splits, judge calibration and limit
 
 ```bash
 pip install -e ".[dev]"
-make test                                            # 140+ tests, including crash-and-resume against a real Temporal test server
+make test                                            # 150+ tests, including crash-and-resume against a real Temporal test server
 make investigate SCENARIO=bad-deploy-n-plus-one-00   # watch agents work in the terminal
 make investigate SCENARIO=bad-deploy-n-plus-one-00 MODE=single
 make bench-smoke                                     # the 10-scenario CI gate
-make demo-sim                                        # gateway on a simulated incident; then: cd dashboard && npm install && npm run dev
+make demo-sim                                        # gateway on simulated backends; launch scenarios from the dashboard (see above)
 ```
 
 With a real model (the same code path, just a different adapter):
 
 ```bash
+python -m agents.cli investigate bad-deploy-n-plus-one-00 --provider openai --commander-model gpt-6-luna   # OPENAI_API_KEY from the environment
+python -m bench.real_llm --model gpt-6-luna --split smoke --config single,multi --concurrency 2           # benchmark a real model (reads .env)
+
 export ANTHROPIC_API_KEY=sk-...
 python -m agents.cli investigate memory-leak-orders-cache-00 --provider anthropic \
     --commander-model claude-opus-4-5 --specialist-model claude-haiku-4-5
@@ -128,12 +192,12 @@ More detail in [docs/architecture.md](docs/architecture.md). The pieces worth re
 | Path | What it is |
 | --- | --- |
 | `agents/core/` | agent loop, LLM adapter (Anthropic, OpenAI, mock), evidence board + citation validator, MCP client |
-| `agents/` | commander, specialists, remediation, single-agent baseline, versioned prompts (`prompts/v1`) |
+| `agents/` | commander, specialists, remediation, single-agent baseline, versioned prompts (`prompts/v1` baseline, `v2` category definitions, `v3` commit-to-a-mechanism) |
 | `mcp_servers/` | metrics, logs, changes, code, runtime servers + the policy layer (tiers, kill switch, audit log) |
 | `orchestrator/` | Temporal workflows, activities, worker |
-| `gateway/`, `slackbot/` | webhook + incident API + SSE; Slack approval messages and signature check |
-| `dashboard/` | Next.js live view, evidence board, approve/reject, audit log, benchmark page |
-| `bench/` | 40 scenarios, simulator, runner, scoring, judge calibration, report |
+| `gateway/`, `slackbot/` | webhook + incident API + SSE + demo launcher endpoints (`/demo/*`); Slack approval messages and signature check |
+| `dashboard/` | Next.js: scenario launcher, live plan / agents / progress, root cause + approve/reject, answer key, evidence + audit + activity tabs, benchmark page |
+| `bench/` | 40 scenarios + 10 hard, simulator, runner, real-LLM runner (`real_llm.py`), scoring, judge calibration, report |
 | `chaos/` | the 10 fault types (each has a simulated form and live steps), red herrings, CLI |
 | `target/` | the system under test: Go `orders-svc`, `payments-svc`, load-generator, config repo, and stand-ins for the LB and scheduler |
 | `observability/`, `docker-compose.yml` | Prometheus rules (recording + alerts), Alertmanager, Loki/Promtail, Grafana, the whole stack |
@@ -145,11 +209,13 @@ permissions, the simulator and the live chaos CLI share one fault definition, an
 
 ## Status and honesty
 
-* Verified here: everything Python (140+ tests), the Temporal crash-resume behaviour against the Temporal test server, the dashboard build and a browser walk-through
-  (fire alert -> live lanes -> approve -> resolved -> audit row).
-* Written but **not executed in the authoring environment** (no Go toolchain, Docker daemon not running): the Go services and stand-ins, `docker-compose.yml`, and the observability
-  configs. CI compiles and vets the Go code and validates the compose file; expect a small fix or two on first `make demo`. `make go-check` compiles the Go services in a container.
-* The C++ load balancer and the Foreman scheduler are deliberately not included yet. `target/stubs/` contains stand-ins with the same config keys and metric names, so the real ones
+* Verified here: everything Python (150+ tests), the Temporal crash-resume behaviour against the Temporal test server, the dashboard build and a browser walk-through
+  (launch a scenario -> live plan and agents -> approve -> resolved -> answer key), with both the offline policy and `gpt-6-luna`.
+* **Docker stack verified end to end** (see [docs/live-stack.md](docs/live-stack.md)): the Go services compile and vet, all 19 containers run, a real injected fault fires a real alert, the gateway opens an incident, `gpt-6-luna` diagnoses it correctly, a dashboard approval reverts the config and the error rate recovers, and `docker kill` on the worker mid-investigation resumes the same workflow (only the two in-flight activities retried). Running it exposed and fixed four bugs (a startup false-positive alert, a service start-up race, a missing prompt-version switch, a port clash). The offline reference policy **misdiagnosed** that live fault, so its simulator scores are harness validation only. One live fault type is an existence proof, not an accuracy number; `bench/live.py` is not yet run at scale.
+* Human approval is exercised through the **dashboard**. The Slack approval path (Block Kit messages, signature verification, replay protection) is implemented and unit-tested but has never been tried in a real Slack workspace.
+* Real-model evidence is one model (`gpt-6-luna`) with at most 3 repeats, prompts tuned on the dev split; held-out failures were inspected after the fact, so the `v3` held-out numbers are lightly contaminated (`v2` held-out is the clean one). A multi-agent accuracy advantage over a single agent is not demonstrated.
+* **Real C++ load balancer and real Foreman scheduler** run as an opt-in overlay (`make demo-real`, see [docs/live-stack.md](docs/live-stack.md#real-components-opt-in-overlay-docker-composerealyml)). The real model diagnosed one live fault on each correctly (balancer timeout 2000 -> 50 ms; Foreman worker count 8 -> 1), and the balancer needed patches (Prometheus `/metrics`, `host:port` backends, an upstream-timeout key, a SIGHUP crash fix). Only those two faults were exercised live on the real components; the rest are implemented but untested there.
+* (Stubs remain the default stack.) The stand-ins in `target/stubs/` keep the same contract. `target/stubs/` contains stand-ins with the same config keys and metric names, so the real ones
   drop in as compose services `lb` and `scheduler` without changing alerts, dashboards, faults or agents.
 
 MIT licensed.
