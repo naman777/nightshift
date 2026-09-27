@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -21,7 +22,7 @@ ACTION_TIERS: dict[str, Tier] = {
     "none": Tier.READ_ONLY, "scale_to_zero": Tier.DESTRUCTIVE, "restart_postgres": Tier.DESTRUCTIVE, "delete_data": Tier.DESTRUCTIVE,
 }
 
-SERVICES = ["orders-svc", "payments-svc", "lb", "scheduler", "postgres"]
+SERVICES = list(SERVICE_MAP["services"]) if os.environ.get("NIGHTSHIFT_SERVICE_MAP") else ["orders-svc", "payments-svc", "lb", "scheduler", "postgres"]
 CATEGORIES = [c.value for c in Category]
 ACTION_TARGET_HELP = ("revert_commit: the commit sha. rollback_deploy: the service (params.sha = previous good sha). set_flag: the flag name (params.value). "
                       "set_config: the service (params.key, params.value). restart_replica: the replica name. scale: the service (params.replicas). escalate: the owning team.")
@@ -112,14 +113,14 @@ def parse_plan(args: dict) -> tuple[Plan | None, str]:
 
 def default_plan(alert: Alert, usage: Usage | None = None) -> Plan:
     hyps = [Hypothesis(id="h1", text="A recent change (deploy, config or flag) caused this", category=Category.CONFIG_CHANGE),
-            Hypothesis(id="h2", text="A downstream dependency is failing or slow", service="payments-svc", category=Category.DEPENDENCY_OUTAGE),
+            Hypothesis(id="h2", text="A downstream dependency is failing or slow", category=Category.DEPENDENCY_OUTAGE),
             Hypothesis(id="h3", text="Resource exhaustion or capacity problem", category=Category.RESOURCE_LEAK)]
     q = f"Investigate alert {alert.name} on {alert.service}."
     asg = [Assignment(agent=a, question=f"{q} {t}", hypothesis_ids=["h1", "h2", "h3"]) for a, t in [
         ("metrics", "Which metrics deviate from baseline, and when did each start?"),
         ("logs", "Which error signatures are new, and when did they begin?"),
         ("changes", "What deployed or changed shortly before the symptoms began?"),
-        ("code", "Does the orders-svc code path show a regression? Do tests pass?")]]
+        ("code", f"Does the {alert.service} code path show a regression? Do tests pass?")]]
     return Plan(hypotheses=hyps, assignments=asg, usage=usage or Usage())
 
 

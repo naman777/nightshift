@@ -1,0 +1,274 @@
+{
+ "alert": {
+  "fingerprint": "LBAdminPortUnresponsive-lb-sandbox-1790483070",
+  "name": "LBAdminPortUnresponsive",
+  "service": "lb-sandbox",
+  "severity": "warning",
+  "started_at": 1790483070.418971,
+  "labels": {
+   "alertname": "LBAdminPortUnresponsive",
+   "service": "lb-sandbox",
+   "severity": "warning"
+  },
+  "annotations": {
+   "summary": "LBAdminPortUnresponsive: admin/stats endpoint not answering probes",
+   "state_snapshot": "STATE SNAPSHOT at 04:25:58 UTC (window 30m; series that moved, newest information first):\n  (no catalogued series changed in the window)\n  STEADY error_rate{service=lb}=0; error_rate{service=lb-sandbox}=0; p99_latency_seconds{service=lb}=0.0006086; p99_latency_seconds{service=lb-sandbox}=0.0006083; upstream_healthy{service=lb}=3; upstream_healthy{service=lb-sandbox}=3; backend_up{service=lb,instance=127.0.0.1:8001}=1; backend_up{service=lb,instance=127.0.0.1:8002}=1; backend_up{service=lb,instance=127.0.0.1:8003}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8093}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8094}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8095}=1; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=lb-sandbox,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; admin_port_up{service=lb}=0; admin_port_up{service=lb-sandbox}=0; admin_probe_seconds{service=lb}=4.001; admin_probe_seconds{service=lb-sandbox}=4.002; host_cpu_ratio{service=host}=0.0281; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1653; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2303"
+  }
+ },
+ "timings": {
+  "fired_at": 1790483070.418971,
+  "detected_at": 1790483158.2099924,
+  "reported_at": 1790483197.3226702,
+  "investigation_s": 39.07838034629822
+ },
+ "incident_id": "inc-LBAdminPortUnresponsive-lb-sandbox-1790483070",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The lb-sandbox stats listener on :8091 became intermittently unresponsive while nsbox-lb.service remained active; a source-level blocking read without a visible timeout could stall its single stats loop, but the triggering client/event is unconfirmed.",
+  "service": "lb-sandbox",
+  "category": "code_defect",
+  "confidence": 0.38,
+  "evidence": [
+   "ev_1203",
+   "ev_1204",
+   "ev_1207",
+   "ev_1221",
+   "ev_1224"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Shared host resource contention stalled both balancers' admin probes.",
+    "evidence": [
+     "ev_1222",
+     "ev_1223",
+     "ev_1206"
+    ]
+   },
+   {
+    "hypothesis": "A recent lb-sandbox config/deploy change altered the admin port and remained in effect at onset.",
+    "evidence": [
+     "ev_1200",
+     "ev_1201",
+     "ev_1202",
+     "ev_1214",
+     "ev_1215"
+    ]
+   },
+   {
+    "hypothesis": "A service stop/crash directly explains the later admin-port failure.",
+    "evidence": [
+     "ev_1221",
+     "ev_1224",
+     "ev_1213"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "lb-sandbox stats listener :8091 is intermittently stalled; blocking synchronous read without a visible timeout is a plausible mechanism, but no triggering client is evidenced.",
+    "service": "lb-sandbox",
+    "category": "code_defect",
+    "confidence": 0.38
+   },
+   {
+    "root_cause": "Repeated lifecycle restart/stop activity may be related, but logs do not identify initiator or causal relation to the admin-port failure.",
+    "service": "lb-sandbox",
+    "category": "service_down",
+    "confidence": 0.17
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "lb-sandbox owning team",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 122331,
+   "output_tokens": 8155,
+   "cost_usd": 0.016309,
+   "llm_calls": 31,
+   "tool_calls": 43,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "lb-sandbox owning team",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 122331,
+  "output_tokens": 8155,
+  "cost_usd": 0.016309,
+  "llm_calls": 31,
+  "tool_calls": 43,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "Did admin_port_up/admin_probe_seconds for lb and lb-sandbox change at alert onset, and what happened to their data-path and host-resource metrics at that time?",
+   "summary": "The anomaly list identifies the alert-associated series as lb-sandbox p99_latency_seconds at Unix 1790482204, but the provided samples do not establish a corresponding onset in that metric; the relevant query for p99 and most data-path/host-resource metrics was blocked by tool budget. In the observed admin series, lb admin_port_up stayed 0 and admin_probe_seconds stayed ~4.001 s throughout the 30-minute sample. lb-sandbox admin_port_up toggled repeatedly (0\u21921 at 1790481758, 1\u21920 at 1790482238, 0\u21921 at 1790482628, and 1\u21920 at 1790483078), while admin_probe_seconds moved from ~4 seconds to ~0.0003\u20130.0005 at 1790481608, returned to ~4 seconds at 1790482238, dropped again at 1790482478, and returned near 4 seconds at 1790483078. At alert timestamp 1790482204, sampled immediately before/after, lb-sandbox admin_port_up was 1 and probe duration ~0.0004; at the next sample 1790482238 both changed to 0 and ~4 seconds. Data-path evidence is incomplete: lb error_rate remained zero, and observed lb-sandbox backend_connections for each listed backend (instance 127.0.0.1:9120) were zero; other data-path and host-resource metrics could not be queried. [metric name=admin_port_up service=lb ratio=1 onset=1790481368] [metric name=admin_probe_seconds service=lb ratio=1 onset=1790481368] [metric name=admin_port_up service=lb-sandbox ratio=variable onset=1790481758] [metric name=admin_probe_seconds service=lb-sandbox ratio=~0.0001 onset=1790481608] [metric name=error_rate service=lb ratio=1 onset=1790481368] [metric name=backend_connections service=lb-sandbox ratio=1 onset=1790481548]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1206",
+    "ev_1207",
+    "ev_1208",
+    "ev_1209"
+   ],
+   "usage": {
+    "input_tokens": 8005,
+    "output_tokens": 1499,
+    "cost_usd": 0.00155,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do lb-sandbox journald logs show around the alert onset for admin listener :8091, unit lifecycle, and any deliberate stop or errors?",
+   "summary": "The available lb-sandbox logs show frequent service stops/restarts around the alert window and repeated backend-unreachable errors, while the admin/stats listener on :8091 is logged as listening after many starts. No cause for the stops or explicit deliberate-stop rationale is established; broader lifecycle/error queries were cut off by the tool budget.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1210",
+    "ev_1211",
+    "ev_1212",
+    "ev_1213"
+   ],
+   "usage": {
+    "input_tokens": 26011,
+    "output_tokens": 937,
+    "cost_usd": 0.00307,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "What lb-sandbox code/config/deploy changes were still in effect at alert onset, especially anything affecting admin port :8091?",
+   "summary": "No lb-sandbox deploys were returned in the queried 240-minute window (call_1). The config history repeatedly changed sandbox.conf backends from 8093\u20138095 to 9991\u20139993, but every observed rollout was reverted before the next one; the latest rollout, sha 62b6cafd at 1790482811, was reverted by sha 1414e57e at 1790482979. Thus the latest backend-port change was not still in effect after that revert. The evidence shows the listener configured as port 8090, not admin port 8091; no observed diff changed :8091. Alert-onset time was not provided by these tool results, so whether a change was in effect specifically at onset cannot be established. No code diff evidence was returned.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1199",
+    "ev_1200",
+    "ev_1201",
+    "ev_1202"
+   ],
+   "usage": {
+    "input_tokens": 3579,
+    "output_tokens": 716,
+    "cost_usd": 0.000715,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Which code paths serve admin/stats on :8091, and is there a specific defect mechanism that could stall probes while the data path remains healthy?",
+   "summary": "The code shown has no distinct `/admin/stats` route: `LoadBalancer::start()` launches `stats_loop()`, which listens on `listen_port_ + 1` (default data port 8080 implies :8081) and serves the JSON stats response for accepted requests; `/stats` is the documented path. A plausible probe-stalling mechanism is the stats loop's synchronous `read(client, ...)` after `accept`: a client that connects without sending request bytes can block that sole stats-serving thread, so subsequent stats/probe requests to :8091 (when data port is :8090) may hang while the separate data path continues. This is a latent defect, not established as the incident cause: no evidence here shows a silent client triggered it. Tests did not run because `make test` was not allow-listed.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1203",
+    "ev_1204",
+    "ev_1205"
+   ],
+   "usage": {
+    "input_tokens": 24352,
+    "output_tokens": 753,
+    "cost_usd": 0.002812,
+    "llm_calls": 5,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "For lb-sandbox, identify the exact timestamps and surrounding log lines for each nsbox-lb.service Stopping/Stopped/Started event from 1790481500 through 1790483100; do logs identify the initiator, exit status/signal, or a deliberate stop reason before the first admin probe failure?",
+   "summary": "In lb-sandbox, the systemd lifecycle records show four explicit stop sequences (Stopping/Stopped) at 1790481552\u20131553, 1790481925, 1790482406\u20132407, and 1790482791, with Started events at 1790481700, 1790481925, 1790481948, 1790482116, 1790482569, 1790482791, 1790482814, and 1790482982. Deactivation/restart entries at 1790481945\u20131948, 1790482113\u20132116, 1790482811\u20132814, and 1790482979\u20132982 indicate automatic restart cycles without a preceding logged Stopping/Stopped line in the returned results. Available excerpts don't establish who initiated explicit stops or why; there are no matching probe, exit, or signal lines in the targeted searches, so whether a deliberate reason was logged before the first admin probe failure cannot be determined from this evidence.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1216",
+    "ev_1217",
+    "ev_1218"
+   ],
+   "usage": {
+    "input_tokens": 11982,
+    "output_tokens": 844,
+    "cost_usd": 0.00162,
+    "llm_calls": 4,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "metrics",
+   "question": "At 1790481500\u20131790483100, did lb-sandbox unit_active or host CPU/memory/disk change before admin_port_up falls at 1790482238 and 1790483078; provide timestamped samples and any causal ordering.",
+   "summary": "The sampled metrics show no evidence that a sustained unit_active or host CPU/memory/disk change preceded the admin_port_up falls; exact change times are only bracketed by sparse reported samples, and window comparisons could not run because the metrics tool reported budget exhausted. unit_active was 1 at 1790482200 and 1790482270, while admin_port_up changed from 1 at 1790482200 to 0 at 1790482270, consistent with the cited fall near 1790482238 occurring without a sampled unit_active drop. For the later fall, admin_port_up was 1 at 1790483030 and 0 at 1790483100; unit_active was 1 at both. Around the first fall host CPU was 0.0283 at 1790482200 and 0.0280 at 1790482270; memory 0.1653 and 0.1647; disk 0.2292 and 0.2295. Around the later fall CPU was 0.0257 at 1790483030 and 0.0287 at 1790483100; memory 0.1664 and 0.1653; disk 0.2300 and 0.2303. These samples show no clear abrupt resource jump before either fall. Notably, unit_active did drop at 1790482130 (recovered by 1790482200), before the first fall, and at 1790482470 (recovered by 1790482610), but not immediately before the second stated fall. Sparse sampling cannot establish precise transition times or causality. [metric name=unit_active service=lb-sandbox ratio=1.0 onset=1790482200] [metric name=admin_port_up service=lb-sandbox ratio=0.0 onset=1790482270] [metric name=host_cpu_ratio service=host ratio=0.99 onset=1790482200] [metric name=host_memory_used_ratio service=host ratio=1.0 onset=1790482200] [metric name=host_disk_used_ratio service=host ratio=1.0 onset=1790482200] [metric name=unit_active service=lb-sandbox ratio=1.0 onset=1790483030] [metric name=admin_port_up service=lb-sandbox ratio=0.0 onset=1790483100] [metric name=host_cpu_ratio service=host ratio=1.12 onset=1790483030] [metric name=host_memory_used_ratio service=host ratio=0.99 onset=1790483030] [metric name=host_disk_used_ratio service=host ratio=1.00 onset=1790483030]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1219",
+    "ev_1220",
+    "ev_1221",
+    "ev_1222",
+    "ev_1223",
+    "ev_1224"
+   ],
+   "usage": {
+    "input_tokens": 10494,
+    "output_tokens": 1847,
+    "cost_usd": 0.001972,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Which exact lb-sandbox config version/backend ports were active at 1790482204 and immediately before admin_port_up fell at 1790482238, and was any backend change still in effect then?",
+   "summary": "Inconclusive: the requested active lb-sandbox config version and backend ports at 1790482204 and immediately before admin_port_up fell at 1790482238 cannot be determined from the available change results. No lb-sandbox deploys or config commits were returned in the queried 120-minute window, so I have no evidence to identify or assess a backend change as still in effect. [change kind=config service=lb-sandbox sha=unknown ts=unknown key=backend_ports old=unknown new=unknown msg=\"No matching config commits returned\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1214",
+    "ev_1215"
+   ],
+   "usage": {
+    "input_tokens": 1656,
+    "output_tokens": 393,
+    "cost_usd": 0.000362,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}
