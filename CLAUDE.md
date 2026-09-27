@@ -3,7 +3,7 @@
 AI on-call engineer: multi-agent incident investigator (Python), Temporal durability, MCP tools behind a policy layer, 40-scenario benchmark. `PLAN.md` = phases, `PROGRESS.md` = state, `docs/` = architecture / benchmark / writeup.
 
 ## Commands
-- `python -m pytest -q -p no:cacheprovider` (~15 s, 140+ tests, no docker/keys needed; includes a real Temporal test server crash-resume test)
+- `python -m pytest -q -p no:cacheprovider` (~20 s, 190+ tests, no docker/keys needed; includes a real Temporal test server crash-resume test)
 - `python -m agents.cli investigate <scenario-id> [--mode single] [--provider anthropic]`
 - `python -m bench.runner --split smoke|dev|heldout|hard --config all --repeats 3`, then `python -m bench.report` (rewrites README table between `BENCH:START/END`)
 - `python -m bench.gen_scenarios` / `python -m bench.gen_hard` regenerate scenario YAML (do not hand-edit them)

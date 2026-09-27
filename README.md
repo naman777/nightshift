@@ -128,6 +128,34 @@ How to read this (same simulated worlds, scoring and benchmark mode as the offli
 * One model, one prompt family, at most 3 repeats: enough to see large effects, not small ones.
 * Reproduce (swap `v2` for `v3` or `v1` to compare): `python -m bench.real_llm --model gpt-6-luna --split heldout --config single,multi --repeats 3 --prompt-version v2`, then `python -m bench.real_report --write`. Needs `OPENAI_API_KEY` in `.env`; a full held-out run costs well under a dollar at gpt-6-luna prices ($0.10 in / $0.50 out per 1M tokens).
 
+## Real-host onboarding: does this work on a machine you didn't build it for?
+
+Everything above runs against the simulator or the docker stack. Separately, `onboard/` makes Nightshift installable on a **plain Linux
+host with no Docker** — the target being a real EC2 box already running someone's own service — and three rounds of live testing on it
+answer the actual question an onboarding pitch has to survive: not "does the demo work" but "what happens on a machine nobody prepared for
+this." Full write-up, every raw report, and the exact numbers: [docs/onboarding.md](docs/onboarding.md).
+
+* **Auto-discovery, not hand-written config.** `onboard/discover.py` reads listening sockets, systemd cgroups and `/etc` config symlinks
+  to generate the whole monitoring profile (probes, metric catalogue, service map, log shipping) with nothing typed in by hand — including
+  services with no TCP port at all (PHP-FPM, resolved from nginx's `fastcgi_pass unix:...`) and a **dependency graph built from actually
+  observed connections**, not config guesses: it hammers each HTTP endpoint while sampling `ss`, and correctly found `nginx -> php-fpm ->
+  mariadb`, including the last hop that no config file states anywhere (MySQL's client library uses a unix socket for `localhost`,
+  invisible to text search).
+* **Three rounds, three targets, escalating difficulty.** Round 1: the author's own C++ load balancer, prompts `v1`-`v3`, mixed results
+  (7 correct / 3 partial / 8 wrong of 18). Round 2: prompt `v4` (state-first reasoning, a grounded-remediation guard, a deterministic
+  "what changed" snapshot) fixed on the same target (15/1/0 of 16) and held up on an unrelated app never seen while tuning it
+  (nginx+gunicorn+Flask, 9/1/2 of 12). Round 3: real, unmodified **WordPress** (nginx + PHP-FPM + MariaDB, from wordpress.org) specifically
+  to find where it breaks — it did (2/4/4 of 10) — and two of the failures were fixed live: PHP-FPM's own error log wasn't shipped anywhere
+  (fixed; the affected fault went 0/2 -> 1/2 correct), and a Loki query silently excluded MariaDB's `[Warning]`-level auth failures (a real
+  bug, fixed and verified against Loki directly, not a missing feature).
+* **What is still open, honestly.** A third failure — a wrong DB password two hops from the alerting service — stayed 0/4 correct even
+  after the dependency graph, the log fix and a prompt rule requiring the check. The plumbing is verified working at every layer; the model
+  doesn't reliably chain three specialists through a multi-hop dependency to the right conclusion. That reads as a reasoning-depth limit,
+  not a missing tool, and needs a dedicated multi-hop benchmark (not another prompt tweak) to characterise properly.
+* Also open: true one-command install (discovery + install is two steps and still needs `sudo` and a manually-placed API key), a
+  process killed outright with no clean shutdown log (consistently missed — no state to point at), and everything the docker stack covers
+  that this profile does not (Temporal, Alertmanager, the dashboard, real remediation writes: the host watcher is shadow-mode only).
+
 ## Beyond the reactive loop
 
 * **Proactive review**: a CI/CD hook (`POST /webhook/change`) has a reviewer agent read every diff and flag risky changes *before* an alert.
@@ -138,7 +166,7 @@ How to read this (same simulated worlds, scoring and benchmark mode as the offli
 
 ```bash
 pip install -e ".[dev]"
-make test                                            # 150+ tests, including crash-and-resume against a real Temporal test server
+make test                                            # 190+ tests, including crash-and-resume against a real Temporal test server
 make investigate SCENARIO=bad-deploy-n-plus-one-00   # watch agents work in the terminal
 make investigate SCENARIO=bad-deploy-n-plus-one-00 MODE=single
 make bench-smoke                                     # the 10-scenario CI gate
@@ -192,7 +220,7 @@ More detail in [docs/architecture.md](docs/architecture.md). The pieces worth re
 | Path | What it is |
 | --- | --- |
 | `agents/core/` | agent loop, LLM adapter (Anthropic, OpenAI, mock), evidence board + citation validator, MCP client |
-| `agents/` | commander, specialists, remediation, single-agent baseline, versioned prompts (`prompts/v1` baseline, `v2` category definitions, `v3` commit-to-a-mechanism) |
+| `agents/` | commander, specialists, remediation, single-agent baseline, versioned prompts (`prompts/v1` baseline, `v2` category definitions, `v3` commit-to-a-mechanism, `v4` state-first reasoning + grounded remediation, written for real-host onboarding) |
 | `mcp_servers/` | metrics, logs, changes, code, runtime servers + the policy layer (tiers, kill switch, audit log) |
 | `orchestrator/` | Temporal workflows, activities, worker |
 | `gateway/`, `slackbot/` | webhook + incident API + SSE + demo launcher endpoints (`/demo/*`); Slack approval messages and signature check |
@@ -201,6 +229,7 @@ More detail in [docs/architecture.md](docs/architecture.md). The pieces worth re
 | `chaos/` | the 10 fault types (each has a simulated form and live steps), red herrings, CLI |
 | `target/` | the system under test: Go `orders-svc`, `payments-svc`, load-generator, config repo, and stand-ins for the LB and scheduler |
 | `observability/`, `docker-compose.yml` | Prometheus rules (recording + alerts), Alertmanager, Loki/Promtail, Grafana, the whole stack |
+| `onboard/` | real-host (no-Docker) onboarding: auto-discovery (`discover.py`), a shadow-mode watcher, install/uninstall scripts, fault-injection kits and three live test targets; results in [docs/onboarding.md](docs/onboarding.md) |
 
 ## Design decisions and what did not work
 
@@ -209,7 +238,8 @@ permissions, the simulator and the live chaos CLI share one fault definition, an
 
 ## Status and honesty
 
-* Verified here: everything Python (150+ tests), the Temporal crash-resume behaviour against the Temporal test server, the dashboard build and a browser walk-through
+* **Real-host onboarding (no Docker) is separately verified live on three targets** with the real model: the author's own C++ LB, a second unrelated app, and real WordPress. See "Real-host onboarding" above and [docs/onboarding.md](docs/onboarding.md) for the numbers, the bugs found and fixed live (a Loki query silently excluding `[Warning]`-level lines; a missing app log pipe), and what is still an open gap (multi-hop cross-service causality).
+* Verified here: everything Python (190+ tests, including the onboarding-specific suite in `tests/test_onboard.py`), the Temporal crash-resume behaviour against the Temporal test server, the dashboard build and a browser walk-through
   (launch a scenario -> live plan and agents -> approve -> resolved -> answer key), with both the offline policy and `gpt-6-luna`.
 * **Docker stack verified end to end** (see [docs/live-stack.md](docs/live-stack.md)): the Go services compile and vet, all 19 containers run, a real injected fault fires a real alert, the gateway opens an incident, `gpt-6-luna` diagnoses it correctly, a dashboard approval reverts the config and the error rate recovers, and `docker kill` on the worker mid-investigation resumes the same workflow (only the two in-flight activities retried). Running it exposed and fixed four bugs (a startup false-positive alert, a service start-up race, a missing prompt-version switch, a port clash). The offline reference policy **misdiagnosed** that live fault, so its simulator scores are harness validation only. One live fault type is an existence proof, not an accuracy number; `bench/live.py` is not yet run at scale.
 * Human approval is exercised through the **dashboard**. The Slack approval path (Block Kit messages, signature verification, replay protection) is implemented and unit-tested but has never been tried in a real Slack workspace.
