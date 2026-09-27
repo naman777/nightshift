@@ -1,0 +1,12 @@
+{"fault":"app_crash","round":1,"t_inject":1790484096,"alert_fired_after_s":42,"report_after_s":null,"alerts":"EndpointDown,UnitDown","reports":""}
+{"fault":"slow_config","round":1,"t_inject":1790484459,"alert_fired_after_s":81,"report_after_s":186,"alerts":"EndpointSlow,EndpointSlow","reports":"20260927-045031_EndpointSlow_shop-api.json,20260927-044955_EndpointSlow_nginx.json"}
+{"fault":"bad_upstream","round":1,"t_inject":1790484710,"alert_fired_after_s":60,"report_after_s":121,"alerts":"EndpointDown","reports":"20260927-045349_EndpointDown_nginx.json"}
+{"fault":"bad_deploy","round":1,"t_inject":1790484899,"alert_fired_after_s":51,"report_after_s":165,"alerts":"EndpointDown,EndpointDown","reports":"20260927-045726_EndpointDown_nginx.json,20260927-045653_EndpointDown_shop-api.json"}
+{"fault":"app_crash","round":2,"t_inject":1790485130,"alert_fired_after_s":39,"report_after_s":120,"alerts":"UnitDown","reports":"20260927-050049_EndpointDown_nginx.json"}
+{"fault":"slow_config","round":2,"t_inject":1790485315,"alert_fired_after_s":75,"report_after_s":171,"alerts":"EndpointSlow","reports":"20260927-050435_EndpointSlow_shop-api.json,20260927-050358_EndpointSlow_nginx.json"}
+{"fault":"bad_upstream","round":2,"t_inject":1790485560,"alert_fired_after_s":61,"report_after_s":133,"alerts":"EndpointDown","reports":"20260927-050812_EndpointDown_nginx.json"}
+{"fault":"bad_deploy","round":2,"t_inject":1790485758,"alert_fired_after_s":51,"report_after_s":139,"alerts":"EndpointDown,EndpointDown","reports":"20260927-051136_EndpointDown_shop-api.json"}
+{"fault":"app_crash","round":3,"t_inject":1790485968,"alert_fired_after_s":42,"report_after_s":123,"alerts":"UnitDown","reports":"20260927-051450_EndpointDown_nginx.json"}
+{"fault":"slow_config","round":3,"t_inject":1790486156,"alert_fired_after_s":73,"report_after_s":184,"alerts":"EndpointSlow","reports":"20260927-051848_EndpointSlow_shop-api.json,20260927-051811_EndpointSlow_nginx.json"}
+{"fault":"bad_upstream","round":3,"t_inject":1790486408,"alert_fired_after_s":51,"report_after_s":123,"alerts":"EndpointDown","reports":"20260927-052211_EndpointDown_nginx.json"}
+{"fault":"bad_deploy","round":3,"t_inject":1790486599,"alert_fired_after_s":52,"report_after_s":112,"alerts":"EndpointDown,EndpointDown","reports":"20260927-052509_EndpointDown_shop-api.json"}

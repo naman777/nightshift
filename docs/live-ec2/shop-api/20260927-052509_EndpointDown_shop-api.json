@@ -1,0 +1,273 @@
+{
+ "alert": {
+  "fingerprint": "EndpointDown-shop-api-1790486618",
+  "name": "EndpointDown",
+  "service": "shop-api",
+  "severity": "critical",
+  "started_at": 1790486618.304267,
+  "labels": {
+   "alertname": "EndpointDown",
+   "instance": "http://127.0.0.1:5000/",
+   "job": "probe-http",
+   "port": "5000",
+   "probe": "http",
+   "service": "shop-api",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "EndpointDown: an endpoint stopped answering its probe",
+   "state_snapshot": "STATE SNAPSHOT at 05:24:36 UTC (window 30m; series that moved, newest information first):\n  (no catalogued series changed in the window)\n  STEADY endpoint_up{service=lb,instance=127.0.0.1:8081}=0; endpoint_up{service=shop-api,instance=http://127.0.0.1:5000/}=0; endpoint_up{service=nginx,instance=http://127.0.0.1:80/}=0; endpoint_up{service=lb,instance=http://127.0.0.1:8001/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8002/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8003/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8080/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8090/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8091/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8093/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8094/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8095/}=1; endpoint_latency_seconds{service=lb,instance=127.0.0.1:8081}=3; endpoint_latency_seconds{service=shop-api,instance=http://127.0.0.1:5000/}=0.002646; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:80/}=0.003005; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8001/}=0.0005737; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8002/}=0.0004037; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8003/}=0.0004502; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8080/}=0.0005794; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8090/}=0.0005009; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8091/}=0.0004407; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8093/}=0.0004668; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8094/}=0.0004227; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8095/}=0.0004458; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=nginx,instance=127.0.0.1:9100,name=nginx.service}=1; unit_active{service=nsbox-lb,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; unit_active{service=shop-api,instance=127.0.0.1:9100,name=shop-api.service}=1; host_cpu_ratio{service=host}=0.0297; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1489; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2342"
+  }
+ },
+ "timings": {
+  "fired_at": 1790486618.304267,
+  "detected_at": 1790486676.4169488,
+  "reported_at": 1790486709.019785,
+  "investigation_s": 32.57640361785889
+ },
+ "incident_id": "inc-EndpointDown-shop-api-1790486618",
+ "mode": "multi",
+ "report": {
+  "root_cause": "shop-api deploy 04d9f3df introduced a home-page dereference of absent cfg()[\"discount_factor\"], producing repeated KeyError exceptions that broke the endpoint; logs show the failures at onset and a clean restart immediately before it.",
+  "service": "shop-api",
+  "category": "bad_deploy",
+  "confidence": 0.96,
+  "evidence": [
+   "ev_1771",
+   "ev_1782",
+   "ev_1783",
+   "ev_1785",
+   "ev_1786",
+   "ev_1787"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host capacity/resource pressure caused the endpoint failure.",
+    "evidence": [
+     "ev_1789",
+     "ev_1790"
+    ]
+   },
+   {
+    "hypothesis": "The earlier nginx proxy-port change caused the incident.",
+    "evidence": [
+     "ev_1773"
+    ]
+   },
+   {
+    "hypothesis": "The shop-api process crashed or its listener failed at onset.",
+    "evidence": [
+     "ev_1786",
+     "ev_1775"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Deploy 04d9f3df in shop-api dereferences missing discount_factor in the home endpoint, causing recurring request exceptions.",
+    "service": "shop-api",
+    "category": "bad_deploy",
+    "confidence": 0.96
+   },
+   {
+    "root_cause": "Host CPU contention contributed to endpoint problems; no sharp resource change immediately before onset is established.",
+    "service": "host",
+    "category": "resource_contention",
+    "confidence": 0.12
+   }
+  ],
+  "proposed_action": {
+   "type": "rollback_deploy",
+   "target": "shop-api",
+   "params": {
+    "sha": "previous-good-sha-not-established"
+   },
+   "tier": "reversible"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 87754,
+   "output_tokens": 6301,
+   "cost_usd": 0.011927,
+   "llm_calls": 31,
+   "tool_calls": 40,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "shop-api",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 87754,
+  "output_tokens": 6301,
+  "cost_usd": 0.011927,
+  "llm_calls": 31,
+  "tool_calls": 40,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At alert onset 05:24:36 UTC, what was the exact shop-api :5000 endpoint-up/latency and unit_active trend, and did any host resource metric change beforehand?",
+   "summary": "At the reported alert time 05:24:36 UTC, the available 30-minute metric window shows shop-api :5000 endpoint-up intermittently down and latency intermittently high, but the supplied window's timestamps do not align with 05:24:36 UTC and the requested unit_active series returned no data, so exact alert-onset values/trend cannot be confirmed. Host CPU has brief spikes in the observed interval; memory and disk are broadly steady. Evidence is insufficient to establish whether host resource change preceded the alert onset.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1776",
+    "ev_1777",
+    "ev_1778",
+    "ev_1779",
+    "ev_1780",
+    "ev_1781"
+   ],
+   "usage": {
+    "input_tokens": 10782,
+    "output_tokens": 1120,
+    "cost_usd": 0.001638,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do shop-api.service journal logs around 05:24:36 UTC show about gunicorn lifecycle, listener :5000, and probe-related errors?",
+   "summary": "Inconclusive: the available queries returned no shop-api.service journal entries, so I cannot establish gunicorn lifecycle, listener :5000, or probe-related errors around 05:24:36 UTC. [log service=shop-api.service level=unknown count=0 first_seen=unknown sig=\"no matching journal entries\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1774",
+    "ev_1775"
+   ],
+   "usage": {
+    "input_tokens": 4730,
+    "output_tokens": 392,
+    "cost_usd": 0.000669,
+    "llm_calls": 5,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any shop-api or probe/config change deployed and still in effect before 05:24:36 UTC that could explain the down endpoint?",
+   "summary": "Yes. Before 05:24:36 UTC, shop-api deploy 04d9f3df at 05:23:19 UTC was the latest listed deploy and changed the home endpoint to require config key `discount_factor`; it could explain a failing endpoint if that key is absent. The evidence shows no later revert in the available deploy list, so it was still in effect at onset, but the diff does not establish whether the config key exists. A short-lived nginx upstream-port change was reverted before onset and is a red herring. Earlier repeated deploys of the same change are superseded by the later deploy; I found no evidence that any config change active at onset caused the outage.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_1771",
+    "ev_1772",
+    "ev_1773"
+   ],
+   "usage": {
+    "input_tokens": 12859,
+    "output_tokens": 923,
+    "cost_usd": 0.001748,
+    "llm_calls": 4,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Does the current shop-api probe/listener implementation reveal a concrete mismatch that can make :5000 probe down while shop-api.service remains active?",
+   "summary": "Inconclusive: the available source search did not expose the shop-api implementation, unit, or probe configuration, so I cannot establish a concrete listener/probe mismatch or whether one matches the reported symptom. The only port-5000 hits were Flask/Gunicorn dependency defaults, not shop-api configuration; tests could not run because Python is unavailable. [code file=unknown smell=none tests=fail]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1768",
+    "ev_1769",
+    "ev_1770"
+   ],
+   "usage": {
+    "input_tokens": 18693,
+    "output_tokens": 402,
+    "cost_usd": 0.002071,
+    "llm_calls": 4,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "Using the exact alert onset Unix 1790486618 (confirm UTC mapping), what are shop-api :5000 endpoint_up/latency and shop-api.service unit_active immediately before and after onset, and is any host resource metric change temporally preceding the endpoint failure?",
+   "summary": "Inconclusive for the requested shop-api :5000 endpoint_up/latency and shop-api.service unit_active immediately around Unix 1790486618: the three range queries returned no series, so these measurements and their exact changes cannot be established from the available evidence. Unix 1790486618 maps to 2026-09-27 05:23:38 UTC. Host CPU had an earlier anomaly (onset 1790483970, ratio 1.59 vs baseline) and remains intermittently elevated in the last 30 minutes, but available host samples do not establish a host-resource change immediately preceding the endpoint failure; memory stayed around 0.15 and disk around 0.233. [metric name=endpoint_up service=shop-api ratio=unknown onset=1790486618] [metric name=endpoint_latency_seconds service=shop-api ratio=unknown onset=1790486618] [metric name=unit_active service=shop-api ratio=unknown onset=1790486618] [metric name=host_cpu_ratio service=host ratio=1.59 onset=1790483970] [metric name=host_memory_used_ratio service=host ratio=unknown onset=unknown] [metric name=host_disk_used_ratio service=host ratio=unknown onset=unknown]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1788",
+    "ev_1789",
+    "ev_1790",
+    "ev_1791"
+   ],
+   "usage": {
+    "input_tokens": 7982,
+    "output_tokens": 1033,
+    "cost_usd": 0.001314,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "For shop-api.service around Unix 1790486618, do journal/application logs show a request failure or exception on the home endpoint referencing cfg()[\"discount_factor\"], or a deliberate stop/crash/listener failure?",
+   "summary": "For shop-api.service around Unix 1790486618, logs clearly show recurring home GET exceptions referencing cfg()[\"discount_factor\"] and KeyError: 'discount_factor'. The service was also deliberately stopped and cleanly deactivated at 1790486599\u20136600, then started at 1790486600; evidence does not indicate a crash or listener failure. Thus the request exception is present, alongside a clean lifecycle restart just before the queried time.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_1785",
+    "ev_1786",
+    "ev_1787"
+   ],
+   "usage": {
+    "input_tokens": 9408,
+    "output_tokens": 714,
+    "cost_usd": 0.001298,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "At Unix 1790486618, was discount_factor present in the effective shop-api config, and is there evidence deploy 04d9f3df was loaded by the running process before the endpoint began failing?",
+   "summary": "At Unix 1790486618, the available config-commit evidence does not show discount_factor present in the effective shop-api config; the recorded config values concern db_timeout_ms and slow_ms, not discount_factor (call_2). Deploy 04d9f3df shipped at 1790486599, just 19 seconds before the endpoint failure onset, but deploy metadata alone does not establish that the running process loaded it before failure. Its relevant code change needs inspection, and the evidence here does not establish process-level loading. The earlier discount-factor deploys are not sufficient proof of what ran at onset; the observed revert at 1790485109 reverted the first of them (call_2).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1782",
+    "ev_1783",
+    "ev_1784"
+   ],
+   "usage": {
+    "input_tokens": 4546,
+    "output_tokens": 582,
+    "cost_usd": 0.000746,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

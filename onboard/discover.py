@@ -111,7 +111,24 @@ def unit_workdir(unit: str) -> str:
     return str(Path(path.group(1)).parent) if path else ""
 
 
-def discover() -> list[Service]:
+def repo_from_etc(procs: set[str], etc: str = "/etc") -> str:
+    """Config that lives in a git repo but is deployed by symlink (e.g. /etc/nginx/conf.d/app.conf -> ~/app/nginx/app.conf): follow symlinks under /etc/<process>."""
+    for proc in sorted(procs):
+        base = Path(etc) / proc
+        if not base.is_dir():
+            continue
+        for depth, pattern in enumerate(("*", "*/*", "*/*/*")):
+            for f in base.glob(pattern):
+                if f.is_symlink():
+                    target = f.resolve()
+                    if not str(target).startswith(etc):
+                        root = git_root(str(target))
+                        if root:
+                            return root
+    return ""
+
+
+def discover(repo_overrides: dict[str, str] | None = None) -> list[Service]:
     ss = subprocess.run(["sudo", "-n", "ss", "-ltnpH"], capture_output=True, text=True).stdout
     services: dict[str, Service] = {}
     seen_ports: set[tuple[str, int]] = set()
@@ -132,6 +149,10 @@ def discover() -> list[Service]:
             svc.endpoints.append(classify_port(lst.bind, lst.port))
     for s in services.values():
         s.endpoints.sort(key=lambda e: e.port)
+        if not s.repo:
+            s.repo = repo_from_etc(s.procs)
+        if repo_overrides and s.name in repo_overrides:
+            s.repo = repo_overrides[s.name]
     return sorted(services.values(), key=lambda s: s.name)
 
 
@@ -156,7 +177,11 @@ def render_prometheus(services: list[Service]) -> str:
 
 
 def unit_include(services: list[Service]) -> str:
-    return "(" + "|".join(re.escape(s.unit.removesuffix(".service")) for s in services) + ").service" if services else "none.service"
+    """Regex alternation of the discovered units, valid both in a PromQL string and in node_exporter's flag. No backslashes ('.' becomes '[.]'),
+    because a backslash is an escape in PromQL strings and in systemd ExecStart lines."""
+    if not services:
+        return "none[.]service"
+    return "(" + "|".join(s.unit.removesuffix(".service").replace(".", "[.]") for s in services) + ")[.]service"
 
 
 def render_rules(services: list[Service]) -> str:
@@ -234,8 +259,6 @@ def render_watch_env(services: list[Service], root: str) -> str:
              "NIGHTSHIFT_CONFIG_REPOS='" + json.dumps(repos) + "'", "NIGHTSHIFT_CODE_ROOTS='" + json.dumps(repos) + "'",
              f"NIGHTSHIFT_DB_URL=sqlite:///{root}/nightshift.db", f"NIGHTSHIFT_REPORTS={root}/reports", "NIGHTSHIFT_INCIDENT_BUDGET_USD=1.0", "NIGHTSHIFT_MEMORY=0",
              "NIGHTSHIFT_PROMPT_VERSION=v4"]
-    if repos:
-        lines.append(f"CONFIG_REPO={next(iter(repos.values()))}\nCODE_ROOT={next(iter(repos.values()))}")
     return "\n".join(lines) + "\n"
 
 
@@ -251,9 +274,10 @@ def report(services: list[Service]) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", help="write the generated profile into this directory")
+    ap.add_argument("--repo", action="append", default=[], metavar="SERVICE=PATH", help="set/override a service's source/config git repo (repeatable)")
     ap.add_argument("--root", default=str(Path.home() / "nightshift-run"), help="install root used inside generated paths")
     args = ap.parse_args()
-    services = discover()
+    services = discover(dict(r.split("=", 1) for r in args.repo))
     print(report(services))
     if args.out:
         out = Path(args.out)
