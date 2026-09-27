@@ -1,12 +1,14 @@
 # Onboarding onto a real host (EC2), and what was actually verified
 
-Two rounds, both on the same real Ubuntu 26.04 EC2 instance (2 vCPU, 7.6 GB). **Round 1** (2026-09-26/27, prompts v1-v3): the box already
+Three rounds, all on the same real Ubuntu 26.04 EC2 instance (2 vCPU, 7.6 GB). **Round 1** (2026-09-26/27, prompts v1-v3): the box already
 ran the author's C++ load balancer ([Load-Balancer-CPP](https://github.com/naman777/Load-Balancer-CPP)) as `lb.service`, no Docker, no
 Prometheus, logs only in journald; diagnosis quality was mixed (7 correct / 3 partial / 8 wrong of 18). **Round 2** (2026-09-27, prompt
 v4): the diagnosis logic was fixed (state-first reasoning, a generic service vocabulary, a grounded-config-key guard) and auto-discovery
 was added, then re-tested on the same LB target plus a **second, previously-unseen target** (an nginx + gunicorn + Flask "shop" API with
-its own config schema) to check the fixes generalise rather than being tuned to the LB. **Real language model throughout (`gpt-6-luna`),
-not the offline reference policy.**
+its own config schema) to check the fixes generalise rather than being tuned to the LB. **Round 3** (2026-09-27, same prompt v4, same
+code, no further tuning): a **real, unmodified open-source platform** — WordPress from wordpress.org, on nginx + PHP-FPM + MariaDB —
+deployed as a third, still-unrelated target, specifically to find where the generic, black-box approach stops working. It did stop
+working in a specific, explainable way; see below. **Real language model throughout (`gpt-6-luna`), not the offline reference policy.**
 
 ## Short answer
 
@@ -20,6 +22,7 @@ not the offline reference policy.**
 | Diagnosis quality, round 1 (prompts v1-v3, hand-written config) | Mixed: 7 correct, 3 partial, 8 wrong of 18 scored, plus 1 fault (frozen backend) never detected. |
 | Diagnosis quality, round 2 (prompt v4, auto-discovered config) — **same LB target** | **15 correct, 1 partial, 0 wrong of 16** (4 fault types x 4 rounds). |
 | Diagnosis quality, round 2 — **held-out shop-API target** (never seen while writing v4) | **9 correct, 1 partial, 2 wrong of 12** (3 rounds x 4 fault types), plus **1 run produced no report at all**. All 3 misses are the same fault type: see "The one fault type it still misses" below. |
+| Diagnosis quality, round 3 — **real WordPress** (nginx + PHP-FPM + MariaDB, no code changes to Nightshift) | **2 correct, 4 partial, 4 wrong of 10.** Noticeably worse than the other two targets, for a specific, explainable reason: see "Where generic black-box monitoring stops working" below. |
 
 ## What was installed on the host (all removable with `onboard/uninstall_host.sh --purge`)
 
@@ -31,7 +34,7 @@ Under `~/nightshift-run/`, as systemd units, nothing containerised, the monitore
 * `onboard/discover.py` - **auto-discovery**: reads listening TCP sockets (`ss`), maps each pid to its systemd unit via `/proc/<pid>/cgroup`, classifies each port (answers HTTP -> probe as `http`; connects but stays silent -> probe as `tcp`, and flags a WARNING because a silent port may already be wedged), and finds each service's source/config repo (its `WorkingDirectory`, or by following `/etc/<process>/...` config symlinks to a git repo, e.g. nginx's `/etc/nginx/conf.d/*.conf`). Generates `prometheus.yml`, `rules.yml`, `catalogue.json`, `service_map.json`, `config.alloy` and `watch.env` with no hand-written config. `onboard/install_host.sh` accepts `PROFILE_DIR=<discover output>` to install a generated profile instead of the shipped hand-written one.
 * `onboard/lb_stats_exporter.py` - turns the balancer's own JSON `/stats` page into per-backend metrics (adapter pattern for any app with a stats page; not part of the generated profile)
 * `onboard/watch.py` (`nightshift-watch.service`) - **shadow mode**: polls Prometheus alerts, groups co-firing alerts per service, attaches a deterministic **state snapshot** (below), investigates with the real model, saves `reports/*.{md,json}`. Write actions are recorded by the policy layer and never executed.
-* a **sandbox copy** of the balancer (`nsbox-lb.service`, ports 8090/8091/8093-8095, own config in a git repo) plus a load generator, and a **second real app** (`onboard/testapp/`: nginx -> gunicorn -> Flask -> SQLite "shop" API, `onboard/testapp/faults.sh`) used only as a held-out test target, so faults could be injected without touching the author's LB
+* a **sandbox copy** of the balancer (`nsbox-lb.service`, ports 8090/8091/8093-8095, own config in a git repo) plus a load generator, a **second app** (`onboard/testapp/`: nginx -> gunicorn -> Flask -> SQLite "shop" API), and a **third, real open-source platform** (`onboard/testapp/wordpress/`: an unmodified WordPress install on nginx + PHP-FPM + MariaDB) — three held-out test targets, so faults could be injected without touching the author's LB
 
 Round-1 changes: `NIGHTSHIFT_CATALOGUE` / `NIGHTSHIFT_SERVICE_MAP` overrides, plain-text log parsing, a `SystemdRuntimeBackend` (only `restart` is supported; everything else is refused), `top_anomalies` returns the known metric names. **Round-2 changes** (diagnosis quality): prompt version `v4` (state-first rules, a generic `service`/`category` vocabulary instead of hard-coded demo names, two new categories — `service_down`, `code_defect`), `onboard/snapshot.py` (a deterministic "what changed and when" summary computed from Prometheus before the model runs, attached to every alert), and `agents/remediation.py::config_key_is_grounded` (a `set_config` proposal whose key never appears in any evidence is downgraded to `escalate`, so an invented setting cannot reach the approval queue).
 
@@ -74,6 +77,35 @@ Same grading rule (correct / partial / wrong against the injected cause). Prompt
 
 `crashed_backend` (an echo server killed) and `app_crash` (gunicorn's master killed with `SIGKILL`) are the same failure shape and both fail. The likely reason: a clean `systemctl stop` leaves an unambiguous `Stopping.../Stopped.../Deactivated successfully` lifecycle log the model can read (that is what made `service_stopped` improve so much between rounds). A hard kill leaves no such message — systemd just detects the exit and, for `shop-api` (`RestartSec=45`), the unit can still be down or freshly restarted by the time the investigation runs 40-120s later, with no log line saying why. This is a real gap in what black-box monitoring can see, not obviously a prompting problem: fixing it needs either a `systemd --failed`/exit-code/core-dump signal in the snapshot, or accepting `service_down` with unknown trigger as the correct, honest answer for this class (which several `crashed_backend` runs already gave, with a named instance and low confidence).
 
+## Round 3: a real open-source platform (WordPress), and where generic black-box monitoring stops working
+
+WordPress was installed the normal way (wordpress.org tarball, WP-CLI, a real MySQL database, `wp-config.php` and the nginx vhost in a
+git repo) on a new nginx vhost (`:8200`) alongside the existing services, and MariaDB and PHP-FPM as new systemd units. `onboard/discover.py`
+found all of it automatically: MariaDB's `:3306` (classified `tcp`, not `http`), the new nginx vhost, and — through the `/etc/nginx/conf.d`
+symlink-following added for this round — nginx's config repo. No hand-written config, no Nightshift code changes, same prompt `v4`.
+
+| Fault (injected cause) | 2 rounds | Verdict |
+| --- | --- | --- |
+| MariaDB stopped (`db_down`) | **correct x2** on `mariadb` itself (`service_down`, `restart_replica` proposed) | The unit-death signal that worked well in round 2 (`service_stopped`) generalises: MariaDB dying is diagnosed correctly. |
+| ...but the resulting WordPress outage | wrong, then partial | The **separate** investigation of `nginx` (grouped by service, so it runs independently of the `mariadb` one) does not connect "WordPress is down" to "MariaDB is down" — it never queries `unit_active{service="mariadb"}` itself. Cross-service causality is not wired up. |
+| Wrong DB password in `wp-config.php` (`bad_db_creds`) | **wrong x2** | The right commit is in the evidence (the "changes" specialist can see it), but nothing connects it to the failure: there is no WordPress/PHP/MySQL error text anywhere Nightshift can read (see below), so nothing confirms the credential change actually broke the DB connection. |
+| PHP-FPM pool exhausted (`fpm_starved`) | wrong, then partial (named "PHP-FPM waiting" as a considered but unconfirmed mechanism) | The blackbox probe can see the site got slow; nothing tells the model *why*, because PHP-FPM's own worker-utilisation state (busy/idle workers, queue length) is invisible to a black-box probe. |
+| Uploads volume filled to 99.9% (`disk_full`) | **partial x2** | Both runs correctly surfaced the exact mount and the exact 99.9% figure (the generated `disk_used_ratio` alert and per-service attribution worked), but then hedged ("cannot determine whether this is a real fill or a metric artifact") instead of committing to `resource_leak`/`capacity`, even though "over 90% full" is unambiguous. |
+
+**Why this target is harder, and it is not a prompting problem:** the LB and shop-API targets both fail in ways that are visible to a
+generic collector — a process/unit dies (systemd lifecycle logs), a config file changes (git diff), a probe times out (blackbox). Two of
+WordPress's four failure mechanisms here are only visible **inside the application**: MySQL's own "access denied" error and PHP's fatal
+"error establishing a database connection" are never written anywhere the generic Loki/journald pipeline reads (MariaDB logs to its own
+file by default, not journald; the browser-visible PHP error doesn't reach a log at all in this configuration). A generic auto-discovery
+collector has a real, principled floor: it sees state (up/down), config (git diffs) and black-box latency/availability, and stops there.
+Getting the rest requires either app-specific log shipping (MariaDB's error log, PHP-FPM's own error log) or a resource-specific exporter
+(a PHP-FPM status-page exporter, the same pattern as `onboard/lb_stats_exporter.py` for the C++ balancer). Neither was built for this round.
+
+This is the most useful finding of the three rounds for an interview: **"we tested on WordPress and it did worse" is more credible, not
+less, than three targets all scoring well** — it shows the honest edge of what black-box discovery covers, and names exactly what closes
+the gap (app log shipping, cross-service correlation, a resource-specific exporter per stateful backend), rather than claiming universal
+coverage.
+
 ## Why it fails when it fails (v4, and what changed from v1-v3)
 
 1. ~~Anchoring on a real code defect for unrelated outages~~ **fixed for `service_stopped`**: the systemd-lifecycle log lines plus the "commit to a mechanism" state-first rule stopped the code defect from swallowing unrelated failures in that fault; it still happens for `bad_deploy` r2 (SIGKILL blamed) and is the residual pattern for hard kills generally.
@@ -85,9 +117,9 @@ Same grading rule (correct / partial / wrong against the injected cause). Prompt
 
 ## What was NOT verified
 
-* Any system other than the author's and the one test app deployed for this run; more than one host; Kubernetes; CloudWatch/Datadog data; IAM/cross-account access.
+* More than one host; Kubernetes; CloudWatch/Datadog data; IAM/cross-account access; anyone's production but the author's, plus two apps deployed for this test (one is a real, unmodified open-source project — WordPress — the other two were built for the test).
 * The durable Temporal path, Alertmanager, Postgres, the dashboard, approvals and the real remediation write path. The watcher is a single process with SQLite and executes nothing.
-* Alert thresholds tuned on anything but this host; log-volume or memory/CPU faults; the `hung_backend` fault under concurrent load; dependency inference between discovered services (discovery finds services and ports, not call graphs).
+* Alert thresholds tuned on anything but this host; log-volume or memory/CPU faults; the `hung_backend` fault under concurrent load; cross-service causality (round 3 shows this is a real, currently-missing capability, not a hypothetical one); app-specific log shipping or exporters for MySQL/PHP-FPM (also shown as missing by round 3).
 * True one-command onboarding: discovery + install is two commands and still needs `sudo`, a Python venv and manually-placed LLM credentials.
 
 ## Reproduce
@@ -111,6 +143,10 @@ sudo cp onboard/host/nightshift-watch.service /etc/systemd/system/ && sudo syste
 onboard/run_faults.sh 4                                                          # LB sandbox: crashed_backend config_break idle_client_stats service_stopped
 FAULT_SCRIPT=onboard/testapp/faults.sh ALERT_SELECT='.labels.service=="nginx" or .labels.service=="shop-api"' \
   REPORT_RE='_(nginx|shop-api)[.]json$' FAULTS="app_crash slow_config bad_upstream bad_deploy" onboard/run_faults.sh 3   # shop-API held-out target
+
+# round 3: real WordPress (run onboard/testapp/wordpress/setup.sh first, needs sudo, ~apt: mariadb-server php-fpm php-mysql ...)
+FAULT_SCRIPT=onboard/testapp/wordpress/faults.sh ALERT_SELECT='.labels.service=="nginx" or .labels.service=="mariadb"' \
+  REPORT_RE='_(nginx|mariadb)[.]json$' FAULTS="db_down bad_db_creds fpm_starved disk_full" onboard/run_faults.sh 2
 ```
 
-Raw data: `docs/live-ec2/reports/` and `docs/live-ec2/prompt-v4/` (round 1 / round 2 on the LB, every report as `.md` + `.json`), `docs/live-ec2/shop-api/` (round 2 held-out target), `docs/live-ec2/fault_runs_*.jsonl` (timings per injected fault).
+Raw data: `docs/live-ec2/reports/` and `docs/live-ec2/prompt-v4/` (round 1 / round 2 on the LB, every report as `.md` + `.json`), `docs/live-ec2/shop-api/` (round 2 held-out target), `docs/live-ec2/wordpress/` (round 3, real WordPress), `docs/live-ec2/fault_runs_*.jsonl` (timings per injected fault).

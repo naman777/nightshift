@@ -1,0 +1,197 @@
+{
+ "alert": {
+  "fingerprint": "EndpointDown+UnitDown-mariadb-1790489278",
+  "name": "EndpointDown+UnitDown",
+  "service": "mariadb",
+  "severity": "critical",
+  "started_at": 1790489278.304267,
+  "labels": {
+   "alertname": "EndpointDown+UnitDown",
+   "instance": "127.0.0.1:3306",
+   "job": "probe-tcp",
+   "port": "3306",
+   "probe": "tcp",
+   "service": "mariadb",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "EndpointDown: an endpoint stopped answering its probe; UnitDown: systemd unit is not active",
+   "state_snapshot": "STATE SNAPSHOT at 06:09:15 UTC (window 30m; series that moved, newest information first):\n  CHANGED host_cpu_ratio{service=host} now=0.1266, 30m ago=0.03605, moved at 06:08:00 UTC\n  STEADY endpoint_up{service=mariadb,instance=127.0.0.1:3306}=1; endpoint_up{service=lb,instance=127.0.0.1:8081}=0; endpoint_up{service=shop-api,instance=http://127.0.0.1:5000/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:80/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8001/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8002/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8003/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8080/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8090/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8091/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8093/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8094/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8095/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:8200/}=1; endpoint_latency_seconds{service=mariadb,instance=127.0.0.1:3306}=0.0002161; endpoint_latency_seconds{service=lb,instance=127.0.0.1:8081}=3; endpoint_latency_seconds{service=shop-api,instance=http://127.0.0.1:5000/}=0.001651; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:80/}=0.001846; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8001/}=0.0004871; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8002/}=0.0004858; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8003/}=0.0005055; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8080/}=0.0007955; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8090/}=0.0004861; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8091/}=0.000444; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8093/}=0.0004669; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8094/}=0.0004292; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8095/}=0.0004192; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:8200/}=0.04672; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=mariadb,instance=127.0.0.1:9100,name=mariadb.service}=1; unit_active{service=nginx,instance=127.0.0.1:9100,name=nginx.service}=1; unit_active{service=nsbox-lb,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; unit_active{service=shop-api,instance=127.0.0.1:9100,name=shop-api.service}=1; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1599; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2611; disk_used_ratio{service=nginx,instance=127.0.0.1:9100}=0.0826; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2342; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2611"
+  }
+ },
+ "timings": {
+  "fired_at": 1790489278.304267,
+  "detected_at": 1790489355.7506237,
+  "reported_at": 1790489374.9605505,
+  "investigation_s": 19.17751955986023
+ },
+ "incident_id": "inc-EndpointDown+UnitDown-mariadb-1790489278",
+ "mode": "multi",
+ "report": {
+  "root_cause": "mariadb.service on 127.0.0.1:9100 was deliberately stopped, taking its 127.0.0.1:3306 endpoint down from the alert onset until it started successfully again; the initiating operator or automation is not identified.",
+  "service": "mariadb",
+  "category": "service_down",
+  "confidence": 0.94,
+  "evidence": [
+   "ev_2067",
+   "ev_2068",
+   "ev_2073",
+   "ev_2074"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host resource contention caused the MariaDB interruption.",
+    "evidence": [
+     "ev_2075",
+     "ev_2076"
+    ]
+   },
+   {
+    "hypothesis": "The lb :8081 failure was the MariaDB alert cause.",
+    "evidence": [
+     "ev_2076"
+    ]
+   },
+   {
+    "hypothesis": "A recent shop-api deploy caused the MariaDB outage.",
+    "evidence": [
+     "ev_2065",
+     "ev_2066"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "mariadb.service on 127.0.0.1:9100 was cleanly and deliberately stopped, taking 127.0.0.1:3306 down; actor unknown.",
+    "service": "mariadb",
+    "category": "service_down",
+    "confidence": 0.94
+   }
+  ],
+  "proposed_action": {
+   "type": "none",
+   "target": "",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 59823,
+   "output_tokens": 3723,
+   "cost_usd": 0.007844,
+   "llm_calls": 17,
+   "tool_calls": 25,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 1,
+  "degraded": false
+ },
+ "action": {
+  "type": "none",
+  "target": "mariadb",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 59823,
+  "output_tokens": 3723,
+  "cost_usd": 0.007844,
+  "llm_calls": 17,
+  "tool_calls": 25,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "Did mariadb endpoint_up/latency and unit_active change at 1790489278, and which exact service endpoint/unit first changed?",
+   "summary": "At the requested timestamp 1790489278, mariadb endpoint_up and unit_active both dropped from 1 to 0 on endpoint 127.0.0.1:3306 and unit mariadb.service at 127.0.0.1:9100; their first sampled change is exactly 1790489278. Both recovered to 1 by 1790489353/1790489350 respectively, and their current last samples are 1. Mariadb endpoint latency did not show a corresponding change at that time: recent samples are about 0.0002s, with no onset indicated; a precise latency ratio is not established by available evidence. No other endpoint/unit series in the sampled data indicated a change at 1790489278. [metric name=endpoint_up service=mariadb ratio=0 onset=1790489278] [metric name=unit_active service=mariadb ratio=0 onset=1790489278] [metric name=endpoint_latency_seconds service=mariadb ratio=1 onset=1790489278]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2073",
+    "ev_2074",
+    "ev_2075",
+    "ev_2076"
+   ],
+   "usage": {
+    "input_tokens": 23142,
+    "output_tokens": 1109,
+    "cost_usd": 0.002869,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What mariadb.service lifecycle or probe-related log events occurred around 1790489278, and do they show an intentional stop, crash, or no state change?",
+   "summary": "Around epoch 1790489278, mariadb.service shows a clean, intentional shutdown rather than a crash: MariaDB reports shutdown complete at 1790489259, systemd logs Stopping, Deactivated successfully, and Stopped at that same time; it then starts successfully at 1790489344. No probe-related lines were found in the search. No Failed lifecycle event was found. [log service=mariadb level=info count=1 first_seen=1790489259 sig=\"systemd: Stopping mariadb.service\"] [log service=mariadb level=info count=1 first_seen=1790489259 sig=\"systemd: Deactivated successfully\"] [log service=mariadb level=info count=1 first_seen=1790489259 sig=\"systemd: Stopped mariadb.service\"] [log service=mariadb level=info count=1 first_seen=1790489344 sig=\"systemd: Started mariadb.service\"] [log service=mariadb level=info count=0 first_seen=1790489278 sig=\"probe-related log search returned no matches\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_2067",
+    "ev_2068",
+    "ev_2069"
+   ],
+   "usage": {
+    "input_tokens": 5817,
+    "output_tokens": 659,
+    "cost_usd": 0.000911,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any change still in effect at 1790489278 that could stop mariadb.service or make its :3306 endpoint unavailable?",
+   "summary": "Inconclusive: the observed recent deploys are shop-api changes and no config/flag commits were returned. These results do not establish whether a MariaDB-related change occurred or remained in effect at 1790489278; the deploy list provides no diff tying the listed changes to mariadb.service or port 3306. [change kind=deploy service=shop-api sha=8cba97a6 ts=1790484899 key=unknown old=unknown new=unknown msg=\"feat: apply discount factor to order count on home page\"] [change kind=deploy service=shop-api sha=60740e12 ts=1790485758 key=unknown old=unknown new=unknown msg=\"feat: apply discount factor to order count on home page\"] [change kind=deploy service=shop-api sha=04d9f3df ts=1790486599 key=unknown old=unknown new=unknown msg=\"feat: apply discount factor to order count on home page\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2065",
+    "ev_2066"
+   ],
+   "usage": {
+    "input_tokens": 1763,
+    "output_tokens": 623,
+    "cost_usd": 0.000488,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Is there an evidenced code-level mechanism in any mapped service that could cause the mariadb unit or :3306 endpoint to go down at this onset, rather than merely a hypothetical risk?",
+   "summary": "No evidenced code-level mechanism in the mapped service could be tied to MariaDB or :3306 going down at onset. Search found no MariaDB/MySQL/3306 code references (call_2); the process-control matches concern only this project's echo_server/load_balancer scripts, not MariaDB (call_3). Their existence is not evidence they triggered, and no onset/production trigger evidence was provided. Tests could not be run because the available commands were not allow-listed (calls call_4 and call_6). [code file=README.md smell=none tests=fail]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2070",
+    "ev_2071",
+    "ev_2072"
+   ],
+   "usage": {
+    "input_tokens": 16409,
+    "output_tokens": 579,
+    "cost_usd": 0.00193,
+    "llm_calls": 5,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}
