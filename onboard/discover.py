@@ -10,6 +10,12 @@ How it works (needs `ss`, `systemctl`, and passwordless sudo for `ss -p`; docker
   3. unit -> source repo    ->  WorkingDirectory / ExecStart walked up to the nearest `.git`
   4. each port is classified by talking to it for 2 s: answers HTTP -> `http` probe; connects but silent -> `tcp` probe + a warning
      (a silent port is either a non-HTTP protocol or ALREADY WEDGED, which is worth knowing at onboarding time)
+  5. unix-socket-only backends (PHP-FPM, uWSGI, ...) -> resolved from an already-discovered nginx-style config's
+     `fastcgi_pass unix:...` target, so a daemon with no TCP port still becomes a first-class service
+  6. dependencies -> each HTTP endpoint is poked once, then `ss` is sampled a few times for TCP/unix connections from one
+     service's process to another's listening address; `service_map.json`'s `calls` is the full transitive closure, so a
+     two-hop dependency (nginx -> php-fpm -> mariadb, the last hop over a unix socket MySQL's client library uses invisibly
+     for host 'localhost') is listed directly rather than requiring the model to guess which service to check next
 Everything the model needs (service map, metric catalogue, unit map, per-service config/code repos) is generated from that.
 """
 from __future__ import annotations
@@ -19,6 +25,8 @@ import json
 import re
 import socket
 import subprocess
+import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -57,6 +65,7 @@ class Service:
     log_files: list[str] = field(default_factory=list)   # app-level log files (journald misses these: MariaDB by default logs to
                                                             # journald, but many daemons -- PHP-FPM, most databases in other
                                                             # configs -- write their own error log instead, invisible otherwise)
+    calls: list[str] = field(default_factory=list)         # transitive closure of services this one is observed connecting to
 
 
 def parse_ss(text: str) -> list[Listener]:
@@ -150,6 +159,124 @@ def discover_log_files(name: str, procs: set[str]) -> list[str]:
     return sorted(found)
 
 
+def parse_ss_unix_estab(text: str) -> list[dict]:
+    """Rows for connected (not listening) unix stream sockets. Columns are the same six ss always prints (state, local
+    addr/port, peer addr/port) whether the socket is bound to a path or anonymous ('*'); `port` for a unix socket is really
+    its kernel inode number, which is how two ends of the SAME connection are paired up (see `unix_call_edges`)."""
+    rows = []
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) < 8 or parts[0] != "u_str" or parts[1] != "ESTAB":
+            continue
+        u = _PID.search(" ".join(parts[8:]))
+        rows.append({"local_addr": parts[4], "local_port": parts[5], "peer_port": parts[7],
+                     "pid": int(u.group("pid")) if u else None})
+    return rows
+
+
+def unix_call_edges(estab_rows: list[dict]) -> list[tuple[int, str]]:
+    """(client_pid, server_socket_path) pairs: for each connected unix-stream row bound to a real path (the accepting side,
+    e.g. MariaDB's end of a WordPress DB connection), find its peer by matching inode ('port') numbers and read the PID on
+    that side -- the client. A plain destination-port lookup (as for TCP) doesn't work here because unix sockets have no
+    ports; correlating by inode is the equivalent operation."""
+    by_port = {r["local_port"]: r for r in estab_rows}
+    edges = []
+    for r in estab_rows:
+        if r["local_addr"] == "*" or r["pid"] is None:
+            continue
+        peer = by_port.get(r["peer_port"])
+        if peer and peer["pid"] is not None:
+            edges.append((peer["pid"], r["local_addr"]))
+    return edges
+
+
+def discover_dependencies(services: list[Service], rounds: int = 10, delay_s: float = 0.15) -> dict[str, set[str]]:
+    """One-hop 'calls' edges actually observed on the wire (not inferred from config): which service's process holds a
+    connection -- TCP or unix socket -- to which other service's listening address. Catches dependencies no config file
+    states, such as a PHP app's DB connection (MySQL's client library connects over a unix socket for host 'localhost',
+    invisible to any wp-config.php/nginx-vhost text search).
+
+    A per-request dependency connection (e.g. a DB connection held only while handling that one HTTP request) can be open
+    for a few milliseconds -- far shorter than the gap between "send a request" and "then go sample ss" if those happen one
+    after another. So request generation and `ss` sampling run CONCURRENTLY on a background thread for the whole sampling
+    window, not sequentially; even then, a connection faster than one full round can still be missed entirely (documented
+    as a known limitation, not silently assumed away)."""
+    name_by_unit = {s.unit: s.name for s in services}
+    tcp_port_to_service = {e.port: s.name for s in services for e in s.endpoints if e.probe in ("http", "tcp")}
+    unix_listeners = parse_ss_unix(subprocess.run(["sudo", "-n", "ss", "-lxpH"], capture_output=True, text=True).stdout)
+
+    def svc_of_pid(pid: int) -> str | None:
+        try:
+            unit = unit_from_cgroup(Path(f"/proc/{pid}/cgroup").read_text())
+        except OSError:
+            return None
+        return name_by_unit.get(unit) if unit else None
+
+    path_to_service = {path: svc_of_pid(pid) for path, (_, pid) in unix_listeners.items()}
+    http_ports = [e.port for s in services for e in s.endpoints if e.probe == "http"]
+
+    stop = threading.Event()
+
+    def hammer() -> None:
+        while not stop.is_set():
+            for port in http_ports:
+                try:
+                    with socket.create_connection(("127.0.0.1", port), timeout=0.5) as c:
+                        c.sendall(b"GET / HTTP/1.0\r\nHost: localhost\r\n\r\n")
+                        c.recv(1)  # block briefly on the response so the request (and any DB call it makes) is in flight, not already finished
+                except OSError:
+                    pass
+
+    threads = [threading.Thread(target=hammer, daemon=True) for _ in range(3)]  # a few concurrent requesters: more chances the
+    for t in threads:                                                            # dependency connection is open at any given sample
+        t.start()
+    try:
+        edges: dict[str, set[str]] = {s.name: set() for s in services}
+        for _ in range(rounds):
+            # `ss -tnp state established` (unlike plain `ss -tn`) prints no Netid/State columns at all:
+            # recv-q send-q local-addr:port peer-addr:port users:(...) -- peer is parts[3], not the usual parts[4].
+            tcp = subprocess.run(["sudo", "-n", "ss", "-tnpH", "state", "established"], capture_output=True, text=True).stdout
+            for line in tcp.splitlines():
+                parts = line.split()
+                u = _PID.search(line)
+                if len(parts) < 4 or not u or ":" not in parts[3]:
+                    continue
+                src = svc_of_pid(int(u.group("pid")))
+                dst = tcp_port_to_service.get(int(parts[3].rsplit(":", 1)[-1]))
+                if src and dst and src != dst:
+                    edges[src].add(dst)
+
+            ux = subprocess.run(["sudo", "-n", "ss", "-xpH", "state", "connected"], capture_output=True, text=True).stdout
+            for client_pid, path in unix_call_edges(parse_ss_unix_estab(ux)):
+                src, dst = svc_of_pid(client_pid), path_to_service.get(path)
+                if src and dst and src != dst:
+                    edges[src].add(dst)
+            time.sleep(delay_s)
+        return edges
+    finally:
+        stop.set()
+        for t in threads:
+            t.join(timeout=2)
+
+
+def transitive_closure(direct: dict[str, set[str]]) -> dict[str, set[str]]:
+    """Full reachability, not just one hop: if nginx calls php-fpm and php-fpm calls mariadb, nginx's closure includes
+    mariadb too. A single failed dependency n hops away should not require n rounds of the model guessing which service to
+    check next -- the whole chain is listed for it up front."""
+    out: dict[str, set[str]] = {}
+    for start in direct:
+        seen: set[str] = set()
+        frontier = set(direct.get(start, ()))
+        while frontier:
+            seen |= frontier
+            nxt: set[str] = set()
+            for n in frontier:
+                nxt |= direct.get(n, set()) - seen
+            frontier = nxt
+        out[start] = seen
+    return out
+
+
 def grantable_log_files(services: list[Service]) -> list[str]:
     """Log files this process cannot read now (owned by another user, e.g. root-only application logs) but that a real
     collector needs -- install_host.sh grants group-read via chgrp/chmod (not setfacl: survives simply, at the cost of not
@@ -239,6 +366,10 @@ def discover(repo_overrides: dict[str, str] | None = None) -> list[Service]:
         if not s.repo and s.name not in (repo_overrides or {}):
             s.repo = repo_from_etc(s.procs)
         s.log_files = discover_log_files(s.name, s.procs)
+
+    closure = transitive_closure(discover_dependencies(list(services.values())))
+    for s in services.values():
+        s.calls = sorted(closure.get(s.name, ()))
     return sorted(services.values(), key=lambda s: s.name)
 
 
@@ -365,10 +496,13 @@ def render_service_map(services: list[Service]) -> dict:
 
     svc = {s.name: {"role": f"systemd unit {s.unit}; processes: {', '.join(sorted(s.procs))}; {listens(s)}"
                             + (f"; source repo {s.repo}" if s.repo else "") + (f"; app log files: {', '.join(s.log_files)}" if s.log_files else ""),
-                    "calls": [], **({"config": f"git repo {s.repo}"} if s.repo else {})} for s in services}
+                    "calls": s.calls, **({"config": f"git repo {s.repo}"} if s.repo else {})} for s in services}
     svc["host"] = {"role": "the machine itself; node_exporter metrics", "calls": []}
-    return {"services": svc, "notes": "Generated by onboard/discover.py from listening sockets and systemd cgroups. Dependencies between services are NOT inferred; "
-                                       "only black-box probes, host metrics and journald logs exist unless the app exports more."}
+    return {"services": svc, "notes": "Generated by onboard/discover.py from listening sockets, systemd cgroups, and a few rounds of observed TCP/unix-socket "
+                                       "connections after lightly exercising each HTTP endpoint (see discover_dependencies). `calls` is the FULL transitive "
+                                       "closure, not just one hop -- if A observably calls B and B calls C, A's `calls` already lists both B and C, so a "
+                                       "two-hop dependency does not require guessing which service to check next. A dependency that never opened a new "
+                                       "connection during the sampling window (e.g. only uses a long-lived pooled connection) will be missing here."}
 
 
 def render_catalogue(services: list[Service]) -> dict:
@@ -399,6 +533,8 @@ def report(services: list[Service]) -> str:
             lines.append(f"    {addr:<28} {e.probe:<5}" + (f"  WARNING: {e.note}" if e.note else ""))
         if s.log_files:
             lines.append(f"    log files: {', '.join(s.log_files)}")
+        if s.calls:
+            lines.append(f"    calls (observed, transitive): {', '.join(s.calls)}")
     return "\n".join(lines)
 
 
