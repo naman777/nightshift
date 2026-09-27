@@ -118,3 +118,15 @@ Exact-match on (service, category) is the primary metric; the judge is a seconda
   telemetry is noisier. Scenarios where the live stack disagrees with the simulator should be fixed in the fault module, which updates both.
 * Forty scenarios is small; report the spread across repeats, and be careful reading differences of a few points.
 * Faults 6, 8, 10 and the load-balancer variants of 1 and 7 run against stand-ins for Foreman and the C++ load balancer until the real ones are dropped in.
+
+## Real-model runs (`bench/real_llm.py`)
+
+Same scenarios, simulator, scoring and benchmark mode as above; only the model is real (`gpt-6-luna`). Results go to `bench/results/real-llm/summary-<split>-<prompt>.json` and are rendered
+into the README by `python -m bench.real_report --write`; they are never mixed into the offline-policy tables.
+
+* **Prompt versions are part of the result.** `v1` (baseline), `v2` (category definitions: name the failure mechanism, not the trigger), `v3` (commit to the best-supported mechanism instead of `unknown`).
+  Selected with `--prompt-version`; every summary records it.
+* **Tuning discipline.** Prompts were developed on the dev split. Held-out failures for `v2` were inspected before `v3` was written, so `v3` held-out numbers are lightly contaminated; `v2` held-out is the clean number.
+* **Headline (held-out, 15 scenarios x 3 repeats):** `v2` single 96% / multi 76%; `v3` single 96% / multi 96%. 0% unsafe actions and 100% evidence grounding in every real run.
+* **Cost** is computed from token counts at the model's standard short-context rates (in `agents/core/llm.py`); **wall time** is measured, not modelled.
+* **Limits:** one model, at most 3 repeats, so only large effects are visible. The simulator is cleaner than real telemetry. Multi-agent costs ~5x more and takes 4-5x longer than single agent for no measured accuracy gain.

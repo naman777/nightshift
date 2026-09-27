@@ -11,6 +11,7 @@ from functools import lru_cache
 
 from agents.core.db import Database
 from agents.core.evidence import EvidenceBoard
+from agents.prompts import LATEST
 from agents.core.llm import make_llm
 from agents.core.mcp_client import InProcessClient
 from agents.core.memory import IncidentMemory
@@ -22,7 +23,7 @@ from mcp_servers.logs.backend import LokiBackend
 from mcp_servers.metrics.backend import PrometheusBackend
 from mcp_servers.policy import PolicyEngine
 from mcp_servers.registry import build_servers
-from mcp_servers.runtime.backend import DockerRuntimeBackend
+from mcp_servers.runtime.backend import DockerRuntimeBackend, SystemdRuntimeBackend
 
 
 class PacedLLM:
@@ -54,14 +55,17 @@ def live_backends() -> dict:
             "logs": LokiBackend(os.environ.get("LOKI_URL", "http://localhost:3100")),
             "changes": GitChangesBackend(os.environ.get("CONFIG_REPO", "target/config"), os.environ.get("DEPLOY_LOG", "target/deploys.jsonl")),
             "code": FsCodeBackend(os.environ.get("CODE_ROOT", "target/orders-svc")),
-            "runtime": DockerRuntimeBackend()}
+            "runtime": SystemdRuntimeBackend() if os.environ.get("NIGHTSHIFT_RUNTIME") == "systemd" else DockerRuntimeBackend()}
 
 
 def build_runtime(labels: dict[str, str] | None = None, benchmark_mode: bool = False,
                   db: Database | None = None) -> tuple[AgentRuntime, PolicyEngine]:
     labels = labels or {}
     db = db or shared_db()
-    if os.environ.get("NIGHTSHIFT_BACKEND", "sim") == "sim" and labels.get("scenario"):
+    # A `scenario` label (dashboard launcher, benchmark) always means "investigate that simulated world", even when this
+    # process otherwise runs against the live stack: real Alertmanager alerts never carry it. Without this, a scenario
+    # launched from the dashboard of a live gateway is investigated against healthy live telemetry and comes back inconclusive.
+    if labels.get("scenario"):
         from bench.sim import sim_backends
 
         backends = sim_backends(_world(labels["scenario"]))
@@ -78,6 +82,7 @@ def build_runtime(labels: dict[str, str] | None = None, benchmark_mode: bool = F
     rt = AgentRuntime(llm=llm, client=client, board=board, on_step=lambda st: board.record_step(st.incident_id, st),
                       commander_model=model or os.environ.get("NIGHTSHIFT_COMMANDER_MODEL", "mock-strong"),
                       specialist_model=model or os.environ.get("NIGHTSHIFT_SPECIALIST_MODEL", "mock-cheap"),
+                      prompt_version=os.environ.get("NIGHTSHIFT_PROMPT_VERSION") or LATEST,
                       budget_usd=float(os.environ.get("NIGHTSHIFT_INCIDENT_BUDGET_USD", "1.0")),
                       memory=IncidentMemory(db) if os.environ.get("NIGHTSHIFT_MEMORY", "1") == "1" else None, memory_write=True)
     return rt, policy

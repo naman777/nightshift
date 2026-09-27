@@ -1,0 +1,120 @@
+From 04fc7ccc2322f80abc73c25102451897a6b42762 Mon Sep 17 00:00:00 2001
+From: Naman Kundra <namankundra6@gmail.com>
+Date: Sat, 26 Sep 2026 16:52:32 +0530
+Subject: [PATCH 3/3] CLI-pinned settings survive SIGHUP reloads (regression
+ test)
+
+---
+ load-balancer/main.cpp | 32 ++++++++++++++++++++++++++------
+ scripts/test.sh        | 18 ++++++++++++++++++
+ 2 files changed, 44 insertions(+), 6 deletions(-)
+
+diff --git a/load-balancer/main.cpp b/load-balancer/main.cpp
+index 58be397..cf63434 100644
+--- a/load-balancer/main.cpp
++++ b/load-balancer/main.cpp
+@@ -44,6 +44,21 @@ static void print_usage(const char* prog) {
+               << "Environment: LB_LOG_FORMAT=json (structured logs), LB_LOG_CONN=1 (log every closed connection).\n";
+ }
+ 
++// Which settings were pinned by CLI flags. On SIGHUP the config file is re-read, but a pinned setting must keep its
++// CLI value; otherwise a reload would silently replace it with the file's value or, worse, the compiled-in default.
++struct CliPins {
++    bool algo = false, weights = false, max_conn = false, timeout = false, health_interval = false, health_path = false;
++};
++
++static void apply_pins(LBConfig& nc, const LBConfig& cli, const CliPins& p) {
++    if (p.algo)            nc.algo = cli.algo;
++    if (p.weights)       { nc.weights = cli.weights; nc.weights_by_index.clear(); }
++    if (p.max_conn)        nc.max_conn = cli.max_conn;
++    if (p.timeout)         nc.upstream_timeout_ms = cli.upstream_timeout_ms;
++    if (p.health_interval) nc.health_check_interval_ms = cli.health_check_interval_ms;
++    if (p.health_path)     nc.health_check_path = cli.health_check_path;
++}
++
+ int main(int argc, char* argv[]) {
+     std::signal(SIGINT,  signal_handler);
+     std::signal(SIGTERM, signal_handler);
+@@ -65,17 +80,18 @@ int main(int argc, char* argv[]) {
+ 
+     // Second pass: CLI flags override config file values.
+     bool backends_from_cli = false;
++    CliPins pins;   // settings given on the command line keep winning over the config file across SIGHUP reloads
+     for (int i = 1; i < argc; ++i) {
+         std::string arg = argv[i];
+         if (arg == "--config") { ++i; continue; }
+         else if (arg == "--port"     && i + 1 < argc) cfg.port    = std::stoi(argv[++i]);
+         else if (arg == "--backends" && i + 1 < argc) { parse_backends(argv[++i], cfg.backends, cfg.backend_hosts); backends_from_cli = true; }
+-        else if (arg == "--weights"  && i + 1 < argc) cfg.weights  = parse_ints(argv[++i]);
++        else if (arg == "--weights"  && i + 1 < argc) cfg.weights  = parse_ints(argv[++i]), pins.weights = true;
+         else if (arg == "--threads"  && i + 1 < argc) cfg.threads   = static_cast<size_t>(std::stoi(argv[++i]));
+-        else if (arg == "--max-conn" && i + 1 < argc) cfg.max_conn  = std::stoi(argv[++i]);
+-        else if (arg == "--upstream-timeout-ms" && i + 1 < argc) cfg.upstream_timeout_ms = std::stoi(argv[++i]);
+-        else if (arg == "--health-interval-ms"  && i + 1 < argc) cfg.health_check_interval_ms = std::stoi(argv[++i]);
+-        else if (arg == "--health-path"         && i + 1 < argc) cfg.health_check_path = argv[++i];
++        else if (arg == "--max-conn" && i + 1 < argc) cfg.max_conn  = std::stoi(argv[++i]), pins.max_conn = true;
++        else if (arg == "--upstream-timeout-ms" && i + 1 < argc) cfg.upstream_timeout_ms = std::stoi(argv[++i]), pins.timeout = true;
++        else if (arg == "--health-interval-ms"  && i + 1 < argc) cfg.health_check_interval_ms = std::stoi(argv[++i]), pins.health_interval = true;
++        else if (arg == "--health-path"         && i + 1 < argc) cfg.health_check_path = argv[++i], pins.health_path = true;
+         else if (arg == "--algo"     && i + 1 < argc) {
+             std::string a = argv[++i];
+             if      (a == "rr") cfg.algo = Algorithm::ROUND_ROBIN;
+@@ -83,6 +99,7 @@ int main(int argc, char* argv[]) {
+             else if (a == "rh") cfg.algo = Algorithm::RENDEZVOUS;
+             else if (a == "lc") cfg.algo = Algorithm::LEAST_CONNECTIONS;
+             else { std::cerr << "Unknown algo: " << a << "\n"; return 1; }
++            pins.algo = true;
+         } else if (arg != "--help" && arg != "-h") {
+             std::cerr << "Unknown argument: " << arg << "\n";
+             print_usage(argv[0]);
+@@ -117,14 +134,17 @@ int main(int argc, char* argv[]) {
+ 
+         const std::vector<int> initial_backends = cfg.backends;
+         const bool backends_pinned_by_cli = backends_from_cli;
++        const LBConfig cli_cfg = cfg;
++        const CliPins cli_pins = pins;
+ 
+-        std::thread([mask, config_path, &lb, initial_backends, backends_pinned_by_cli] {
++        std::thread([mask, config_path, &lb, initial_backends, backends_pinned_by_cli, cli_cfg, cli_pins] {
+             sigset_t m = mask;
+             while (true) {
+                 int sig;
+                 if (sigwait(&m, &sig) != 0 || sig != SIGHUP) break;
+                 try {
+                     auto nc = load_config(config_path);
++                    apply_pins(nc, cli_cfg, cli_pins);
+                     lb.set_algorithm(nc.algo);
+                     auto w = effective_weights(nc, initial_backends.size());
+                     if (!w.empty()) lb.set_weights(w);
+diff --git a/scripts/test.sh b/scripts/test.sh
+index f512e43..a9e527c 100644
+--- a/scripts/test.sh
++++ b/scripts/test.sh
+@@ -109,6 +109,24 @@ BAD=0; for _ in $(seq 6); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://
+ if [ "$BAD" -eq 0 ]; then pass "failover: dead backend is skipped, all 6 requests succeed"; else fail "failover" "$BAD of 6 requests failed"; fi
+ kill "$LBPID" 2>/dev/null || true; rm -f "$CONF"
+ 
++# Regression: settings pinned on the command line must survive a SIGHUP reload even when the config file says otherwise
++# (a reload used to reset --health-path to "/" and flip --algo, which marked every backend DOWN behind a real health endpoint).
++CONF=$(mktemp)
++printf 'upstream_timeout_ms: 50\nalgo: lc\n' > "$CONF"
++"$ROOT/load-balancer/load_balancer" --config "$CONF" --port 9090 --backends localhost:8001,localhost:8003 --algo rr \
++    --upstream-timeout-ms 5000 --health-path /healthz --threads 8 > /tmp/lb_pin.log 2>&1 &
++PINPID=$!
++sleep 0.6
++kill -HUP "$PINPID"; sleep 0.5
++CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:9090/orders/1?delay=300")
++ALGO_FLIPS=$(grep -c 'Algorithm changed to least-connections' /tmp/lb_pin.log || true)
++if [ "$CODE" = "200" ] && [ "$ALGO_FLIPS" = "0" ]; then
++    pass "CLI-pinned timeout and algo survive a SIGHUP reload (file says timeout=50, algo=lc)"
++else
++    fail "CLI pins survive reload" "HTTP $CODE, algo flips=$ALGO_FLIPS"
++fi
++kill "$PINPID" 2>/dev/null || true; rm -f "$CONF"
++
+ # ── Summary ────────────────────────────────────────────────────────────────────
+ echo ""
+ echo "Results: $PASS passed, $FAIL failed."
+-- 
+2.43.0.windows.1
+

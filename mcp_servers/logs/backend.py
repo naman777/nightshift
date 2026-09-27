@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import time
 from typing import Any, Protocol
 
@@ -13,9 +15,13 @@ class LogsBackend(Protocol):
                      start: float, end: float, limit: int) -> list[dict[str, Any]]: ...
 
 
+_PLAIN_LEVEL = re.compile(r"\[(DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\s*\]", re.I)
+
+
 class LokiBackend:
-    def __init__(self, url: str = "http://localhost:3100"):
+    def __init__(self, url: str = "http://localhost:3100", plain: bool | None = None):
         self.url = url.rstrip("/")
+        self.plain = os.environ.get("LOKI_PLAIN_TEXT") == "1" if plain is None else plain
 
     def now(self) -> float:
         return time.time()
@@ -25,8 +31,10 @@ class LokiBackend:
         q = sel
         if contains:
             q += f' |= "{contains}"'
-        if level:
+        if level and not self.plain:
             q += f' | json | level="{level}"'
+        elif level:  # plain-text logs: match the bracketed level token, e.g. "[ERROR]" / "[WARN ]"
+            q += f' |~ "(?i)\\\\[{level}\\\\s*\\\\]|level={level}"'
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.get(f"{self.url}/loki/api/v1/query_range", params={
                 "query": q, "start": int(start * 1e9), "end": int(end * 1e9), "limit": limit, "direction": "forward"})
@@ -37,7 +45,8 @@ class LokiBackend:
                 try:
                     j = json.loads(line)
                 except ValueError:
-                    j = {"msg": line, "level": "info"}
+                    m = _PLAIN_LEVEL.search(line)
+                    j = {"msg": line, "level": m.group(1).lower() if m else "info"}
                 out.append({"ts": int(int(ts) / 1e9), "service": stream["stream"].get("service", service or ""),
                             "level": j.get("level", "info"), "msg": j.get("msg", line)})
         return sorted(out, key=lambda d: d["ts"])[:limit]

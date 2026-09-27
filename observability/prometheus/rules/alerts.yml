@@ -13,7 +13,9 @@ groups:
         labels: {severity: critical, service: orders-svc}
         annotations: {summary: "orders-svc p99 latency above 600ms"}
       - alert: ServiceMemoryGrowth
-        expr: memory_bytes / min_over_time(memory_bytes[30m]) > 1.8
+        # Startup warm-up growth must not page: only evaluate once every replica has been up for 45 min, so the warm-up has scrolled
+        # out of the 30-minute window (a memory_leak fault injected in the first 45 min after `make up` will not alert).
+        expr: (memory_bytes / min_over_time(memory_bytes[30m]) > 1.8) and on(service) (min by (service) (time() - process_start_time_seconds) > 2700)
         for: 2m
         labels: {severity: warning}
         annotations: {summary: "memory is 1.8x its 30-minute minimum"}

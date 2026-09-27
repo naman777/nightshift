@@ -107,6 +107,11 @@ services:
     image: temporalio/temporal:latest
     command: ["server", "start-dev", "--ip", "0.0.0.0", "--ui-port", "8233"]
     ports: ["7233:7233", "8233:8233"]
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "localhost:7233"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
 
   # ---------------------------------------------------------------- Nightshift
   gateway:
@@ -118,6 +123,10 @@ services:
       NIGHTSHIFT_ORCH: temporal
       NIGHTSHIFT_API_TOKEN: "${NIGHTSHIFT_API_TOKEN:-dev-token-change-me}"   # required by the gateway; set your own in .env
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      NIGHTSHIFT_LLM_PROVIDER: "${NIGHTSHIFT_LLM_PROVIDER:-mock}"          # mock = offline reference policy; openai = real model (needs OPENAI_API_KEY in .env)
+      NIGHTSHIFT_COMMANDER_MODEL: "${NIGHTSHIFT_COMMANDER_MODEL:-mock-strong}"
+      NIGHTSHIFT_SPECIALIST_MODEL: "${NIGHTSHIFT_SPECIALIST_MODEL:-mock-cheap}"
+      NIGHTSHIFT_PROMPT_VERSION: "${NIGHTSHIFT_PROMPT_VERSION:-}"          # empty = latest default (v1); v3 was the best on the benchmark
       NIGHTSHIFT_DB_URL: postgresql://nightshift:nightshift@postgres:5432/nightshift
       TEMPORAL_ADDRESS: temporal:7233
       PROMETHEUS_URL: http://prometheus:9090
@@ -128,7 +137,8 @@ services:
       CODE_ROOT: /app/target
     volumes: ["./target:/app/target"]
     ports: ["8000:8000"]
-    depends_on: [postgres, temporal]
+    restart: unless-stopped
+    depends_on: {postgres: {condition: service_healthy}, temporal: {condition: service_healthy}}
 
   nightshift-worker:
     build: {context: ., dockerfile: Dockerfile.agents}
@@ -138,12 +148,12 @@ services:
     environment: *ns-env
     volumes: ["./target:/app/target", "/var/run/docker.sock:/var/run/docker.sock"]
     restart: "no"   # `docker kill nightshift-worker`, then `docker start nightshift-worker`: the investigation resumes
-    depends_on: [postgres, temporal]
+    depends_on: {postgres: {condition: service_healthy}, temporal: {condition: service_healthy}}
 
   dashboard:
     build: {context: ./dashboard}
     environment: {GATEWAY_INTERNAL_URL: "http://gateway:8000", NIGHTSHIFT_API_TOKEN: "${NIGHTSHIFT_API_TOKEN:-dev-token-change-me}"}
-    ports: ["3001:3000"]
+    ports: ["${DASHBOARD_PORT:-3001}:3000"]
     depends_on: [gateway]
 
 volumes:

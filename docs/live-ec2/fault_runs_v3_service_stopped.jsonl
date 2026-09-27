@@ -1,0 +1,2 @@
+{"fault":"service_stopped","round":1,"t_inject":1790462235,"alert_fired_after_s":36,"report_after_s":93,"alerts":"LBUnitDown","reports":"20260926-223847_LBBackendUnhealthy+LBUnitDown_lb-sandbox.json"}
+{"fault":"service_stopped","round":2,"t_inject":1790462432,"alert_fired_after_s":40,"report_after_s":103,"alerts":"LBUnitDown","reports":"20260926-224212_LBBackendUnhealthy+LBUnitDown+LBDataPathErrors_lb-sandbox.json"}

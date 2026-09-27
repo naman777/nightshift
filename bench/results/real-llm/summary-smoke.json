@@ -4,75 +4,75 @@
   "split": "smoke",
   "repeats": 1,
   "scenarios": 10,
-  "note": "real LLM; cost uses fallback pricing if the model is not in agents/core/llm.py PRICES",
+  "note": "real LLM; cost recomputed from token counts at gpt-6-luna short-context standard rates ($0.10 in / $0.50 out per 1M)",
   "configs": {
     "single@gpt-6-luna": {
       "runs": 10,
       "invalid": 0,
-      "root_cause_accuracy": 0.5,
-      "accuracy_std": 0.0,
-      "top3_accuracy": 0.5,
-      "judge_accuracy": 0.5,
-      "service_accuracy": 0.8,
-      "remediation_quality": 0.5,
-      "unsafe_action_rate": 0.0,
-      "evidence_grounding": 1.0,
-      "red_herring_accuracy": 0.6667,
-      "no_herring_accuracy": 0.25,
-      "dev_accuracy": 0.5,
-      "heldout_accuracy": null,
-      "injection_obeyed_rate": null,
-      "cost_usd": {
-        "mean": 0.0513,
-        "p50": 0.0554,
-        "p95": 0.0887
-      },
-      "modeled_time_s": {
-        "mean": 20.597,
-        "p50": 22.63,
-        "p95": 33.43
-      },
-      "wall_time_s": {
-        "mean": 14.3182,
-        "p50": 15.7071,
-        "p95": 17.6968
-      },
-      "llm_calls_mean": 3.5,
-      "tool_calls_mean": 8.0
-    },
-    "multi@gpt-6-luna": {
-      "runs": 10,
-      "invalid": 0,
       "root_cause_accuracy": 0.6,
       "accuracy_std": 0.0,
-      "top3_accuracy": 0.7,
-      "judge_accuracy": 0.7,
-      "service_accuracy": 0.8,
+      "top3_accuracy": 0.6,
+      "judge_accuracy": 0.6,
+      "service_accuracy": 0.9,
       "remediation_quality": 0.8,
       "unsafe_action_rate": 0.0,
       "evidence_grounding": 1.0,
-      "red_herring_accuracy": 0.5,
-      "no_herring_accuracy": 0.75,
+      "red_herring_accuracy": 0.8333,
+      "no_herring_accuracy": 0.25,
       "dev_accuracy": 0.6,
       "heldout_accuracy": null,
       "injection_obeyed_rate": null,
       "cost_usd": {
-        "mean": 0.2448,
-        "p50": 0.2601,
-        "p95": 0.3593
+        "mean": 0.0021,
+        "p50": 0.0021,
+        "p95": 0.0027
       },
       "modeled_time_s": {
-        "mean": 54.597,
-        "p50": 51.39,
-        "p95": 94.17
+        "mean": 24.821,
+        "p50": 23.81,
+        "p95": 34.89
       },
       "wall_time_s": {
-        "mean": 32.3657,
-        "p50": 34.0283,
-        "p95": 46.5275
+        "mean": 13.2243,
+        "p50": 12.5153,
+        "p95": 17.9884
       },
-      "llm_calls_mean": 31.6,
-      "tool_calls_mean": 38.9
+      "llm_calls_mean": 4.4,
+      "tool_calls_mean": 10.0
+    },
+    "multi@gpt-6-luna": {
+      "runs": 10,
+      "invalid": 0,
+      "root_cause_accuracy": 0.2,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 0.5,
+      "judge_accuracy": 0.5,
+      "service_accuracy": 0.6,
+      "remediation_quality": 0.6,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 0.3333,
+      "no_herring_accuracy": 0.0,
+      "dev_accuracy": 0.2,
+      "heldout_accuracy": null,
+      "injection_obeyed_rate": null,
+      "cost_usd": {
+        "mean": 0.0084,
+        "p50": 0.0072,
+        "p95": 0.0134
+      },
+      "modeled_time_s": {
+        "mean": 53.809,
+        "p50": 47.49,
+        "p95": 86.54
+      },
+      "wall_time_s": {
+        "mean": 31.9006,
+        "p50": 29.3038,
+        "p95": 52.6178
+      },
+      "llm_calls_mean": 31.7,
+      "tool_calls_mean": 39.8
     }
   }
 }

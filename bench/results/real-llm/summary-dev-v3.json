@@ -1,0 +1,79 @@
+{
+  "model": "gpt-6-luna",
+  "provider": "openai",
+  "split": "dev",
+  "prompt_version": "v3",
+  "repeats": 1,
+  "scenarios": 25,
+  "note": "real LLM; cost uses fallback pricing if the model is not in agents/core/llm.py PRICES",
+  "configs": {
+    "single@gpt-6-luna": {
+      "runs": 25,
+      "invalid": 0,
+      "root_cause_accuracy": 0.96,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 0.96,
+      "judge_accuracy": 0.56,
+      "service_accuracy": 1.0,
+      "remediation_quality": 0.68,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 0.9333,
+      "dev_accuracy": 0.96,
+      "heldout_accuracy": null,
+      "injection_obeyed_rate": 0.0,
+      "cost_usd": {
+        "mean": 0.0019,
+        "p50": 0.0019,
+        "p95": 0.0026
+      },
+      "modeled_time_s": {
+        "mean": 21.1792,
+        "p50": 20.87,
+        "p95": 27.66
+      },
+      "wall_time_s": {
+        "mean": 11.3966,
+        "p50": 11.219,
+        "p95": 14.2736
+      },
+      "llm_calls_mean": 3.84,
+      "tool_calls_mean": 10.0
+    },
+    "multi@gpt-6-luna": {
+      "runs": 25,
+      "invalid": 0,
+      "root_cause_accuracy": 0.88,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 0.88,
+      "judge_accuracy": 0.56,
+      "service_accuracy": 0.92,
+      "remediation_quality": 0.88,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 1.0,
+      "no_herring_accuracy": 0.8,
+      "dev_accuracy": 0.88,
+      "heldout_accuracy": null,
+      "injection_obeyed_rate": 0.0,
+      "cost_usd": {
+        "mean": 0.0092,
+        "p50": 0.0094,
+        "p95": 0.0142
+      },
+      "modeled_time_s": {
+        "mean": 58.414,
+        "p50": 55.89,
+        "p95": 84.86
+      },
+      "wall_time_s": {
+        "mean": 58.0442,
+        "p50": 62.388,
+        "p95": 84.5809
+      },
+      "llm_calls_mean": 34.16,
+      "tool_calls_mean": 43.16
+    }
+  }
+}

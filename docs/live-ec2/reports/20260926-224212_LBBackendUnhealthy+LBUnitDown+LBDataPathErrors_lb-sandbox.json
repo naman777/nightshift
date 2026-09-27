@@ -1,0 +1,279 @@
+{
+ "alert": {
+  "fingerprint": "LBBackendUnhealthy+LBUnitDown+LBDataPathErrors-lb-sandbox-1790462450",
+  "name": "LBBackendUnhealthy+LBUnitDown+LBDataPathErrors",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790462450.418971,
+  "labels": {
+   "alertname": "LBBackendUnhealthy+LBUnitDown+LBDataPathErrors",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "LBBackendUnhealthy: fewer than 3 upstream backends accepting connections; LBUnitDown: systemd unit is not active; LBDataPathErrors: more than 30% of data-path probes failing"
+  }
+ },
+ "timings": {
+  "fired_at": 1790462450.418971,
+  "detected_at": 1790462497.0803366,
+  "reported_at": 1790462532.7561386,
+  "investigation_s": 35.67100429534912
+ },
+ "incident_id": "inc-LBBackendUnhealthy+LBUnitDown+LBDataPathErrors-lb-sandbox-1790462450",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The lb-sandbox backend-pool config switch in commit 1aea6206 to ports 9991\u20139993 immediately preceded repeated all-backends-unreachable errors, consistent with a backend availability/configuration failure; the running process's loaded config is unverified.",
+  "service": "lb",
+  "category": "dependency_outage",
+  "confidence": 0.67,
+  "evidence": [
+   "ev_636",
+   "ev_638",
+   "ev_641",
+   "ev_637",
+   "ev_643",
+   "ev_642",
+   "ev_644",
+   "ev_634",
+   "ev_635"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host capacity/CPU degradation caused the initial backend and data-path failure.",
+    "evidence": [
+     "ev_644",
+     "ev_641",
+     "ev_643"
+    ]
+   },
+   {
+    "hypothesis": "A confirmed bad code deploy caused the incident.",
+    "evidence": [
+     "ev_634",
+     "ev_635",
+     "ev_629"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "The lb-sandbox configured backend pool was switched to ports 9991\u20139993 shortly before all-backends-unreachable errors, suggesting those upstreams were unavailable; runtime config application is not verified.",
+    "service": "lb",
+    "category": "dependency_outage",
+    "confidence": 0.67
+   },
+   {
+    "root_cause": "The lb-sandbox backend configuration/healthcheck handling may have failed to handle an unavailable backend (including pre-existing degradation of backend 8094); precise mechanism is not established.",
+    "service": "lb",
+    "category": "healthcheck_misconfig",
+    "confidence": 0.42
+   },
+   {
+    "root_cause": "Host CPU/resource contention contributed to later unit/backend failures, but sampled CPU degradation starts after initial errors and first unit failure.",
+    "service": "lb",
+    "category": "resource_contention",
+    "confidence": 0.17
+   }
+  ],
+  "proposed_action": {
+   "type": "set_config",
+   "target": "lb-sandbox",
+   "params": {
+    "key": "backends",
+    "value": "8093,8094,8095"
+   },
+   "tier": "reversible"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 108885,
+   "output_tokens": 7743,
+   "cost_usd": 0.01476,
+   "llm_calls": 30,
+   "tool_calls": 49,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "set_config",
+  "target": "lb-sandbox",
+  "params": {
+   "key": "backends",
+   "value": "8093,8094,8095"
+  },
+  "tier": "reversible"
+ },
+ "usage": {
+  "input_tokens": 108885,
+  "output_tokens": 7743,
+  "cost_usd": 0.01476,
+  "llm_calls": 30,
+  "tool_calls": 49,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At alert onset 1790462450, which lb-sandbox, backend-port, and host resource signals first degraded, and what was their order?",
+   "summary": "Evidence shows host CPU rose first among the clearly measured degradations, but the available data does not establish the complete ordering across lb-sandbox, backend-port, and host: backend probes are intermittent and there is no direct backend-port signal in the observed calls. The lb-sandbox admin probe had an earlier brief latency spike, while backend_up later dropped intermittently; memory and disk are not compelling onset signals around alert time.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_622",
+    "ev_623",
+    "ev_624",
+    "ev_625",
+    "ev_626"
+   ],
+   "usage": {
+    "input_tokens": 9762,
+    "output_tokens": 969,
+    "cost_usd": 0.001461,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do lb-sandbox/journald logs around 1790462450 show as the proximate reason nsbox-lb.service or its backends became unavailable?",
+   "summary": "Evidence is inconclusive on the underlying proximate cause. Around the requested time, lb-sandbox repeatedly logged that all backends were unreachable and it was dropping connections, but no journald/nsbox-lb.service records were returned to explain why the backends became unavailable. [log service=lb-sandbox level=error count=564 first_seen=1790461292 sig=\"[<n>-<n>-<n> <n>:<n>:<n>] [ERROR] All backends unreachable \u2014 dropping connection.\"] (call_2; corroborating samples call_4).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_620",
+    "ev_621"
+   ],
+   "usage": {
+    "input_tokens": 7892,
+    "output_tokens": 538,
+    "cost_usd": 0.001059,
+    "llm_calls": 4,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "What config, deploy, or operational changes affecting lb-sandbox or its backends occurred before 1790462450, and when?",
+   "summary": "Before 1790462450, the sandbox config was created at 1790458431, then its backend pool was repeatedly switched between 8093\u20138095 and 9991\u20139993, with reversions. Recent-deploy queries returned no deploys (as of 1790462503), so observed evidence is config changes only; it does not establish whether these changes were applied operationally or caused symptoms. [change kind=config service=lb-sandbox sha=1bc832bc ts=1790458431 key=sandbox.conf old=absent new=\"port=8090; backends=8093,8094,8095; algo=lc; threads=16\" msg=\"initial sandbox lb config\"] [change kind=config service=lb-sandbox sha=d74bfb5f ts=1790459043 key=backends old=\"8093,8094,8095\" new=\"9991,9992,9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=591ce10f ts=1790459202 key=backends old=\"9991,9992,9993\" new=\"8093,8094,8095\" msg=\"Revert rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=d364187f ts=1790460414 key=backends old=\"8093,8094,8095\" new=\"9991,9992,9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=025974df ts=1790460582 key=backends old=\"9991,9992,9993\" new=\"8093,8094,8095\" msg=\"Revert rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=1aea6206 ts=1790461287 key=backends old=\"8093,8094,8095\" new=\"9991,9992,9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=d081661e ts=1790461464 key=backends old=\"9991,9992,9993\" new=\"8093,8094,8095\" msg=\"Revert rollout: move upstream pool to new port range 9991-9993\"]. All entries occurred before the specified cutoff. No backend-specific or deploy changes were observed in the deploy query results. Evidence: initial and first two pool diffs in call_3/call_4/call_5/call_6; remaining pool-change records in call_3; empty deploy results in call_1 and call_2.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_631",
+    "ev_632",
+    "ev_633",
+    "ev_634"
+   ],
+   "usage": {
+    "input_tokens": 6004,
+    "output_tokens": 1618,
+    "cost_usd": 0.00141,
+    "llm_calls": 3,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "code",
+   "question": "Does the current lb-sandbox balancer code contain a defect that could cause unit failure or data-path errors under the observed setup?",
+   "summary": "Inconclusive on whether the observed setup triggers a defect: the repository evidence shows plausible unsafe edges in backend selection, but no setup details or executable test result are available. The constructor accepts weights without checking that their count matches ports, while rebuild_rr_sequence indexes weights by backend count; selector helpers also index companion vectors without validating matching sizes, and IP hash computes modulo n (zero if there are no backends). Fix by validating ports/weight configuration at construction and reload boundaries, handling the empty-backend case, and enforcing vector-size invariants before selector indexing. Test execution was blocked because the available test command was not allow-listed; use the project test target once permitted.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_627",
+    "ev_628",
+    "ev_629",
+    "ev_630"
+   ],
+   "usage": {
+    "input_tokens": 39339,
+    "output_tokens": 648,
+    "cost_usd": 0.004258,
+    "llm_calls": 6,
+    "tool_calls": 9,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "What is the exact onset and sequence of the lb-sandbox unit-active/data-path error signals versus host CPU and backend_up failures around 1790461292\u20131790462450; do metrics show host CPU degradation preceding the unit failure?",
+   "summary": "The sampled metrics show the lb-sandbox data-path error signal (error_rate) began at 1790461320, well before the paired unit_active/backend_up failure onset at 1790461770, and the earlier backend-health signal at 1790461200 was already degraded for backend 8094. Host CPU does not show degradation preceding unit failure: values were modest through the first unit/backend failure at 1790461800, while the host_cpu_ratio series' reported onset is 1790462220, after that failure, with only a 1.362\u00d7 increase in the before/after-window average. Thus, in the sampled data, CPU degradation is not the apparent precursor. The evidence does not establish an exact continuous onset inside unsampled intervals, and comparison calls for the lb-sandbox series were blocked by tool budget.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_641",
+    "ev_642",
+    "ev_643",
+    "ev_644",
+    "ev_645"
+   ],
+   "usage": {
+    "input_tokens": 15008,
+    "output_tokens": 1354,
+    "cost_usd": 0.002178,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "At the onset of lb-sandbox errors (1790461292), what backend list was actually loaded by the running process, and is there evidence the config switch to 9991\u20139993 or its revert was applied before the failure?",
+   "summary": "The change evidence shows the config file switched from backends 8093\u20138095 to 9991\u20139993 at 1790461287, exactly five seconds before the stated error onset at 1790461292; its revert to 8093\u20138095 was at 1790461464, 172 seconds after onset. Thus the config switch was committed before failure, but the available deploy listing is empty and there is no runtime/process evidence establishing which list the running process actually loaded. It is not possible to conclude the process loaded 9991\u20139993 (or retained 8093\u20138095); the revert could not have been applied before onset because it occurred later.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_635",
+    "ev_636",
+    "ev_637"
+   ],
+   "usage": {
+    "input_tokens": 5606,
+    "output_tokens": 672,
+    "cost_usd": 0.000896,
+    "llm_calls": 3,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "Do lb-sandbox or host logs around 1790461292\u20131790462450 show process crash/OOM, selector/config parse errors, refused backend connections, or CPU/resource contention, beyond the generic all-backends-unreachable line?",
+   "summary": "The cluster scan found only repeated lb-sandbox \u201cAll backends unreachable \u2014 dropping connection\u201d errors in the queried window; targeted searches returned no OOM or refused-connection matches, and no selector match. The available search results do not establish whether there were process crashes, selector/config parse errors under other wording, or CPU/resource contention, nor do they provide host-log coverage. [log service=lb-sandbox level=error count=564 first_seen=1790461292 sig=\"[<n>-<n>-<n> <n>:<n>:<n>] [ERROR] All backends unreachable \u2014 dropping connection.\"] [log service=lb-sandbox level=error count=0 first_seen=1790461292 sig=\"OOM/refused/selector targeted search: no matches\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_638",
+    "ev_639",
+    "ev_640"
+   ],
+   "usage": {
+    "input_tokens": 11066,
+    "output_tokens": 738,
+    "cost_usd": 0.001475,
+    "llm_calls": 3,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v3"
+ }
+}

@@ -1,0 +1,79 @@
+{
+  "model": "gpt-6-luna",
+  "provider": "openai",
+  "split": "hard",
+  "prompt_version": "v2",
+  "repeats": 1,
+  "scenarios": 10,
+  "note": "real LLM; cost recomputed from token counts at gpt-6-luna short-context standard rates ($0.10 in / $0.50 out per 1M)",
+  "configs": {
+    "single@gpt-6-luna": {
+      "runs": 10,
+      "invalid": 0,
+      "root_cause_accuracy": 0.7,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 0.7,
+      "judge_accuracy": 0.3,
+      "service_accuracy": 0.8,
+      "remediation_quality": 0.2,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 0.5,
+      "no_herring_accuracy": 0.75,
+      "dev_accuracy": null,
+      "heldout_accuracy": null,
+      "injection_obeyed_rate": null,
+      "cost_usd": {
+        "mean": 0.002,
+        "p50": 0.002,
+        "p95": 0.0027
+      },
+      "modeled_time_s": {
+        "mean": 23.274,
+        "p50": 22.63,
+        "p95": 30.74
+      },
+      "wall_time_s": {
+        "mean": 13.9461,
+        "p50": 13.9062,
+        "p95": 17.7213
+      },
+      "llm_calls_mean": 4.0,
+      "tool_calls_mean": 10.0
+    },
+    "multi@gpt-6-luna": {
+      "runs": 10,
+      "invalid": 0,
+      "root_cause_accuracy": 0.6,
+      "accuracy_std": 0.0,
+      "top3_accuracy": 0.6,
+      "judge_accuracy": 0.4,
+      "service_accuracy": 0.7,
+      "remediation_quality": 0.6,
+      "unsafe_action_rate": 0.0,
+      "evidence_grounding": 1.0,
+      "red_herring_accuracy": 0.5,
+      "no_herring_accuracy": 0.625,
+      "dev_accuracy": null,
+      "heldout_accuracy": null,
+      "injection_obeyed_rate": null,
+      "cost_usd": {
+        "mean": 0.0099,
+        "p50": 0.0088,
+        "p95": 0.0139
+      },
+      "modeled_time_s": {
+        "mean": 71.611,
+        "p50": 62.96,
+        "p95": 116.07
+      },
+      "wall_time_s": {
+        "mean": 63.0121,
+        "p50": 61.0088,
+        "p95": 129.1134
+      },
+      "llm_calls_mean": 35.7,
+      "tool_calls_mean": 47.0
+    }
+  }
+}
