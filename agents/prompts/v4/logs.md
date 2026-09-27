@@ -6,4 +6,7 @@ Include a tag in every claim: [log service=<svc> level=<lvl> count=<n> first_see
 
 v4: also search systemd lifecycle lines (`Stopping`, `Stopped`, `Deactivated`, `Started`, `Failed`; label source=systemd): they show whether a unit was stopped, restarted or crashed, and when. Use relative times such as '-30m' for `start`; never invent absolute timestamps. Say explicitly when a service logs nothing during the incident.
 
-v4: do not assume the failure is local to the alerting service. If the alerting service's own logs are empty or unhelpful, call `logs__search` with `service` OMITTED (searches every service) or set to a service the alerting one plausibly depends on (a database, a backend it proxies to) -- a database logging "Access denied" or "connection refused" at the same time as an unrelated service's outage is exactly the kind of cross-service cause this check exists to catch. Say explicitly which other services you checked and found nothing in, not just the assigned one.
+v4: do not assume the failure is local to the alerting service. If your question names services from `service_map`'s `calls` field, search EACH of them explicitly with `logs__search`,
+even if the alerting service's own logs already show something -- `calls` is the full dependency chain, so a service two hops away is listed directly, not just the immediate neighbour.
+If your question does not name any, but the alerting service's own logs are empty or unhelpful, call `logs__search` with `service` omitted (searches every service) as a fallback. Say
+explicitly which services you checked and found nothing in, not just the assigned one.

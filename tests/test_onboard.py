@@ -50,6 +50,29 @@ def test_loki_plain_query_uses_line_filter_not_json(monkeypatch):
     assert out[0]["level"] == "warn"
 
 
+def test_loki_plain_query_level_warn_also_matches_the_word_warning(monkeypatch):
+    """Regression: MariaDB (and others) log '[Warning]', not '[WARN]'. A level='warn' query used to build a regex that
+    matched only the literal word 'warn', silently excluding every '[Warning]' line -- including a real access-denied
+    auth failure -- from both the Loki query itself and the line's own level classification."""
+    seen = {}
+
+    class R:
+        def raise_for_status(self): ...
+        def json(self): return {"data": {"result": [{"stream": {"service": "mariadb"}, "values": [
+            ["1790000000000000000", "2026-09-27 08:22:08 1 [Warning] Access denied for user 'wordpress'@'localhost'"]]}]}}
+
+    class C:
+        def __init__(self, **kw): ...
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): ...
+        async def get(self, url, params): seen.update(params); return R()
+
+    monkeypatch.setattr("mcp_servers.logs.backend.httpx.AsyncClient", C)
+    out = asyncio.run(LokiBackend("http://x", plain=True).search("mariadb", None, "warn", 0, 2e9, 10))
+    assert "warn(?:ing)?" in seen["query"]           # the query itself now accepts the "Warning" spelling
+    assert out[0]["level"] == "warn"                  # and the parsed level is normalized to the short form other code expects
+
+
 def test_systemd_backend_only_restarts_and_refuses_the_rest():
     b = SystemdRuntimeBackend(units={"lb": "lb.service"})
     assert asyncio.run(b.restart("nope", None))["ok"] is False
@@ -320,3 +343,57 @@ def test_service_map_notes_unix_socket_and_app_logs():
     s = Service("php-fpm", "php8.5-fpm.service", {"php-fpm8.5"}, [Endpoint(0, "unix", path="/run/php/php8.5-fpm.sock")], log_files=["/var/log/php8.5-fpm.log"])
     role = render_service_map([s])["services"]["php-fpm"]["role"]
     assert "/run/php/php8.5-fpm.sock (unix socket)" in role and "/var/log/php8.5-fpm.log" in role
+
+
+# -- dependency discovery (observed connections -> service_map "calls") -----------------------------------------------------------------
+
+SS_UNIX_ESTAB_SAMPLE = """u_str ESTAB 0      0                                                          * 9549640            * 9550504 users:((\"php-fpm8.5\",pid=1471402,fd=6))
+u_str ESTAB 0      0                                    /run/mysqld/mysqld.sock 9550504            * 9549640 users:((\"mariadbd\",pid=1435222,fd=61))
+"""
+
+
+def test_parse_ss_unix_estab_and_unix_call_edges_pair_by_inode():
+    from onboard.discover import parse_ss_unix_estab, unix_call_edges
+
+    rows = parse_ss_unix_estab(SS_UNIX_ESTAB_SAMPLE)
+    assert len(rows) == 2
+    edges = unix_call_edges(rows)
+    assert edges == [(1471402, "/run/mysqld/mysqld.sock")]  # client pid, server socket path
+
+
+def test_transitive_closure_follows_multiple_hops():
+    from onboard.discover import transitive_closure
+
+    direct = {"nginx": {"php-fpm"}, "php-fpm": {"mariadb"}, "mariadb": set()}
+    closure = transitive_closure(direct)
+    assert closure["nginx"] == {"php-fpm", "mariadb"}   # two hops away, listed directly
+    assert closure["php-fpm"] == {"mariadb"}
+    assert closure["mariadb"] == set()
+
+
+def test_transitive_closure_handles_a_cycle_without_looping_forever():
+    from onboard.discover import transitive_closure
+
+    closure = transitive_closure({"a": {"b"}, "b": {"a"}})
+    assert closure["a"] == {"a", "b"} and closure["b"] == {"a", "b"}
+
+
+def test_service_map_exposes_the_full_dependency_chain():
+    from onboard.discover import Endpoint, Service, render_service_map
+
+    svcs = [Service("nginx", "nginx.service", set(), [Endpoint(80, "http")], calls=["mariadb", "php-fpm"])]
+    role = render_service_map(svcs)["services"]["nginx"]
+    assert role["calls"] == ["mariadb", "php-fpm"]
+
+
+def test_to_ts_accepts_iso8601_as_well_as_relative_and_unix():
+    from mcp_servers.common import to_ts
+
+    now = 1_790_000_000.0
+    assert to_ts("-30m", now) == now - 1800
+    assert to_ts(1790497328, now) == 1790497328.0
+    assert to_ts("2026-09-27T08:22:08+00:00", now) == 1790497328.0
+    assert to_ts("2026-09-27T08:22:08Z", now) == 1790497328.0
+    import pytest
+    with pytest.raises(ValueError):
+        to_ts("not a time", now)

@@ -22,7 +22,7 @@ working in a specific, explainable way; see below. **Real language model through
 | Diagnosis quality, round 1 (prompts v1-v3, hand-written config) | Mixed: 7 correct, 3 partial, 8 wrong of 18 scored, plus 1 fault (frozen backend) never detected. |
 | Diagnosis quality, round 2 (prompt v4, auto-discovered config) — **same LB target** | **15 correct, 1 partial, 0 wrong of 16** (4 fault types x 4 rounds). |
 | Diagnosis quality, round 2 — **held-out shop-API target** (never seen while writing v4) | **9 correct, 1 partial, 2 wrong of 12** (3 rounds x 4 fault types), plus **1 run produced no report at all**. All 3 misses are the same fault type: see "The one fault type it still misses" below. |
-| Diagnosis quality, round 3 — **real WordPress** (nginx + PHP-FPM + MariaDB) | Initial: **2 correct, 4 partial, 4 wrong of 10** — worse than the other targets, for a specific reason (below). After shipping PHP-FPM's log and discovering it as a service (same session, still round 3): re-ran the 2 failing faults, **1 improved to correct** (PHP-FPM pool exhaustion), **1 still wrong** (a two-hop DB credential failure that needs real dependency inference, not just a prompt nudge). |
+| Diagnosis quality, round 3 — **real WordPress** (nginx + PHP-FPM + MariaDB) | Initial: **2 correct, 4 partial, 4 wrong of 10** — worse than the other targets, for a specific reason (below). Fix 1 (ship PHP-FPM's own log, discover it as a service): `fpm_starved` improved 0/2 -> 1/2 correct. Fix 2 (a real, observed dependency graph -- see "The dependency graph was built"): correctly finds `nginx -> php8.5-fpm -> mariadb`, including the hop no config file states; found and fixed two unrelated real bugs along the way (a log-level query that silently excluded MariaDB's `[Warning]` lines; `changes` specialist discarding correct evidence as "out of scope"). `bad_db_creds` still 0/4 correct after all of it — the infrastructure works, verified independently; the model doesn't reliably chain it end-to-end for this fault. |
 
 ## What was installed on the host (all removable with `onboard/uninstall_host.sh --purge`)
 
@@ -124,6 +124,43 @@ This is the most useful finding of the three rounds for an interview: **"we test
 of the two failures we could fix in an afternoon and which one needs the dependency-graph work already on the backlog"** is a far more
 credible story than three targets all scoring well.
 
+## The dependency graph was built. It fixed one bug. It did not fix `bad_db_creds`.
+
+`onboard/discover.py` now builds a **real, observed** dependency graph, not a config-file guess: it pokes every discovered HTTP endpoint
+continuously from three background threads while sampling `ss` ten times, correlating TCP established connections (by destination port)
+and unix-socket connections (by matching the kernel inode of each end of a connected pair) back to the service that owns each end. This
+found `nginx -> php8.5-fpm -> mariadb` correctly and reliably (3/3 consecutive discovery runs) — including the `nginx -> mariadb` hop that
+**no config file states anywhere**, because MySQL's client library connects over a unix socket for host `localhost` invisibly to any
+`wp-config.php`/nginx-vhost text search. `service_map.json`'s `calls` field for `nginx` now lists `["mariadb", "php8.5-fpm"]`, the full
+transitive closure, exactly as designed. Prompts (`commander.md`, `logs.md`, `single.md`) were updated to require checking every service
+in `calls`, not just the alerting one.
+
+**Two real, unrelated bugs were found and fixed by trying to use this.** Neither is about the dependency graph itself:
+
+1. **A live query bug, not a missing capability.** MariaDB logs auth failures as `[Warning]`, not `[WARN]`. The plain-text log filter built
+   a regex that matched the literal word "warn" and excluded "warning" — so a `level="warn"` query silently returned zero results for a
+   line that was sitting right there in Loki the whole time. Fixed in `mcp_servers/logs/backend.py` (`_LEVEL_QUERY_ALIASES`,
+   `_LEVEL_NORMALIZE`); verified directly against Loki before and after (0 results -> the exact `Access denied` line, level normalized to
+   `warn`). This kind of bug — a real signal present in the data, invisible only because of a query-construction mismatch — is exactly the
+   kind of thing that live testing on a second, real application finds and a demo never would.
+2. **A `changes` specialist that saw the right evidence and threw it away.** One run's `changes` agent found sha `e52b3985`, "database
+   password changes", in its config search — and then wrote it off as "unrelated to the requested nginx/PHP-FPM configuration" because its
+   assigned question was scoped to nginx. Added a rule to `agents/prompts/v4/changes.md`: report a relevant change even outside the
+   literal wording of the question, using `calls` to judge relevance. Also widened `mcp_servers/common.py::to_ts` to accept ISO 8601
+   timestamps (a model tried one, got a hard tool error, and reported the search as "rejected" — a separate small robustness gap found
+   along the way).
+
+**Re-running `bad_db_creds` twice more after all three fixes: still 0/2 correct**, and the failure mode changed in an important way — one
+run **fabricated** a specific-sounding cause ("invalid pool sizing... left the socket missing") that does not appear anywhere in the real
+PHP-FPM log, despite every prompt instruction to cite only real evidence; the other stayed honestly `unknown` at low confidence (0.27)
+rather than committing to a wrong specific answer, which is the correct behaviour when the evidence really doesn't resolve it. The
+dependency-graph *infrastructure* works and was verified independently at every layer (discovery finds the edge; the service map carries
+it; the log query that used to silently fail now returns the right line). What still doesn't work reliably is the model **actually
+following the chain through three specialists and multiple tool calls to the exact right conclusion** for this specific fault. This is a
+different, harder class of problem than "a file wasn't being read" — it is closer to a reasoning-depth / attention limit than a plumbing
+gap, and the honest thing to say about it is that it needs measurement across many more runs (n=2 twice over is not enough to call this
+converged, in either direction) rather than another one-line prompt fix.
+
 ## Why it fails when it fails (v4, and what changed from v1-v3)
 
 1. ~~Anchoring on a real code defect for unrelated outages~~ **fixed for `service_stopped`**: the systemd-lifecycle log lines plus the "commit to a mechanism" state-first rule stopped the code defect from swallowing unrelated failures in that fault; it still happens for `bad_deploy` r2 (SIGKILL blamed) and is the residual pattern for hard kills generally.
@@ -138,7 +175,8 @@ credible story than three targets all scoring well.
 * More than one host; Kubernetes; CloudWatch/Datadog data; IAM/cross-account access; anyone's production but the author's, plus two apps deployed for this test (one is a real, unmodified open-source project — WordPress — the other two were built for the test).
 * The durable Temporal path, Alertmanager, Postgres, the dashboard, approvals and the real remediation write path. The watcher is a single process with SQLite and executes nothing.
 * Alert thresholds tuned on anything but this host; log-volume or memory/CPU faults; the `hung_backend` fault under concurrent load.
-* **Multi-hop cross-service causality.** A generic instruction to "check other services' logs" fixed a one-hop miss (PHP-FPM's own log) but not a two-hop one (nginx -> PHP-FPM -> MariaDB); a real dependency graph is still needed. App-log shipping for arbitrary daemons is real now (`onboard/discover.py`), but only for files it can find by name/process-name globbing — a daemon with an unconventional log path or format isn't covered.
+* **Reliable multi-hop reasoning.** A real, observed dependency graph now exists (`onboard/discover.py::discover_dependencies`, verified independently of the model) and prompts require checking it, but `bad_db_creds` (nginx -> PHP-FPM -> MariaDB, credential change on the far end) is still 0/4 correct across every fix tried. This looks like a model reasoning-depth limit, not a missing tool or missing data — worth a wider, dedicated multi-hop-causality benchmark, not another prompt tweak, before concluding either way.
+* App-log shipping for arbitrary daemons is real now, but only for files `discover_log_files` can find by name/process-name globbing — a daemon with an unconventional log path or format isn't covered. The dependency-observation sampling (`ss` + a warm-up hammer thread) is inherently probabilistic for very short-lived connections; it was reliable in 3/3 tries here but is not a guarantee.
 * True one-command onboarding: discovery + install is two commands and still needs `sudo`, a Python venv and manually-placed LLM credentials.
 
 ## Reproduce

@@ -42,3 +42,5 @@ A change (config, flag, deploy) is usually only the trigger. `category` names wh
 - Name the exact instance / backend / port / commit that is affected; do not describe a whole pool when one member is down.
 - `set_config` is allowed only with a key you saw in a config diff or in the evidence. Never invent a config key or setting; if you cannot name a real key, use `restart_replica`
   (params.service = the service), `revert_commit`, or `escalate`.
+- Check `service_map`'s `calls` for the alerting service (its full transitive dependency chain) and search EACH one's logs explicitly, not only the alerting service's own -- a dependency
+  two hops away is listed directly, so do not stop at the first hop. Never end at `unknown` because a local investigation was empty without having checked `calls` first.
