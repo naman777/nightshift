@@ -10,13 +10,13 @@ OUT="${OUT:-$R/fault_runs.jsonl}"
 # target selection (defaults = the sandbox balancer); the shop API target sets these, see onboard/testapp/
 FAULT_SCRIPT="${FAULT_SCRIPT:-$HERE/faults.sh}"
 ALERT_SELECT="${ALERT_SELECT:-.labels.service==\"lb-sandbox\"}"
-REPORT_GLOB="${REPORT_GLOB:-*_lb-sandbox.json}"
+REPORT_RE="${REPORT_RE:-_lb-sandbox[.]json$}"   # which report files belong to this target
 rounds="${1:-1}"; shift || true
 faults=("$@"); [ ${#faults[@]} -eq 0 ] && read -ra faults <<< "${FAULTS:-crashed_backend config_break idle_client_stats service_stopped}"  # hung_backend is latent under light load (see docs), run it explicitly
 
 sandbox_alerts() { curl -s localhost:9090/api/v1/alerts | jq -r "[.data.alerts[] | select(($ALERT_SELECT) and .state==\"firing\") | .labels.alertname] | join(\",\")"; }
 sandbox_any_alert() { curl -s localhost:9090/api/v1/alerts | jq -r "[.data.alerts[] | select($ALERT_SELECT) | .labels.alertname] | join(\",\")"; }
-report_count()   { ls "$REPORTS"/$REPORT_GLOB 2>/dev/null | wc -l; }
+report_count()   { ls "$REPORTS" 2>/dev/null | grep -cE "$REPORT_RE"; }
 wait_for() { # seconds, command that must print non-empty
   local end=$((SECONDS + $1)); while [ $SECONDS -lt $end ]; do out="$($2)"; [ -n "$out" ] && { echo "$out"; return 0; }; sleep 3; done; return 1; }
 
@@ -39,7 +39,7 @@ for round in $(seq 1 "$rounds"); do
         sleep 3
       done
     fi
-    latest=$(ls -t "$REPORTS"/$REPORT_GLOB 2>/dev/null | head -$(( $(report_count) - before )) | xargs -r -n1 basename | paste -sd, -)
+    latest=$(ls -t "$REPORTS" 2>/dev/null | grep -E "$REPORT_RE" | head -$(( $(report_count) - before )) | paste -sd, -)
     "$FAULT_SCRIPT" "$f" revert
     jq -nc --arg fault "$f" --argjson round "$round" --argjson t_inject "$t_inject" --argjson t_alert "$t_alert" --argjson t_report "$t_report" \
        --arg alerts "$alerts" --arg reports "$latest" \

@@ -1,0 +1,386 @@
+{
+ "alert": {
+  "fingerprint": "EndpointDown-shop-api-1790485778",
+  "name": "EndpointDown",
+  "service": "shop-api",
+  "severity": "critical",
+  "started_at": 1790485778.304267,
+  "labels": {
+   "alertname": "EndpointDown",
+   "instance": "http://127.0.0.1:5000/",
+   "job": "probe-http",
+   "port": "5000",
+   "probe": "http",
+   "service": "shop-api",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "EndpointDown: an endpoint stopped answering its probe",
+   "state_snapshot": "STATE SNAPSHOT at 05:10:37 UTC (window 30m; series that moved, newest information first):\n  CHANGED endpoint_up{service=shop-api,instance=http://127.0.0.1:5000/} now=0, 30m ago=1, moved at 05:09:37 UTC\n  CHANGED endpoint_up{service=nginx,instance=http://127.0.0.1:80/} now=0, 30m ago=1, moved at 05:09:37 UTC\n  STEADY endpoint_up{service=lb,instance=127.0.0.1:8081}=0; endpoint_up{service=lb,instance=http://127.0.0.1:8001/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8002/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8003/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8080/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8090/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8091/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8093/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8094/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8095/}=1; endpoint_latency_seconds{service=lb,instance=127.0.0.1:8081}=3.001; endpoint_latency_seconds{service=shop-api,instance=http://127.0.0.1:5000/}=0.002685; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:80/}=0.002962; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8001/}=0.0004688; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8002/}=0.0005101; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8003/}=0.0004534; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8080/}=0.0005329; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8090/}=0.0005293; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8091/}=0.0004533; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8093/}=0.00042; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8094/}=0.0004238; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8095/}=0.0003993; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=nginx,instance=127.0.0.1:9100,name=nginx.service}=1; unit_active{service=lb-sandbox,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; unit_active{service=nsbox-lb,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; unit_active{service=shop-api,instance=127.0.0.1:9100,name=shop-api.service}=1; host_cpu_ratio{service=host}=0.03; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1509; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2328"
+  }
+ },
+ "timings": {
+  "fired_at": 1790485778.304267,
+  "detected_at": 1790485837.5597315,
+  "reported_at": 1790485896.598046,
+  "investigation_s": 59.01040482521057
+ },
+ "incident_id": "inc-EndpointDown-shop-api-1790485778",
+ "mode": "multi",
+ "report": {
+  "root_cause": "shop-api experienced repeated process termination by SIGKILL followed by systemd restarts, causing instability of the :5000 endpoint and downstream nginx :80; the evidence does not establish the exact kill source or prove which kill preceded the initial nginx probe failure.",
+  "service": "shop-api",
+  "category": "service_down",
+  "confidence": 0.48,
+  "evidence": [
+   "ev_1595",
+   "ev_1598",
+   "ev_1591",
+   "ev_1594",
+   "ev_1558"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host-wide resource contention caused both probe failures.",
+    "evidence": [
+     "ev_1593",
+     "ev_1564"
+    ]
+   },
+   {
+    "hypothesis": "nginx proxy_pass change to port 5001 caused the incident.",
+    "evidence": [
+     "ev_1567",
+     "ev_1585"
+    ]
+   },
+   {
+    "hypothesis": "shop-api discount-factor deploy SHA 60740e12 is established as the failure cause.",
+    "evidence": [
+     "ev_1583",
+     "ev_1586",
+     "ev_1590"
+    ]
+   },
+   {
+    "hypothesis": "lb :8081 TCP endpoint failure caused the shop-api/nginx probe failures.",
+    "evidence": [
+     "ev_1563",
+     "ev_1569"
+    ]
+   },
+   {
+    "hypothesis": "lb-sandbox all-backends-unreachable errors are tied to this incident.",
+    "evidence": [
+     "ev_1597"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "shop-api process repeatedly terminated by SIGKILL and restarted, creating instability at its :5000 endpoint and downstream nginx :80; exact causal timing/source of kills is unverified.",
+    "service": "shop-api",
+    "category": "service_down",
+    "confidence": 0.48
+   },
+   {
+    "root_cause": "nginx :80 endpoint failure not otherwise explained by its lifecycle logs; the endpoint first goes down before shop-api :5000, but the initiating mechanism is unproven.",
+    "service": "nginx",
+    "category": "unknown",
+    "confidence": 0.25
+   },
+   {
+    "root_cause": "Unidentified host-level trigger causing shop-api process instability; available CPU and memory data do not strongly support contention.",
+    "service": "host",
+    "category": "unknown",
+    "confidence": 0.15
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "shop-api owning team",
+   "params": {
+    "reason": "Investigate source of SIGKILLs and coordinate a controlled recovery; no specific reversible mitigation is supported by current evidence."
+   },
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 250685,
+   "output_tokens": 13781,
+   "cost_usd": 0.03196,
+   "llm_calls": 51,
+   "tool_calls": 76,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 3,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "shop-api owning team",
+  "params": {
+   "reason": "Investigate the source and timing of repeated SIGKILLs and coordinate controlled recovery; evidence does not establish a safe reversible mitigation."
+  },
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 250685,
+  "output_tokens": 13781,
+  "cost_usd": 0.03196,
+  "llm_calls": 51,
+  "tool_calls": 76,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At 05:09:37 UTC, what changed in endpoint latency/up and resource metrics for shop-api :5000, nginx :80, and lb :8081 versus their healthy peers?",
+   "summary": "At and around 05:09:37 UTC the clearest change was a shared intermittent latency/availability problem on shop-api :5000 and nginx :80, while the lb :8081 TCP probe stayed unavailable with steady latency; the LB HTTP peer endpoints stayed up and fast. Resource evidence shows host memory rising but CPU and disk were not anomalous; unavailable window comparisons leave resource impact and exact peer-relative ratios uncertain. [endpoint_latency_seconds name=endpoint_latency_seconds service=shop-api:5000 ratio=~900x at spikes vs normal ~0.0016s onset=1790484526] [endpoint_up name=endpoint_up service=shop-api:5000 ratio=0 vs 1 healthy peers intermittently onset=1790484914] [endpoint_latency_seconds name=endpoint_latency_seconds service=nginx:80 ratio=~790x at spikes vs normal ~0.0019s onset=1790484526] [endpoint_up name=endpoint_up service=nginx:80 ratio=0 vs 1 healthy peers intermittently onset=1790484764] [endpoint_up name=endpoint_up service=lb:8081 ratio=0 vs healthy HTTP LB peers 1 onset=unknown, already down throughout sampled window] [endpoint_latency_seconds name=endpoint_latency_seconds service=lb:8081 ratio=1.0 vs pre-window baseline onset=none] [host_memory_used_ratio name=host_memory_used_ratio service=host ratio=1.17 vs baseline onset=1790485036] [host_cpu_ratio name=host_cpu_ratio service=host ratio=unknown/no distinct onset onset=none] [host_disk_used_ratio name=host_disk_used_ratio service=host ratio=unknown/no distinct onset onset=none]. Evidence refs: call_1 identified recorded anomalies and baseline ratios; call_2 provides per-instance endpoint up and exact sampled changes/current values; call_3 provides endpoint latency and healthy LB peer series; call_4/call_5/call_6 provide host CPU, memory, and disk; call_7 shows service units active (shop-api is active at the last sample); call_8 verifies lb:8081 latency remained unchanged (ratio 1.0). Resource comparison calls call_10\u2013call_12 and up comparison call_9 were blocked by budget.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1560",
+    "ev_1561",
+    "ev_1562",
+    "ev_1563",
+    "ev_1564",
+    "ev_1565"
+   ],
+   "usage": {
+    "input_tokens": 31241,
+    "output_tokens": 1926,
+    "cost_usd": 0.004086,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do shop-api.service and nginx.service logs show immediately around 05:09:37 UTC, including any clean stop/reload or listener errors?",
+   "summary": "Inconclusive: the available searches returned no lines for either shop-api.service or nginx.service, so there is no evidence here about their activity immediately around 05:09:37 UTC or whether either cleanly stopped/reloaded or had listener errors. [log service=shop-api.service level=unknown count=0 first_seen=unknown sig=\"no matching lines returned\"] [log service=nginx.service level=unknown count=0 first_seen=unknown sig=\"no matching lines returned\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1556",
+    "ev_1557"
+   ],
+   "usage": {
+    "input_tokens": 5587,
+    "output_tokens": 438,
+    "cost_usd": 0.000777,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Which changes to shop-api, nginx, and lb were still in effect at 05:09:37 UTC, and did any relevant change occur before the endpoint failures?",
+   "summary": "At 05:09:37 UTC (Unix 1790485777), the latest shop-api deploy was SHA 60740e12 at 05:09:18 (1790485758), adding discount_factor handling; no later revert is present in the supplied deploy evidence, so it was still in effect. The nginx upstream-to-5001 change from SHA fa5312b9 (05:06:00) had been reverted by SHA 61f7035d (05:08:58), so that change was no longer in effect at onset; nginx retained the 15s read timeout from SHA e86657d4. The config value slow_ms=1500 introduced at 05:01:55 by 648593a8 had been restored to 0 by 59513881 at 05:05:31. Earlier config increased db_timeout_ms to 2500, and no restoring commit is shown. There is no lb change evidence, nor endpoint-failure onset timestamp/evidence in the available tool results; therefore I cannot establish whether any still-active change occurred shortly before endpoint failures or assess lb state. [change kind=deploy service=shop-api sha=60740e12 ts=1790485758 key=home.orders old=count(*) new=count(*)*discount_factor msg=\"feat: apply discount factor to order count on home page\"] [change kind=config service=nginx sha=fa5312b9 ts=1790485560 key=proxy_pass old=127.0.0.1:5000 new=127.0.0.1:5001 msg=\"nginx: move upstream to new app port 5001\"] [change kind=config service=nginx sha=61f7035d ts=1790485738 key=proxy_pass old=127.0.0.1:5001 new=127.0.0.1:5000 msg=\"Revert nginx upstream move\"] [change kind=config service=nginx sha=e86657d4 ts=1790483772 key=proxy_read_timeout old=10s new=15s msg=\"nginx: allow slower upstream responses\"] [change kind=config service=shop-api sha=648593a8 ts=1790485315 key=slow_ms old=0 new=1500 msg=\"config: warm cache with 1500ms delay before serving\"] [change kind=config service=shop-api sha=59513881 ts=1790485531 key=slow_ms old=1500 new=0 msg=\"Revert warm cache delay\"] [change kind=config service=shop-api sha=48a6d9e8 ts=1790483772 key=db_timeout_ms old=2000 new=2500 msg=\"config: raise db timeout to 2500ms\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1566",
+    "ev_1567",
+    "ev_1568",
+    "ev_1569"
+   ],
+   "usage": {
+    "input_tokens": 32113,
+    "output_tokens": 1475,
+    "cost_usd": 0.003948,
+    "llm_calls": 6,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "code",
+   "question": "Do the shop-api or nginx code/config paths contain a mechanism matching simultaneous :5000 and :80 probe failures while both systemd units remain active?",
+   "summary": "[code file=nginx/shop.conf smell=none tests=fail] The inspected nginx configuration accepts requests on port 80 and proxies them to 127.0.0.1:5000 with a 15-second upstream read timeout (call_10). That establishes the relationship between the two probe ports, but shows no shared failure mechanism or behavior that would explain both probes failing while both systemd units remain active; its relevance to the stated symptom is therefore unconfirmed, and there is no evidence the configured timeout or any other trigger occurred (trigger=unknown). [code file=shop-api unknown smell=none tests=fail] No shop-api source or systemd unit details were obtained, and the test runner rejected the attempted `all` target as not allow-listed, so the question cannot be resolved from the available evidence (call_3, call_7, call_11, call_12).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1558",
+    "ev_1559"
+   ],
+   "usage": {
+    "input_tokens": 65103,
+    "output_tokens": 841,
+    "cost_usd": 0.006932,
+    "llm_calls": 6,
+    "tool_calls": 10,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "metrics",
+   "question": "For shop-api :5000 and nginx :80, provide the exact time series around 05:09:18 deploy and 05:09:37 alert onset, including whether failures/latency spikes persistently start before or after the deploy and whether the 1.5s latency correlates between the two endpoints.",
+   "summary": "The 30-minute series show the 1.5s latency spikes align exactly on shop-api :5000 and nginx :80, first at Unix 1790484530 and again at 1790485400, with normal sub-4ms samples between; they are intermittent, not persistent. At the first spike the shop-api and nginx probes were still up, then nginx first records down at 1790484770 and shop-api at 1790484920, so failures begin after the spike/deploy-era window rather than persistently preceding it. Deploy/alert times were not independently timestamped by metrics tools; the available records are insufficient to assign precise onset relative to 05:09:18 and 05:09:37. Series remain available through current sample 1790485865, with both probes down at that endpoint. Ratio fields below are point latency relative to nearby ordinary ~0.002s samples (approximately 750x), and up/down values are relative to healthy=1.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1575",
+    "ev_1576",
+    "ev_1577",
+    "ev_1578",
+    "ev_1579",
+    "ev_1580",
+    "ev_1581"
+   ],
+   "usage": {
+    "input_tokens": 10652,
+    "output_tokens": 1512,
+    "cost_usd": 0.001822,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "Search shop-api.service and nginx.service logs specifically from 05:08:30\u201305:11:00 UTC; identify any clean stop/reload, crash, listener error, timeout, or app exception and establish which component's event occurred first.",
+   "summary": "Inconclusive: the requested incident window could not be inspected. Queries for both services over 05:08:30\u201305:11:00 UTC failed because the tools rejected the ISO timestamp format. Relative systemd searches for shop-api.service found no matching Stopping, Stopped, Deactivated, or Started lines, but do not establish what occurred during the requested interval. The Failed search and all nginx lifecycle searches were cut off by tool-budget exhaustion. I cannot determine whether either component had a stop/reload, crash, listener error, timeout, or app exception, or which component's event came first. [log service=shop-api.service level=unknown count=0 first_seen=unknown sig=\"requested-window query failed; no log evidence\"] [log service=nginx.service level=unknown count=0 first_seen=unknown sig=\"requested-window query failed; no log evidence\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1572",
+    "ev_1573",
+    "ev_1574"
+   ],
+   "usage": {
+    "input_tokens": 4884,
+    "output_tokens": 1243,
+    "cost_usd": 0.00111,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Determine whether shop-api SHA 60740e12 was actually loaded at 05:09:37 and whether it changed request-path behavior relevant to the failing :5000 probe; report deploy/reload timing and any subsequent change.",
+   "summary": "Inconclusive on whether SHA 60740e12 was actually loaded at 05:09:37: the observed records show its deploy timestamp (1790485758, 05:09:18 UTC), but provide no runtime reload/load event. Its code changes only the `/` response's order-count calculation by multiplying by `cfg()[\"discount_factor\"]`; it does not change the request path or listener/upstream port relevant to a failing :5000 probe. A later deploy, 8cba97a6 at 1790484899 (05:08:19 UTC), had the same code change and was reverted by 62d678b8 at 1790485109 (05:11:59 UTC); 60740e12 is the later redeployment of that behavior. No subsequent revert of 60740e12 is established by the available deploy evidence, so whether it remained in effect at the probe onset is uncertain. The observed port change 5000\u21925001 was reverted to 5000 before the later deploys; those config changes are not a cause of a probe at 05:09:37 based on the evidence available.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1582",
+    "ev_1583",
+    "ev_1584",
+    "ev_1585",
+    "ev_1586"
+   ],
+   "usage": {
+    "input_tokens": 17371,
+    "output_tokens": 1248,
+    "cost_usd": 0.002362,
+    "llm_calls": 5,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Inspect the shop-api code at SHA 60740e12 around discount_factor handling and the probe/home request path; identify any concrete blocking/error mechanism that can explain ~1.5s latency followed by intermittent endpoint failure, or rule it out.",
+   "summary": "Inconclusive: the source search could not identify shop-api application files or inspect the discount_factor/probe/home path, so there is no code evidence to attribute the ~1.5s latency or intermittent failure to a blocking/error mechanism, nor to rule one out. The requested pytest run did not execute because the sandbox reports Python is unavailable. [code file=unknown smell=none tests=fail]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1570",
+    "ev_1571"
+   ],
+   "usage": {
+    "input_tokens": 15034,
+    "output_tokens": 431,
+    "cost_usd": 0.001719,
+    "llm_calls": 4,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "Using an accepted relative time range covering the incident, what exact shop-api.service and nginx.service lifecycle/error events occurred around the first sustained :5000/:80 probe-down period, and which event occurred first?",
+   "summary": "Using a 24-hour relative range, the evidence shows shop-api lifecycle activity around 04:36\u201305:09 on Sep 27 and an nginx restart at 04:36:13, but the sampled records do not establish which of these occurred around the first sustained :5000/:80 probe-down interval. The exact first event therefore cannot be determined from these results. [log service=shop-api level=info count=25 first_seen=1790483772 sig=\"systemd lifecycle and process exit/restart messages\"] [log service=nginx level=info count=7 first_seen=1790483766 sig=\"systemd Starting/Started/Stopping/Stopped/Deactivated lifecycle messages\"] [log service=lb-sandbox level=error count=1056 first_seen=1790460419 sig=\"All backends unreachable \u2014 dropping connection\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1595",
+    "ev_1596",
+    "ev_1597",
+    "ev_1598"
+   ],
+   "usage": {
+    "input_tokens": 18662,
+    "output_tokens": 970,
+    "cost_usd": 0.002351,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "metrics",
+   "question": "At the first sustained endpoint-down transition, do shop-api:5000 and nginx:80 transition together or does one lead, and is there contemporaneous evidence of host CPU/memory contention?",
+   "summary": "The first sustained simultaneous endpoint-down interval starts at the nginx:80 probe transition (first down sample 1790484770) while shop-api:5000 is still up at 1790484770; shop-api first goes down at 1790484950, so nginx leads by about 180 seconds. nginx remains down at current sample 1790485880; shop-api also is down currently. No convincing host resource contention is evident: CPU is low (around 0.03 baseline with intermittent samples ~0.14\u20130.15, max 0.1631) and memory is only ~0.15 of capacity, although memory rose modestly from ~0.126\u20130.138 to ~0.149\u20130.153 around 1790485010. Service unit-active metrics stayed 1 throughout, so probe failures were not accompanied by observed unit inactivity. Evidence: calls call_2 through call_7; compare-window evidence for shop-api call_8.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_1591",
+    "ev_1592",
+    "ev_1593",
+    "ev_1594"
+   ],
+   "usage": {
+    "input_tokens": 10821,
+    "output_tokens": 1184,
+    "cost_usd": 0.001674,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Was shop-api SHA 60740e12 actually loaded and still active at the first sustained endpoint-down transition, and is there any evidence its / handler change could affect the probe response?",
+   "summary": "SHA 60740e12 cannot be established as loaded at the first sustained endpoint-down transition: available deploy history only shows it shipped at 1790485758, and its exact diff changes only the `/` response's `orders` calculation by multiplying the database count by `cfg()[\"discount_factor\"]` (call_1, call_3). The evidence includes an earlier revert of the same handler change at 1790485109 (call_2); because the 60740e12 redeploy reintroduces it later, that earlier revert does not demonstrate it was reverted after 60740e12. We lack the endpoint-down onset timestamp, runtime/load evidence, and later post-SHA commits needed to say it was active at onset or still in effect then. If the probe checks `/` for successful HTTP response rather than validating the `orders` value, the shown arithmetic/JSON-body change does not itself indicate an effect on probe success; no probe definition is available to confirm its exact criteria.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1587",
+    "ev_1588",
+    "ev_1589",
+    "ev_1590"
+   ],
+   "usage": {
+    "input_tokens": 8494,
+    "output_tokens": 796,
+    "cost_usd": 0.001248,
+    "llm_calls": 3,
+    "tool_calls": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

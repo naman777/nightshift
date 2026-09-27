@@ -151,8 +151,8 @@ def test_generated_profile_is_valid_yaml_and_consistent(tmp_path):
     rules = yaml.safe_load(render_rules(svcs))
     exprs = {r.get("record") or r.get("alert"): r["expr"] for g in rules["groups"] for r in g["rules"]}
     assert {"endpoint_up", "unit_active", "EndpointDown", "UnitDown"} <= set(exprs)
-    assert 'name=~"(lb|api).service"' in exprs["unit_active"]
-    assert unit_include(svcs) == "(lb|api).service"
+    assert 'name=~"(lb|api)[.]service"' in exprs["unit_active"]
+    assert unit_include(svcs) == "(lb|api)[.]service"
     cat = render_catalogue(svcs)
     assert cat["endpoint_up"] == ["lb", "api"] and cat["host_cpu_ratio"] == ["host"]
     sm = render_service_map(svcs)
@@ -186,3 +186,39 @@ def test_classify_port_http_vs_silent():
     assert classify_port("127.0.0.1", serve(b"HTTP/1.1 200 OK\r\n\r\n"), timeout=1).probe == "http"
     silent = classify_port("127.0.0.1", serve(None), timeout=0.5)
     assert silent.probe == "tcp" and "UNRESPONSIVE" in silent.note
+
+
+def test_repo_from_etc_follows_config_symlinks(tmp_path):
+    import os
+
+    import pytest
+
+    from onboard.discover import repo_from_etc
+
+    (tmp_path / "etc" / "nginx" / "conf.d").mkdir(parents=True)
+    (tmp_path / "app" / ".git").mkdir(parents=True)
+    (tmp_path / "app" / "nginx").mkdir()
+    (tmp_path / "app" / "nginx" / "a.conf").write_text("x")
+    try:
+        os.symlink(tmp_path / "app" / "nginx" / "a.conf", tmp_path / "etc" / "nginx" / "conf.d" / "a.conf")
+    except OSError:
+        pytest.skip("symlinks not permitted on this OS")
+    assert repo_from_etc({"nginx"}, str(tmp_path / "etc")) == str((tmp_path / "app").resolve())
+    assert repo_from_etc({"apache2"}, str(tmp_path / "etc")) == ""
+
+
+def test_watch_env_has_no_cross_service_repo_fallback():
+    from onboard.discover import Endpoint, Service, render_watch_env
+
+    env = render_watch_env([Service("a", "a.service", set(), [Endpoint(1, "http")], repo="/r/a"), Service("b", "b.service", set(), [Endpoint(2, "http")])], "/x")
+    assert "CONFIG_REPO=" not in env.replace("NIGHTSHIFT_CONFIG_REPOS=", "") and '"a": "/r/a"' in env
+
+
+def test_generated_rules_use_no_backslashes_in_promql_strings():
+    """promtool rejected `nsbox\-lb` (an invalid PromQL escape); unit names with '-' must pass through untouched."""
+    from onboard.discover import Endpoint, Service, render_rules, unit_include
+
+    svcs = [Service("nsbox-lb", "nsbox-lb.service", set(), [Endpoint(1, "http")]), Service("shop-api", "shop-api.service", set(), [Endpoint(2, "http")])]
+    assert unit_include(svcs) == "(nsbox-lb|shop-api)[.]service"
+    unit_expr = [l for l in render_rules(svcs).splitlines() if "node_systemd_unit_state" in l][0]
+    assert "\-" not in unit_expr and 'name=~"(nsbox-lb|shop-api)[.]service"' in unit_expr
