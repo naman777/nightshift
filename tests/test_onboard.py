@@ -238,3 +238,85 @@ def test_disk_alert_attributes_a_nested_mount_to_the_longer_repo_path():
     rules = yaml.safe_load(render_rules(svcs))
     alerts = {r["alert"]: r["expr"] for g in rules["groups"] for r in g["rules"] if "alert" in r}
     assert alerts["DiskFull"] == "disk_used_ratio > 0.9"
+
+
+# -- unix-socket backend discovery + app log-file shipping ------------------------------------------------------------------------------
+
+SS_UNIX_SAMPLE = """u_str LISTEN 0      4096                          /run/php/php8.5-fpm.sock 8742696 * 0 users:(("php-fpm8.5",pid=1453548,fd=10),("php-fpm8.5",pid=1453547,fd=10))
+u_str LISTEN 0      4096                    /var/lib/amazon/ssm/ipc/health 67198   * 0 users:(("amazon-ssm-agen",pid=17576,fd=9))
+u_dgr UNCONN 0      0                        /run/user/1000/systemd/notify 9105069 * 0 users:(("systemd",pid=1,fd=18))
+"""
+
+
+def test_parse_ss_unix_extracts_socket_path_and_pid():
+    from onboard.discover import parse_ss_unix
+
+    listeners = parse_ss_unix(SS_UNIX_SAMPLE)
+    assert listeners["/run/php/php8.5-fpm.sock"] == ("php-fpm8.5", 1453548)  # first user= entry wins
+    assert "/run/user/1000/systemd/notify" not in listeners  # u_dgr (datagram), not u_str LISTEN -- not matched
+
+
+def test_unix_backends_resolves_nginx_fastcgi_pass(tmp_path):
+    from onboard.discover import Endpoint, Service, unix_backends
+
+    (tmp_path / "nginx").mkdir()
+    (tmp_path / "nginx" / "wordpress.conf").write_text("server {\n  fastcgi_pass unix:/run/php/php8.5-fpm.sock;\n}\n")
+    nginx = Service("nginx", "nginx.service", {"nginx"}, [Endpoint(8200, "http")], repo=str(tmp_path))
+    listeners = {"/run/php/php8.5-fpm.sock": ("php-fpm8.5", 1453548), "/run/other.sock": ("other", 99)}
+    assert unix_backends([nginx], listeners) == {"/run/php/php8.5-fpm.sock": ("php-fpm8.5", 1453548)}
+    assert unix_backends([Service("x", "x.service", set(), [])], listeners) == {}  # no repo -> nothing to scan
+
+
+def test_discover_log_files_matches_service_and_process_names(tmp_path, monkeypatch):
+    import onboard.discover as d
+
+    monkeypatch.setattr(d, "Path", d.Path)  # no-op, keeps normal Path; we point discover_log_files at a fake /var/log via monkeypatch below
+    fake_var_log = tmp_path / "var_log"
+    (fake_var_log).mkdir()
+    (fake_var_log / "php8.5-fpm.log").write_text("x")
+    (fake_var_log / "mysql").mkdir()
+    (fake_var_log / "mysql" / "error.log").write_text("x")
+    real_path_cls = d.Path
+
+    def fake_path(arg="/var/log"):
+        return real_path_cls(fake_var_log) if arg == "/var/log" else real_path_cls(arg)
+
+    monkeypatch.setattr(d, "Path", fake_path)
+    assert str(fake_var_log / "php8.5-fpm.log") in d.discover_log_files("php8.5-fpm", {"php-fpm8.5"})
+    assert str(fake_var_log / "mysql" / "error.log") in d.discover_log_files("mysql", {"mariadbd"})
+    assert d.discover_log_files("nonexistent-thing", {"nope"}) == []
+
+
+def test_grantable_log_files_only_lists_unreadable_ones(tmp_path, monkeypatch):
+    import os
+
+    from onboard.discover import Endpoint, Service, grantable_log_files
+
+    readable = tmp_path / "readable.log"; readable.write_text("x")
+    a = Service("a", "a.service", set(), [Endpoint(1, "http")], log_files=[str(readable)])
+    real_access = os.access
+
+    def fake_access(path, mode):
+        if str(path).endswith("secret.log"):
+            return False
+        return real_access(path, mode)
+
+    monkeypatch.setattr(os, "access", fake_access)
+    b = Service("b", "b.service", set(), [Endpoint(2, "http")], log_files=[str(tmp_path / "secret.log")])
+    assert grantable_log_files([a, b]) == [str(tmp_path / "secret.log")]
+
+
+def test_render_alloy_adds_a_file_source_for_app_logs():
+    from onboard.discover import Endpoint, Service, render_alloy
+
+    s = Service("mysql", "mariadb.service", set(), [Endpoint(3306, "tcp")], log_files=["/var/log/mysql/error.log"])
+    out = render_alloy([s])
+    assert 'loki.source.file "mysql_file_0"' in out and '"__path__" = "/var/log/mysql/error.log"' in out and '"service" = "mysql"' in out
+
+
+def test_service_map_notes_unix_socket_and_app_logs():
+    from onboard.discover import Endpoint, Service, render_service_map
+
+    s = Service("php-fpm", "php8.5-fpm.service", {"php-fpm8.5"}, [Endpoint(0, "unix", path="/run/php/php8.5-fpm.sock")], log_files=["/var/log/php8.5-fpm.log"])
+    role = render_service_map([s])["services"]["php-fpm"]["role"]
+    assert "/run/php/php8.5-fpm.sock (unix socket)" in role and "/var/log/php8.5-fpm.log" in role

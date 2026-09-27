@@ -22,7 +22,7 @@ working in a specific, explainable way; see below. **Real language model through
 | Diagnosis quality, round 1 (prompts v1-v3, hand-written config) | Mixed: 7 correct, 3 partial, 8 wrong of 18 scored, plus 1 fault (frozen backend) never detected. |
 | Diagnosis quality, round 2 (prompt v4, auto-discovered config) — **same LB target** | **15 correct, 1 partial, 0 wrong of 16** (4 fault types x 4 rounds). |
 | Diagnosis quality, round 2 — **held-out shop-API target** (never seen while writing v4) | **9 correct, 1 partial, 2 wrong of 12** (3 rounds x 4 fault types), plus **1 run produced no report at all**. All 3 misses are the same fault type: see "The one fault type it still misses" below. |
-| Diagnosis quality, round 3 — **real WordPress** (nginx + PHP-FPM + MariaDB, no code changes to Nightshift) | **2 correct, 4 partial, 4 wrong of 10.** Noticeably worse than the other two targets, for a specific, explainable reason: see "Where generic black-box monitoring stops working" below. |
+| Diagnosis quality, round 3 — **real WordPress** (nginx + PHP-FPM + MariaDB) | Initial: **2 correct, 4 partial, 4 wrong of 10** — worse than the other targets, for a specific reason (below). After shipping PHP-FPM's log and discovering it as a service (same session, still round 3): re-ran the 2 failing faults, **1 improved to correct** (PHP-FPM pool exhaustion), **1 still wrong** (a two-hop DB credential failure that needs real dependency inference, not just a prompt nudge). |
 
 ## What was installed on the host (all removable with `onboard/uninstall_host.sh --purge`)
 
@@ -93,18 +93,36 @@ symlink-following added for this round — nginx's config repo. No hand-written 
 | Uploads volume filled to 99.9% (`disk_full`) | **partial x2** | Both runs correctly surfaced the exact mount and the exact 99.9% figure (the generated `disk_used_ratio` alert and per-service attribution worked), but then hedged ("cannot determine whether this is a real fill or a metric artifact") instead of committing to `resource_leak`/`capacity`, even though "over 90% full" is unambiguous. |
 
 **Why this target is harder, and it is not a prompting problem:** the LB and shop-API targets both fail in ways that are visible to a
-generic collector — a process/unit dies (systemd lifecycle logs), a config file changes (git diff), a probe times out (blackbox). Two of
-WordPress's four failure mechanisms here are only visible **inside the application**: MySQL's own "access denied" error and PHP's fatal
-"error establishing a database connection" are never written anywhere the generic Loki/journald pipeline reads (MariaDB logs to its own
-file by default, not journald; the browser-visible PHP error doesn't reach a log at all in this configuration). A generic auto-discovery
-collector has a real, principled floor: it sees state (up/down), config (git diffs) and black-box latency/availability, and stops there.
-Getting the rest requires either app-specific log shipping (MariaDB's error log, PHP-FPM's own error log) or a resource-specific exporter
-(a PHP-FPM status-page exporter, the same pattern as `onboard/lb_stats_exporter.py` for the C++ balancer). Neither was built for this round.
+generic collector — a process/unit dies (systemd lifecycle logs), a config file changes (git diff), a probe times out (blackbox).
 
-This is the most useful finding of the three rounds for an interview: **"we tested on WordPress and it did worse" is more credible, not
-less, than three targets all scoring well** — it shows the honest edge of what black-box discovery covers, and names exactly what closes
-the gap (app log shipping, cross-service correlation, a resource-specific exporter per stateful backend), rather than claiming universal
-coverage.
+**First correction, from actually checking rather than assuming:** MariaDB on this distro logs to journald by default (`log_error` is
+commented out, so its stdout — captured by systemd — carries the exact line `Access denied for user 'wordpress'@'localhost' (using
+password: YES)` during `bad_db_creds`), and it was already being shipped, because `discover.py` gives every discovered service a journal
+source. The `logs__search` tool already accepts any service name or none. **Nothing was missing; the model just never looked.** The
+`nginx` investigation for `bad_db_creds` never queried MariaDB's logs, because nothing told it a two-hop dependency existed. What *was*
+genuinely missing: PHP-FPM writes its own error log to a file (`/var/log/php8.5-fpm.log`, root-only, never in journald), and PHP-FPM had
+no TCP port so `discover.py` never saw it as a service at all — it was invisible, not just unread.
+
+### The two fixes shipped for this, and what each one actually bought
+
+1. **Unix-socket backend discovery** (`onboard/discover.py::unix_backends`): resolves an nginx `fastcgi_pass unix:...` target to
+   whichever process is listening on that socket, the same way a TCP port resolves to a service — this is what makes PHP-FPM (or uWSGI,
+   or a unix-socket gunicorn) a first-class discovered service at all, with `unit_active` tracking, even though it has no probeable port.
+2. **App-log-file discovery + shipping** (`discover_log_files`, a new `loki.source.file` block per file, `install_host.sh` granting
+   `adm`-group read on root-only files): ships a daemon's own error log when it doesn't use journald.
+3. **A one-line prompt nudge** (`agents/prompts/v4/logs.md`): search other services' logs, not only the alerting one, when the local ones
+   are empty or unhelpful.
+
+**Re-running `fpm_starved` (2 more rounds) after these landed: 1 correct, 1 still wrong** (previously 1 wrong, 1 partial). The correct run
+named the exact mechanism — `php8.5-fpm`'s pool repeatedly hit its one-worker limit — because PHP-FPM's own log line
+(`WARNING: [pool www] server reached pm.max_children setting (1), consider raising it`) was now reachable, and PHP-FPM was now a service
+the model could name at all. **Re-running `bad_db_creds` (2 more rounds): still 0 correct.** The prompt nudge got the logs specialist as
+far as PHP-FPM's FastCGI reset log (one hop away) but not to MariaDB's `Access denied` line (two hops away) in either run. A one-line
+"check other services" instruction closes a one-hop gap; it does not substitute for an actual dependency graph.
+
+This is the most useful finding of the three rounds for an interview: **"we tested on WordPress, it did worse, and here's exactly which
+of the two failures we could fix in an afternoon and which one needs the dependency-graph work already on the backlog"** is a far more
+credible story than three targets all scoring well.
 
 ## Why it fails when it fails (v4, and what changed from v1-v3)
 
@@ -119,7 +137,8 @@ coverage.
 
 * More than one host; Kubernetes; CloudWatch/Datadog data; IAM/cross-account access; anyone's production but the author's, plus two apps deployed for this test (one is a real, unmodified open-source project — WordPress — the other two were built for the test).
 * The durable Temporal path, Alertmanager, Postgres, the dashboard, approvals and the real remediation write path. The watcher is a single process with SQLite and executes nothing.
-* Alert thresholds tuned on anything but this host; log-volume or memory/CPU faults; the `hung_backend` fault under concurrent load; cross-service causality (round 3 shows this is a real, currently-missing capability, not a hypothetical one); app-specific log shipping or exporters for MySQL/PHP-FPM (also shown as missing by round 3).
+* Alert thresholds tuned on anything but this host; log-volume or memory/CPU faults; the `hung_backend` fault under concurrent load.
+* **Multi-hop cross-service causality.** A generic instruction to "check other services' logs" fixed a one-hop miss (PHP-FPM's own log) but not a two-hop one (nginx -> PHP-FPM -> MariaDB); a real dependency graph is still needed. App-log shipping for arbitrary daemons is real now (`onboard/discover.py`), but only for files it can find by name/process-name globbing — a daemon with an unconventional log path or format isn't covered.
 * True one-command onboarding: discovery + install is two commands and still needs `sudo`, a Python venv and manually-placed LLM credentials.
 
 ## Reproduce

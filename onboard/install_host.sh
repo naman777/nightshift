@@ -10,6 +10,14 @@ mkdir -p "$ROOT/host" "$ROOT/data/prometheus" "$ROOT/data/loki" "$ROOT/data/allo
 cp "$SRC/catalogue.json" "$SRC/service_map.json" "$ROOT/host/"
 [ -f "$SRC/watch.env" ] && cp "$SRC/watch.env" "$ROOT/host/watch.env"
 UNIT_INC="$(cat "$SRC/unit_include.txt" 2>/dev/null || echo "(lb|nsbox-lb).service")"
+# app-level log files discover.py found but this user can't read (e.g. a root-only daemon log): grant the adm group read access
+# so alloy (which runs with SupplementaryGroups=adm) can tail them. Known limitation: a logrotate that recreates the file with
+# fresh root-only permissions undoes this until the next install run.
+if [ -f "$SRC/log_grants.txt" ] && [ -s "$SRC/log_grants.txt" ]; then
+  while IFS= read -r f; do
+    [ -f "$f" ] && sudo -n chgrp adm "$f" 2>/dev/null && sudo -n chmod g+r "$f" 2>/dev/null
+  done < "$SRC/log_grants.txt"
+fi
 for f in prometheus.yml rules.yml blackbox.yml loki.yml config.alloy; do
   sed "s#/__ROOT__#/$R#g" "$SRC/$f" > "$ROOT/host/$f"
 done
