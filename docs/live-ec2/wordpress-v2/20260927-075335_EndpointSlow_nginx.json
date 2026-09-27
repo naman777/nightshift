@@ -1,0 +1,348 @@
+{
+ "alert": {
+  "fingerprint": "EndpointSlow-nginx-1790495468",
+  "name": "EndpointSlow",
+  "service": "nginx",
+  "severity": "warning",
+  "started_at": 1790495468.304267,
+  "labels": {
+   "alertname": "EndpointSlow",
+   "instance": "http://127.0.0.1:8200/",
+   "job": "probe-http",
+   "port": "8200",
+   "probe": "http",
+   "service": "nginx",
+   "severity": "warning"
+  },
+  "annotations": {
+   "summary": "EndpointSlow: an endpoint takes more than 1s to answer its probe",
+   "state_snapshot": "STATE SNAPSHOT at 07:52:33 UTC (window 30m; series that moved, newest information first):\n  CHANGED endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:8200/} now=1.139, 30m ago=0.04492, moved at 07:51:03 UTC\n  CHANGED host_cpu_ratio{service=host} now=0.6151, 30m ago=0.0306, moved at 07:51:18 UTC\n  STEADY endpoint_up{service=mariadb,instance=127.0.0.1:3306}=1; endpoint_up{service=lb,instance=127.0.0.1:8081}=0; endpoint_up{service=shop-api,instance=http://127.0.0.1:5000/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:80/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8001/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8002/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8003/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8080/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8090/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8091/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8093/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8094/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8095/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:8200/}=1; endpoint_latency_seconds{service=mariadb,instance=127.0.0.1:3306}=0.000258; endpoint_latency_seconds{service=lb,instance=127.0.0.1:8081}=3.001; endpoint_latency_seconds{service=shop-api,instance=http://127.0.0.1:5000/}=0.001951; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:80/}=0.003901; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8001/}=0.0005729; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8002/}=0.0006721; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8003/}=0.0007199; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8080/}=0.002831; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8090/}=0.0005812; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8091/}=0.0005444; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8093/}=0.0004708; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8094/}=0.0003713; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8095/}=0.0006211; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=mariadb,instance=127.0.0.1:9100,name=mariadb.service}=1; unit_active{service=nginx,instance=127.0.0.1:9100,name=nginx.service}=1; unit_active{service=nsbox-lb,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; unit_active{service=php8.5-fpm,instance=127.0.0.1:9100,name=php8.5-fpm.service}=1; unit_active{service=shop-api,instance=127.0.0.1:9100,name=shop-api.service}=1; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1984; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.266; disk_used_ratio{service=nginx,instance=127.0.0.1:9100}=0.08265; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2342; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.266"
+  }
+ },
+ "timings": {
+  "fired_at": 1790495468.304267,
+  "detected_at": 1790495553.4505882,
+  "reported_at": 1790495615.3877358,
+  "investigation_s": 61.89551544189453
+ },
+ "incident_id": "inc-EndpointSlow-nginx-1790495468",
+ "mode": "multi",
+ "report": {
+  "root_cause": "php8.5-fpm\u2019s www pool on the nginx :8200 FastCGI path repeatedly hit its single-child limit and restarted, producing intermittent latency and endpoint-down samples; the evidence does not establish what triggered the FPM exits or the live pool configuration.",
+  "service": "php8.5-fpm",
+  "category": "capacity",
+  "confidence": 0.72,
+  "evidence": [
+   "ev_2565",
+   "ev_2566",
+   "ev_2554",
+   "ev_2577",
+   "ev_2581",
+   "ev_2584"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host CPU resource contention is the primary established cause.",
+    "evidence": [
+     "ev_2570",
+     "ev_2571",
+     "ev_2583",
+     "ev_2567"
+    ]
+   },
+   {
+    "hypothesis": "LB backend 127.0.0.1:8081 latency causes nginx :8200 latency.",
+    "evidence": [
+     "ev_2548",
+     "ev_2569"
+    ]
+   },
+   {
+    "hypothesis": "A nginx bad deploy or changed nginx config is established as the cause.",
+    "evidence": [
+     "ev_2561",
+     "ev_2563",
+     "ev_2564"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "php8.5-fpm www pool reached its observed pm.max_children=1 capacity and repeatedly restarted on the FastCGI path serving nginx :8200.",
+    "service": "php8.5-fpm",
+    "category": "capacity",
+    "confidence": 0.72
+   },
+   {
+    "root_cause": "Host CPU contention of unidentified origin contributes to nginx :8200 latency; sampled CPU and latency rise together, with uncertain onset ordering.",
+    "service": "host",
+    "category": "resource_contention",
+    "confidence": 0.45
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "PHP-FPM / platform on-call team",
+   "params": {
+    "reason": "Review php8.5-fpm lifecycle and www-pool configuration around 07:44\u201307:51 UTC; validate safe worker-capacity adjustment and determine why the process repeatedly exited. Do not change worker limits until host memory and active pool configuration are verified."
+   },
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 194975,
+   "output_tokens": 9244,
+   "cost_usd": 0.024118,
+   "llm_calls": 44,
+   "tool_calls": 59,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 3,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "PHP-FPM / platform on-call team",
+  "params": {
+   "reason": "Review php8.5-fpm lifecycle and www-pool configuration around 07:44\u201307:51 UTC; validate safe worker-capacity adjustment and determine why the process repeatedly exited. Do not change worker limits until host memory and active pool configuration are verified."
+  },
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 194975,
+  "output_tokens": 9244,
+  "cost_usd": 0.024118,
+  "llm_calls": 44,
+  "tool_calls": 59,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "Did host CPU pressure or nginx :8200 latency rise first, and what do their time series show around 07:51:03 UTC?",
+   "summary": "Host CPU pressure rose first: its first clear increase was at Unix 1790494873 (07:41:13 UTC), while nginx :8200 latency changed at the same sampled timestamp from about 0.043\u20130.046 s to 0.002 s (so it initially dropped), then surged at 1790495083 (07:44:43 UTC) to 1.1047 s. Around 07:51:03 UTC (Unix 1790495463; nearest samples 1790495473), CPU was elevated at 0.2328 and :8200 latency was high at 1.1101 s; endpoint_up for :8200 was 1 at that sample, after intervening down samples. The plotted samples are sparse, so the first-observed CPU rise precedes the latency surge, but the precise underlying transition between samples is not established. [metric name=host_cpu_ratio service=host ratio=8.245 onset=1790494813] [metric name=endpoint_latency_seconds service=nginx ratio=12.229 onset=1790494873] [metric name=endpoint_up service=nginx ratio=0.803 onset=1790494873]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_2551",
+    "ev_2552",
+    "ev_2553",
+    "ev_2554",
+    "ev_2555"
+   ],
+   "usage": {
+    "input_tokens": 10943,
+    "output_tokens": 1100,
+    "cost_usd": 0.001645,
+    "llm_calls": 4,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "What nginx log events/errors or request patterns began around 07:51:03 UTC, particularly for the :8200 endpoint?",
+   "summary": "Around 07:51:03 UTC nginx shows a sharp burst of repeated localhost GET / requests from curl/8.18.0, returning HTTP 200 with ~73.4 KB responses; the timestamp-specific search returned 22 entries. The search did not establish that these requests targeted :8200 (access-log entries do not include host/port), nor that this burst began precisely at 07:51:03 rather than slightly earlier. Separately, the observed :8200-related nginx errors are FastCGI/PHP socket failures, including repeated missing /run/php/php8.5-fpm.sock errors at 05:52:58 and one connection reset at 07:47:38; no evidence ties these earlier errors to a new error beginning at 07:51:03. Clustered nginx errors also include an older upstream connection-refused signature beginning 04:41:40. No systemd lifecycle evidence was retrieved, so service stop/restart/crash status cannot be determined.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2556",
+    "ev_2557",
+    "ev_2558",
+    "ev_2559",
+    "ev_2560"
+   ],
+   "usage": {
+    "input_tokens": 48924,
+    "output_tokens": 975,
+    "cost_usd": 0.005379,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any nginx or host-related change deployed or activated before 07:51:03 UTC that could explain the :8200 latency increase?",
+   "summary": "Inconclusive for nginx/host changes before 07:51:03 UTC. The deploy list contains only shop-api deploys, and the config result is a truncated large commit with no visible metadata (sha/timestamp) or usable nginx/host diff, so I cannot establish whether a relevant change occurred shortly before onset or whether it remained in effect. The visible WordPress nginx.conf filename alone is insufficient evidence. [change kind=deploy service=shop-api sha=8cba97a6 ts=1790484899 key=unknown old=unknown new=unknown msg=\"feat: apply discount factor to order count on home page\"] [change kind=deploy service=shop-api sha=60740e12 ts=1790485758 key=unknown old=unknown new=unknown msg=\"feat: apply discount factor to order count on home page\"] [change kind=deploy service=shop-api sha=04d9f3df ts=1790486599 key=unknown old=unknown new=unknown msg=\"feat: apply discount factor to order count on home page\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2546",
+    "ev_2547"
+   ],
+   "usage": {
+    "input_tokens": 3699,
+    "output_tokens": 521,
+    "cost_usd": 0.000631,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Does nginx's :8200 endpoint code/config path depend on lb :8081, and could that dependency explain the latency onset?",
+   "summary": "[code file=nginx/wordpress.conf smell=none tests=fail] The inspected :8200 nginx path does not show a dependency on :8081: it listens on 8200, serves local WordPress files, and sends PHP requests to a local PHP-FPM Unix socket. Thus no :8081 dependency is evident in this config to explain latency onset; trigger evidence is unknown because no runtime telemetry or onset data was inspected. The test command could not run because Python is unavailable in the sandbox.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2548",
+    "ev_2549",
+    "ev_2550"
+   ],
+   "usage": {
+    "input_tokens": 8728,
+    "output_tokens": 431,
+    "cost_usd": 0.001089,
+    "llm_calls": 3,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "Between 07:40 and 07:52 UTC, which host resource or process metrics (CPU by process/run queue/IO) identify the workload driving CPU elevation, and does that workload onset precede the nginx :8200 latency surge at 07:44:43?",
+   "summary": "Metrics available here show host-wide CPU rising from about 07:41:10 UTC (1790495070) and reaching 0.614 at 07:42:00, with a peak 0.703 around 07:44:00; however, the recorded metrics do not include per-process CPU, run queue, or IO, so they cannot identify which workload drove it. The nginx :8200 latency surge begins at the same sampled time as CPU elevation (07:41:10), earlier than the question's 07:44:43 reference, so evidence does not establish workload-specific onset precedence. nginx service remained active, and host memory/disk-used ratios were essentially steady; these do not explain or identify the CPU workload.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2570",
+    "ev_2571",
+    "ev_2572",
+    "ev_2573",
+    "ev_2574"
+   ],
+   "usage": {
+    "input_tokens": 20170,
+    "output_tokens": 943,
+    "cost_usd": 0.002488,
+    "llm_calls": 7,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "Around 07:44:43\u201307:52 UTC, what do host and php8.5-fpm/nginx journal logs show about lifecycle/state transitions or the process consuming resources, especially PHP-FPM socket availability at :8200?",
+   "summary": "Around 07:44\u201307:52 UTC, php8.5-fpm repeatedly terminated and immediately came back ready (07:44:04, 07:47:38, 07:50:48), while its pool repeatedly reached pm.max_children=1, indicating saturation at the configured single-worker limit. The observed journal excerpts do not establish whether the :8200 socket was unavailable in this exact interval: nginx samples show missing-socket failures earlier at 05:52:58, while PHP-FPM logs at the requested times say it was ready to handle connections. Host-specific search returned no logs; no demonstrated host resource-killer evidence is available. Thus lifecycle and pool pressure are clear, but exact socket availability/root cause remains inconclusive.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2565",
+    "ev_2566",
+    "ev_2567",
+    "ev_2568",
+    "ev_2569"
+   ],
+   "usage": {
+    "input_tokens": 32435,
+    "output_tokens": 791,
+    "cost_usd": 0.003638,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Are there any nginx, php8.5-fpm, or host changes with timestamps before the :8200 latency surge at 07:44:43 UTC, and can evidence establish the exact change stayed in effect at onset?",
+   "summary": "No nginx or php8.5-fpm deploys appear in the checked 1,000-minute window, and the deploy list has only shop-api changes. The configuration result is a truncated, broad WordPress/import-style commit, so its exact nginx/host diffs, commit SHA, timestamp, and whether any candidate was reverted cannot be established from the available evidence. Thus I cannot establish an exact nginx, php8.5-fpm, or host change stayed in effect at 07:44:43 UTC; finding is inconclusive. [change kind=deploy service=nginx sha=unknown ts=unknown key=unknown old=unknown new=unknown msg=\"no deploys returned\"] [change kind=deploy service=php8.5-fpm sha=unknown ts=unknown key=unknown old=unknown new=unknown msg=\"no deploys returned\"] [change kind=config service=unknown sha=unknown ts=unknown key=unknown old=unknown new=unknown msg=\"config output truncated; exact candidate and revert status unavailable\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2561",
+    "ev_2562",
+    "ev_2563",
+    "ev_2564"
+   ],
+   "usage": {
+    "input_tokens": 3877,
+    "output_tokens": 581,
+    "cost_usd": 0.000678,
+    "llm_calls": 2,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "For 07:41\u201307:52 UTC, do nginx :8200 requests specifically show FastCGI timeout/refused/reset errors coincident with its latency/down samples, and what exact PHP-FPM lifecycle/pool messages precede each?",
+   "summary": "Inconclusive: the available cluster scan reports one nginx FastCGI reset at 07:47:38 UTC on :8200, but the searches for the full 07:41\u201307:52 interval and PHP-FPM lifecycle/pool messages failed due to invalid time arguments. Therefore I cannot determine whether errors coincided with each latency/down sample or identify preceding FPM events. [log service=nginx level=error count=1 first_seen=1790495258 sig=\"recv() failed (104: Connection reset by peer) while reading response header from upstream\"] (call_1)",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2575",
+    "ev_2576"
+   ],
+   "usage": {
+    "input_tokens": 4245,
+    "output_tokens": 591,
+    "cost_usd": 0.00072,
+    "llm_calls": 3,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "metrics",
+   "question": "Can available metrics compare PHP-FPM process/worker count or request saturation against nginx :8200 latency/down timestamps from 07:41\u201307:52, and determine whether host CPU elevation starts before the latency symptoms?",
+   "summary": "Available metrics do not expose PHP-FPM worker/process counts or request-saturation measures, so they cannot establish worker saturation relative to nginx :8200. PHP-FPM's only observed metric here is unit_active, which stays at 1.0 in the sampled range; its service endpoint latency/up queries returned no series. For nginx :8200, latency was roughly 0.045\u20130.046s through 1790494830, briefly fell to ~0.002s by 1790494860, then first rose to ~1.109s at 1790495055; the broad top-anomaly onset is 1790494852. Host CPU's anomaly onset is 1790494822, before the :8200 high-latency rise at 1790495055, but it does not precede the initial nginx :8200 anomaly/onset around 1790494852. The endpoint latency series later alternates between low and high values through the present sample, so the evidence suggests CPU elevation precedes the severe latency phase, but not conclusively the initial symptom.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2581",
+    "ev_2582",
+    "ev_2583",
+    "ev_2584"
+   ],
+   "usage": {
+    "input_tokens": 12621,
+    "output_tokens": 1261,
+    "cost_usd": 0.001892,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "code",
+   "question": "Does the actual nginx :8200 config serve requests through php8.5-fpm, and does the configured pm.max_children=1 provide a direct mechanism for the observed endpoint latency/down events?",
+   "summary": "[code file=nginx/wordpress.conf smell=none tests=fail] The checked-in nginx server block listens on :8200 and routes matching .php requests via FastCGI to /run/php/php8.5-fpm.sock, so the config does serve PHP through php8.5-fpm (call_2). [code file=unknown smell=worker-exhaustion tests=fail] The evidence does not establish pm.max_children=1: the repository search found no such setting or FPM pool config (call_3). If the active pool is configured with one child, that can directly serialize PHP request handling and cause queueing/latency, with potential apparent endpoint downs if waits exceed nginx's configured 10s FastCGI read timeout; however active deployment state and any observed trigger are unknown, so this is not established as the cause or matched to a specific symptom pattern (call_2, call_3). [code file=unknown smell=none tests=fail] Test execution was unavailable because python is not installed in the sandbox (call_4).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2577",
+    "ev_2578",
+    "ev_2579",
+    "ev_2580"
+   ],
+   "usage": {
+    "input_tokens": 6644,
+    "output_tokens": 555,
+    "cost_usd": 0.000942,
+    "llm_calls": 3,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

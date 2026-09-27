@@ -26,7 +26,9 @@ from pathlib import Path
 IGNORE_UNITS = re.compile(r"^(ssh|sshd|systemd-.*|snapd|amazon-ssm-agent|chrony|chronyd|multipathd|ModemManager|udisks2|acpid|nightshift-.*|user@.*|packagekit|polkit)\.service$")
 IGNORE_PORTS = {22, 53}
 _SS_LINE = re.compile(r"^LISTEN\s+\S+\s+\S+\s+(?P<addr>\S+):(?P<port>\d+)\s+\S+\s*(?P<users>users:.*)?$")
+_SS_UNIX_LINE = re.compile(r"^u_str\s+LISTEN\s+\S+\s+\S+\s+(?P<path>/\S+)\s+\S+\s+\S+\s+\S+\s*(?P<users>users:.*)?$")
 _PID = re.compile(r'\("(?P<proc>[^"]+)",pid=(?P<pid>\d+)')
+_UNIX_UPSTREAM = re.compile(r"(?:fastcgi_pass|proxy_pass|uwsgi_pass)\s+unix:(?P<path>/\S+?)(?:;|:)")
 
 
 @dataclass
@@ -40,8 +42,9 @@ class Listener:
 @dataclass
 class Endpoint:
     port: int
-    probe: str = "tcp"          # http | tcp
+    probe: str = "tcp"          # http | tcp | unix (unix: not blackbox-probed, port is 0 and the real address is in `path`)
     note: str = ""
+    path: str = ""               # unix socket path, only set when probe == "unix"
 
 
 @dataclass
@@ -51,6 +54,9 @@ class Service:
     procs: set[str] = field(default_factory=set)
     endpoints: list[Endpoint] = field(default_factory=list)
     repo: str = ""
+    log_files: list[str] = field(default_factory=list)   # app-level log files (journald misses these: MariaDB by default logs to
+                                                            # journald, but many daemons -- PHP-FPM, most databases in other
+                                                            # configs -- write their own error log instead, invisible otherwise)
 
 
 def parse_ss(text: str) -> list[Listener]:
@@ -62,6 +68,40 @@ def parse_ss(text: str) -> list[Listener]:
         for u in _PID.finditer(m.group("users")):
             out.append(Listener(int(m.group("port")), m.group("addr").strip("[]"), u.group("proc"), int(u.group("pid"))))
     return out
+
+
+def parse_ss_unix(text: str) -> dict[str, tuple[str, int]]:
+    """Unix-socket listeners: {socket path -> (process name, pid)}. Used to resolve an nginx `fastcgi_pass unix:...` (or
+    `proxy_pass`/`uwsgi_pass`) target to the daemon actually behind it -- PHP-FPM, uWSGI, a unix-socket gunicorn, etc. -- which
+    has no TCP port and so is otherwise invisible to `ss -ltnp`-based discovery entirely."""
+    out: dict[str, tuple[str, int]] = {}
+    for line in text.splitlines():
+        m = _SS_UNIX_LINE.match(line.strip())
+        if not m or not m.group("users"):
+            continue
+        u = _PID.search(m.group("users"))
+        if u:
+            out[m.group("path")] = (u.group("proc"), int(u.group("pid")))
+    return out
+
+
+def unix_backends(nginx_services: list[Service], unix_listeners: dict[str, tuple[str, int]]) -> dict[str, tuple[str, int]]:
+    """For each nginx-like service with a discovered config repo, find `unix:` upstream targets in its config files and
+    resolve each to a listening (proc, pid) via `unix_listeners`. Returns {socket_path: (proc, pid)}, deduplicated."""
+    found: dict[str, tuple[str, int]] = {}
+    for s in nginx_services:
+        if not s.repo:
+            continue
+        for f in Path(s.repo).rglob("*.conf"):
+            try:
+                text = f.read_text(errors="replace")
+            except OSError:
+                continue
+            for m in _UNIX_UPSTREAM.finditer(text):
+                path = m.group("path")
+                if path in unix_listeners:
+                    found[path] = unix_listeners[path]
+    return found
 
 
 def unit_from_cgroup(text: str) -> str | None:
@@ -91,6 +131,32 @@ def classify_port(bind: str, port: int, timeout: float = 2.0) -> Endpoint:
             return Endpoint(port, "http" if data.startswith(b"HTTP/") else "tcp", "" if data.startswith(b"HTTP/") else "answers, but not HTTP")
     except OSError as e:
         return Endpoint(port, "tcp", f"could not connect: {e}")
+
+
+def discover_log_files(name: str, procs: set[str]) -> list[str]:
+    """Best-effort file-log discovery for daemons that write their own error log instead of journald (systemd's default):
+    check /var/log/<service-name>* and /var/log/<process-name>* (files and one level of directory), for both the discovered
+    service name and each of its process names, since the two often differ (service 'shop-api' vs process 'gunicorn';
+    php-fpm's file is /var/log/php8.5-fpm.log while the unit is php8.5-fpm.service, matched via the .service name minus suffix)."""
+    found: list[str] = []
+    log_dir = Path("/var/log")
+    if not log_dir.is_dir():
+        return found
+    for stem in {name, *procs}:
+        for pattern in (f"{stem}*.log", f"{stem}/*.log"):
+            for f in log_dir.glob(pattern):
+                if f.is_file() and str(f) not in found:
+                    found.append(str(f))
+    return sorted(found)
+
+
+def grantable_log_files(services: list[Service]) -> list[str]:
+    """Log files this process cannot read now (owned by another user, e.g. root-only application logs) but that a real
+    collector needs -- install_host.sh grants group-read via chgrp/chmod (not setfacl: survives simply, at the cost of not
+    surviving a logrotate that recreates the file with fresh root-only permissions -- a known, documented limitation)."""
+    import os
+
+    return sorted({f for s in services for f in s.log_files if not os.access(f, os.R_OK)})
 
 
 def git_root(start: str) -> str:
@@ -153,6 +219,26 @@ def discover(repo_overrides: dict[str, str] | None = None) -> list[Service]:
             s.repo = repo_from_etc(s.procs)
         if repo_overrides and s.name in repo_overrides:
             s.repo = repo_overrides[s.name]
+
+    # unix-socket-only backends (PHP-FPM, uWSGI, ...): no TCP port, so invisible to the loop above. Found by reading any
+    # already-discovered service's config for a `unix:` upstream target and resolving it to whichever process is listening there.
+    known_units = {s.unit for s in services.values()}
+    for path, (proc, pid) in unix_backends(list(services.values()), parse_ss_unix(subprocess.run(["sudo", "-n", "ss", "-lxpH"], capture_output=True, text=True).stdout)).items():
+        try:
+            unit = unit_from_cgroup(Path(f"/proc/{pid}/cgroup").read_text())
+        except OSError:
+            continue
+        if not unit or unit in known_units or IGNORE_UNITS.match(unit):
+            continue
+        name = unit.removesuffix(".service")
+        known_units.add(unit)
+        services[name] = Service(name, unit, procs={proc}, repo=repo_overrides.get(name, "") if repo_overrides else "",
+                                 endpoints=[Endpoint(0, "unix", "no TCP port; not blackbox-probed", path=path)])
+
+    for s in services.values():
+        if not s.repo and s.name not in (repo_overrides or {}):
+            s.repo = repo_from_etc(s.procs)
+        s.log_files = discover_log_files(s.name, s.procs)
     return sorted(services.values(), key=lambda s: s.name)
 
 
@@ -262,12 +348,23 @@ def render_alloy(services: list[Service]) -> str:
         for suffix, match, extra in (("", f"_SYSTEMD_UNIT={s.unit}", ""), ("_lifecycle", f"UNIT={s.unit}", ', source = "systemd"')):
             out.append(f'loki.source.journal "{ident}{suffix}" {{\n  matches    = "{match}"\n  labels     = {{service = "{s.name}", unit = "{s.unit}"{extra}}}\n'
                        f'  max_age    = "72h"\n  forward_to = [loki.write.local.receiver]\n}}\n')
+        # app-level log files: the daemon's own error log (e.g. PHP-FPM), which systemd's journal never sees because the
+        # process writes to a file directly instead of stdout/stderr.
+        for i, f in enumerate(s.log_files):
+            out.append(f'local.file_match "{ident}_file_{i}" {{\n  path_targets = [{{"__path__" = "{f}", "service" = "{s.name}", "source" = "file"}}]\n}}\n'
+                       f'loki.source.file "{ident}_file_{i}" {{\n  targets    = local.file_match.{ident}_file_{i}.targets\n'
+                       f'  forward_to = [loki.write.local.receiver]\n}}\n')
     return "\n".join(out)
 
 
 def render_service_map(services: list[Service]) -> dict:
-    svc = {s.name: {"role": f"systemd unit {s.unit}; processes: {', '.join(sorted(s.procs))}; listens on " +
-                            ", ".join(f":{e.port} ({e.probe})" for e in s.endpoints) + (f"; source repo {s.repo}" if s.repo else ""),
+    def listens(s: Service) -> str:
+        if not s.endpoints:
+            return "no discovered listener"
+        return "listens on " + ", ".join(e.path + " (unix socket)" if e.probe == "unix" else f":{e.port} ({e.probe})" for e in s.endpoints)
+
+    svc = {s.name: {"role": f"systemd unit {s.unit}; processes: {', '.join(sorted(s.procs))}; {listens(s)}"
+                            + (f"; source repo {s.repo}" if s.repo else "") + (f"; app log files: {', '.join(s.log_files)}" if s.log_files else ""),
                     "calls": [], **({"config": f"git repo {s.repo}"} if s.repo else {})} for s in services}
     svc["host"] = {"role": "the machine itself; node_exporter metrics", "calls": []}
     return {"services": svc, "notes": "Generated by onboard/discover.py from listening sockets and systemd cgroups. Dependencies between services are NOT inferred; "
@@ -298,7 +395,10 @@ def report(services: list[Service]) -> str:
     for s in services:
         lines.append(f"  {s.name}  (unit {s.unit}, procs {', '.join(sorted(s.procs))}" + (f", repo {s.repo}" if s.repo else ", no git repo found") + ")")
         for e in s.endpoints:
-            lines.append(f"    :{e.port:<6} {e.probe:<5}" + (f"  WARNING: {e.note}" if e.note else ""))
+            addr = e.path if e.probe == "unix" else f":{e.port}"
+            lines.append(f"    {addr:<28} {e.probe:<5}" + (f"  WARNING: {e.note}" if e.note else ""))
+        if s.log_files:
+            lines.append(f"    log files: {', '.join(s.log_files)}")
     return "\n".join(lines)
 
 
@@ -324,6 +424,10 @@ def main() -> int:
         (out / "service_map.json").write_text(json.dumps(render_service_map(services), indent=1), encoding="utf8")
         (out / "watch.env").write_text(render_watch_env(services, args.root), encoding="utf8")
         (out / "unit_include.txt").write_text(unit_include(services), encoding="utf8")
+        grants = grantable_log_files(services)
+        (out / "log_grants.txt").write_text("\n".join(grants) + ("\n" if grants else ""), encoding="utf8")
+        if grants:
+            print(f"\n{len(grants)} log file(s) found but not readable by this user (install_host.sh will chgrp+chmod them for the adm group): " + ", ".join(grants))
         print(f"\nwrote profile to {out}  (install: PROFILE_DIR={out} onboard/install_host.sh)")
     return 0
 
