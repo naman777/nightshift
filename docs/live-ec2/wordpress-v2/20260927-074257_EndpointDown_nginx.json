@@ -1,0 +1,293 @@
+{
+ "alert": {
+  "fingerprint": "EndpointDown-nginx-1790494858",
+  "name": "EndpointDown",
+  "service": "nginx",
+  "severity": "critical",
+  "started_at": 1790494858.304267,
+  "labels": {
+   "alertname": "EndpointDown",
+   "instance": "http://127.0.0.1:8200/",
+   "job": "probe-http",
+   "port": "8200",
+   "probe": "http",
+   "service": "nginx",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "EndpointDown: an endpoint stopped answering its probe",
+   "state_snapshot": "STATE SNAPSHOT at 07:42:17 UTC (window 30m; series that moved, newest information first):\n  CHANGED endpoint_up{service=nginx,instance=http://127.0.0.1:8200/} now=0, 30m ago=1, moved at 07:41:02 UTC\n  CHANGED endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:8200/} now=0.001848, 30m ago=0.04526, moved at 07:41:02 UTC\n  CHANGED host_cpu_ratio{service=host} now=0.1309, 30m ago=0.0309, moved at 07:41:32 UTC\n  STEADY endpoint_up{service=mariadb,instance=127.0.0.1:3306}=1; endpoint_up{service=lb,instance=127.0.0.1:8081}=0; endpoint_up{service=shop-api,instance=http://127.0.0.1:5000/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:80/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8001/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8002/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8003/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8080/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8090/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8091/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8093/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8094/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8095/}=1; endpoint_latency_seconds{service=mariadb,instance=127.0.0.1:3306}=0.0001949; endpoint_latency_seconds{service=lb,instance=127.0.0.1:8081}=3.001; endpoint_latency_seconds{service=shop-api,instance=http://127.0.0.1:5000/}=0.001624; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:80/}=0.00193; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8001/}=0.0004587; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8002/}=0.0004474; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8003/}=0.0004106; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8080/}=0.0005847; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8090/}=0.0004923; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8091/}=0.0004462; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8093/}=0.0004389; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8094/}=0.0005699; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8095/}=0.000396; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=mariadb,instance=127.0.0.1:9100,name=mariadb.service}=1; unit_active{service=nginx,instance=127.0.0.1:9100,name=nginx.service}=1; unit_active{service=nsbox-lb,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; unit_active{service=php8.5-fpm,instance=127.0.0.1:9100,name=php8.5-fpm.service}=1; unit_active{service=shop-api,instance=127.0.0.1:9100,name=shop-api.service}=1; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1791; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2655; disk_used_ratio{service=nginx,instance=127.0.0.1:9100}=0.08265; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2342; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2655"
+  }
+ },
+ "timings": {
+  "fired_at": 1790494858.304267,
+  "detected_at": 1790494937.5923088,
+  "reported_at": 1790494977.5493436,
+  "investigation_s": 39.929436922073364
+ },
+ "incident_id": "inc-EndpointDown-nginx-1790494858",
+ "mode": "multi",
+ "report": {
+  "root_cause": "Nginx's :8200 WordPress endpoint began returning intermittent HTTP 500s after 07:41:00, but the precise mechanism and trigger remain unconfirmed; host CPU rose beforehand without proven contention, and earlier PHP-FPM initialization failures are not evidence for this incident window. [ev_2448, ev_2455, ev_2466, ev_2469, ev_2470]",
+  "service": "nginx",
+  "category": "unknown",
+  "confidence": 0.18,
+  "evidence": [
+   "ev_2448",
+   "ev_2455",
+   "ev_2456",
+   "ev_2457",
+   "ev_2466",
+   "ev_2467",
+   "ev_2468",
+   "ev_2469",
+   "ev_2470",
+   "ev_2471"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "A recent nginx deploy directly caused the failure.",
+    "evidence": [
+     "ev_2446",
+     "ev_2462"
+    ]
+   },
+   {
+    "hypothesis": "An nginx bind failure or whole nginx process/service outage caused the :8200 issue.",
+    "evidence": [
+     "ev_2449",
+     "ev_2450",
+     "ev_2457",
+     "ev_2468"
+    ]
+   },
+   {
+    "hypothesis": "The historical PHP-FPM invalid pool configuration explains this incident's onset.",
+    "evidence": [
+     "ev_2469",
+     "ev_2470"
+    ]
+   },
+   {
+    "hypothesis": "Host resource contention is established as the cause.",
+    "evidence": [
+     "ev_2455",
+     "ev_2466"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Nginx :8200 WordPress/FastCGI path is returning intermittent HTTP 500s; exact trigger is unconfirmed.",
+    "service": "nginx",
+    "category": "unknown",
+    "confidence": 0.18
+   },
+   {
+    "root_cause": "Host CPU contention may have contributed to :8200 failure, but causality is unproven.",
+    "service": "host",
+    "category": "resource_contention",
+    "confidence": 0.12
+   },
+   {
+    "root_cause": "PHP-FPM failure on the dynamic request path is plausible, but available FPM logs are historical and no incident-window state evidence confirms it.",
+    "service": "php8.5-fpm",
+    "category": "service_down",
+    "confidence": 0.08
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "nginx/PHP-FPM on-call",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 109760,
+   "output_tokens": 7091,
+   "cost_usd": 0.014521,
+   "llm_calls": 26,
+   "tool_calls": 44,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "nginx/PHP-FPM on-call",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 109760,
+  "output_tokens": 7091,
+  "cost_usd": 0.014521,
+  "llm_calls": 26,
+  "tool_calls": 44,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "Did the :8200 endpoint_up/latency change at 07:41:02 precede or follow host CPU movement at 07:41:32, and did any other nginx endpoint or host resource metric move first?",
+   "summary": "Host CPU movement preceded the observed nginx :8200 endpoint change. CPU's detailed series onset estimate is Unix 1790494392.972 (07:33:12 UTC), versus :8200 endpoint_up/latency onset estimates near 1790494857.9 (about 07:40:58 UTC; first changed displayed sample at 07:41:12). This does not align exactly with the question's stated 07:41:02 transition. :8200 up fell from 1 to 0 and latency fell from roughly 0.0419s to 0.002s. Nginx port 80 did not change; disk use remained nearly flat and memory had no sustained comparable jump. Evidence available does not establish whether some other nginx endpoint or host resource metric moved first.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2455",
+    "ev_2456",
+    "ev_2457",
+    "ev_2458",
+    "ev_2459"
+   ],
+   "usage": {
+    "input_tokens": 20452,
+    "output_tokens": 1809,
+    "cost_usd": 0.00295,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do nginx/systemd logs show for the :8200 listener at or immediately before 07:41:02 UTC\u2014especially lifecycle, bind, or request/probe errors?",
+   "summary": "At 07:41:00 UTC nginx recorded a successful Blackbox Exporter GET / to the :8200 vhost (HTTP 200); starting 07:41:08 it alternated between HTTP 500 at :08, :18, :28, :38, :48, and :58 and HTTP 200 at :10, :20, :30, :40, and :50. No bind() errors were found. The retrieved logs provide no systemd lifecycle evidence for this listener, so whether it was stopped/restarted at 07:41:02 is unresolved. An older nginx error cluster shows upstream connection-refused errors but its sample targets port 5000, not :8200.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2448",
+    "ev_2449",
+    "ev_2450",
+    "ev_2451"
+   ],
+   "usage": {
+    "input_tokens": 13504,
+    "output_tokens": 780,
+    "cost_usd": 0.00174,
+    "llm_calls": 3,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any nginx config or deployment change still in effect immediately before 07:41:02 UTC that could selectively affect the :8200 listener?",
+   "summary": "Inconclusive: the deployment query returned no nginx deploys, and the config query output was truncated across an unrelated broad WordPress commit, so I cannot verify a relevant nginx change, its exact timestamp/SHA, or whether one remained in effect at 07:41:02 UTC. [Evidence: call_1, call_2]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2446",
+    "ev_2447"
+   ],
+   "usage": {
+    "input_tokens": 3563,
+    "output_tokens": 302,
+    "cost_usd": 0.000508,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "What config/code serves nginx on :8200, and is there a known mechanism that could make only this endpoint stop answering while :80 and nginx.service remain healthy?",
+   "summary": "[code file=nginx/wordpress.conf smell=none tests=fail] The repository config serving :8200 is nginx/wordpress.conf: it listens on 8200, roots at /home/ubuntu/wordpress, routes requests through WordPress index.php, and sends PHP to the /run/php/php8.5-fpm.sock Unix socket with a 10-second FastCGI read timeout. This provides a plausible endpoint-specific failure mechanism: a stalled/unavailable PHP-FPM socket or PHP response timeout could affect dynamic requests on :8200 while nginx itself remains alive; however there is no evidence in the available code-search/read results that this trigger occurred, and no :80 configuration was identified for comparison. The test invocation `all` was rejected as not allow-listed, so tests were not run successfully. [code file=nginx/wordpress.conf smell=none tests=fail]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2452",
+    "ev_2453",
+    "ev_2454"
+   ],
+   "usage": {
+    "input_tokens": 15721,
+    "output_tokens": 614,
+    "cost_usd": 0.001878,
+    "llm_calls": 3,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "At 07:40:58\u201307:42 UTC, what do nginx and php8.5-fpm logs show for requests to :8200, especially FastCGI socket errors/timeouts and PHP-FPM worker/state events?",
+   "summary": "Inconclusive for the requested 07:40:58\u201307:42 UTC interval: the available search output is timestamped around 05:52\u201305:56 UTC and does not establish the requested window. It does show a different earlier failure: nginx repeatedly could not connect to the PHP-FPM Unix socket for requests hosted at 127.0.0.1:8200, while php8.5-fpm logged invalid pool settings and failed initialization. No evidence here establishes FastCGI timeouts or PHP worker/state events during 07:40:58\u201307:42 UTC. [log service=nginx level=crit count=27 first_seen=1790494793 sig=\"connect() to unix:/run/php/php8.5-fpm.sock failed (2: No such file or directory)\"] [log service=php8.5-fpm level=info count=100 first_seen=1790494793 sig=\"FPM initialization failed; pm.min_spare_servers and pm.max_spare_servers cannot be greater than pm.max_children\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2469",
+    "ev_2470",
+    "ev_2471"
+   ],
+   "usage": {
+    "input_tokens": 20254,
+    "output_tokens": 900,
+    "cost_usd": 0.002475,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "metrics",
+   "question": "Between 07:33 and 07:42 UTC, did php8.5-fpm endpoint/unit/worker metrics or host CPU contention track the :8200 HTTP 500 transitions, and were other nginx endpoints affected?",
+   "summary": "From 07:33\u201307:42 UTC, the :8200 nginx probe stayed up and its latency was roughly 0.041\u20130.046s through 07:40:30, then latency sharply fell at 07:41:00 as endpoint_up changed from 1 to 0; the :80 endpoint remained up with low latency. Host CPU rose beginning 07:40:00, just before the :8200 transition, but its peaks were intermittent and do not establish contention as the cause. php8.5-fpm endpoint metrics returned no series; its service unit was active in the observed samples from 07:40:30 onward. No worker metric is listed among the known metrics. Evidence is insufficient to establish whether FPM or CPU contention tracked the 500 transitions (metric tools observe endpoint availability/latency, not HTTP 500 counts).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2463",
+    "ev_2464",
+    "ev_2465",
+    "ev_2466",
+    "ev_2467",
+    "ev_2468"
+   ],
+   "usage": {
+    "input_tokens": 6303,
+    "output_tokens": 1042,
+    "cost_usd": 0.001152,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Can you retrieve non-truncated diffs/status for nginx/wordpress.conf and relevant PHP-FPM configuration effective at 07:40:58 UTC, including any revert or reload timing?",
+   "summary": "Inconclusive: the path-filtered config response is truncated and does not expose the commit metadata, complete nginx/wordpress.conf diff, or PHP-FPM changes/status needed to establish what was effective at 07:40:58 UTC. The PHP-FPM-filtered query returned no commits, and recent deploys returned none. I cannot verify a revert, reload timing, or whether any change remained in effect at onset from these results.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2460",
+    "ev_2461",
+    "ev_2462"
+   ],
+   "usage": {
+    "input_tokens": 3643,
+    "output_tokens": 336,
+    "cost_usd": 0.000532,
+    "llm_calls": 2,
+    "tool_calls": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

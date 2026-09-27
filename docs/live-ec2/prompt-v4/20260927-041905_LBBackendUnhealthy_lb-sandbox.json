@@ -1,0 +1,281 @@
+{
+ "alert": {
+  "fingerprint": "LBBackendUnhealthy-lb-sandbox-1790482650",
+  "name": "LBBackendUnhealthy",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790482650.418971,
+  "labels": {
+   "alertname": "LBBackendUnhealthy",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "LBBackendUnhealthy: fewer than 3 upstream backends accepting connections",
+   "state_snapshot": "STATE SNAPSHOT at 04:18:28 UTC (window 30m; series that moved, newest information first):\n  CHANGED backend_up{service=lb-sandbox,instance=127.0.0.1:8094} now=0, 30m ago=1, moved at 04:17:28 UTC\n  STEADY error_rate{service=lb}=0; error_rate{service=lb-sandbox}=0; p99_latency_seconds{service=lb}=0.0006315; p99_latency_seconds{service=lb-sandbox}=0.000548; upstream_healthy{service=lb}=3; upstream_healthy{service=lb-sandbox}=2; backend_up{service=lb,instance=127.0.0.1:8001}=1; backend_up{service=lb,instance=127.0.0.1:8002}=1; backend_up{service=lb,instance=127.0.0.1:8003}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8093}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8095}=1; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=lb-sandbox,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; admin_port_up{service=lb}=0; admin_port_up{service=lb-sandbox}=1; admin_probe_seconds{service=lb}=4; admin_probe_seconds{service=lb-sandbox}=0.0004345; host_cpu_ratio{service=host}=0.0275; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1667; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2299"
+  }
+ },
+ "timings": {
+  "fired_at": 1790482650.418971,
+  "detected_at": 1790482708.5795317,
+  "reported_at": 1790482745.238334,
+  "investigation_s": 36.62321472167969
+ },
+ "incident_id": "inc-LBBackendUnhealthy-lb-sandbox-1790482650",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The lb-sandbox backend instance 127.0.0.1:8094 became unavailable around 04:17:28 UTC, leaving only two healthy backends; the evidence does not establish whether it was stopped or otherwise failed.",
+  "service": "lb-sandbox",
+  "category": "service_down",
+  "confidence": 0.44,
+  "evidence": [
+   "ev_1156",
+   "ev_1157",
+   "ev_1158",
+   "ev_1150",
+   "ev_1155"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "A newly deployed lb-sandbox build caused a regression.",
+    "evidence": [
+     "ev_1139",
+     "ev_1153"
+    ]
+   },
+   {
+    "hypothesis": "The sandbox pool config change to ports 9991\u20139993 caused the outage.",
+    "evidence": [
+     "ev_1140",
+     "ev_1154"
+    ]
+   },
+   {
+    "hypothesis": "The load balancer service itself went down.",
+    "evidence": [
+     "ev_1158"
+    ]
+   },
+   {
+    "hypothesis": "A proven health-check code defect caused port 8094 to be marked unhealthy.",
+    "evidence": [
+     "ev_1146",
+     "ev_1147"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Backend instance 127.0.0.1:8094 on lb-sandbox became unavailable; the initiating process or operator action is not established.",
+    "service": "lb-sandbox",
+    "category": "service_down",
+    "confidence": 0.44
+   },
+   {
+    "root_cause": "The lb-sandbox health check marked backend 127.0.0.1:8094 unhealthy before the independent backend_up probe first recorded failure; the cause of that health result is unknown.",
+    "service": "lb-sandbox",
+    "category": "healthcheck_misconfig",
+    "confidence": 0.3
+   },
+   {
+    "root_cause": "A latent HTTP health-status classification defect may have marked an otherwise reachable backend unhealthy, but no event-level trigger evidence ties it to 8094 at onset.",
+    "service": "lb-sandbox",
+    "category": "code_defect",
+    "confidence": 0.12
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "lb-sandbox/backend operations team",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 140598,
+   "output_tokens": 7565,
+   "cost_usd": 0.017841,
+   "llm_calls": 30,
+   "tool_calls": 47,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "lb-sandbox/backend operations team",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 140598,
+  "output_tokens": 7565,
+  "cost_usd": 0.017841,
+  "llm_calls": 30,
+  "tool_calls": 47,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At what exact time did backend_up for lb-sandbox instance 127.0.0.1:8094 fall, and did backend health/connection metrics or host resource metrics change immediately before it?",
+   "summary": "The queried backend_up series for lb-sandbox instance 127.0.0.1:8094 has observed down samples at 1790481616, 1790482486, and 1790482716, with up samples between them. Thus an exact onset for the latest fall is only bounded by the prior up sample at 1790482636 and down sample at 1790482716; scrape points do not establish the precise transition time. Around the alert/anomaly onset 1790481634, backend_healthy for backend 8094 changed from 1 at 1790481766 to 0 at 1790481796, while upstream_healthy was 0 at 1790481616 and rose to 2 at 1790481776; backend_connections for 8094 remained zero. Host CPU, memory, and disk show no immediate resource spike/change at those times in the queried samples. Evidence is insufficient to give the exact fall time for the asked instance or establish a precise immediate-before relationship.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1142",
+    "ev_1143",
+    "ev_1144",
+    "ev_1145"
+   ],
+   "usage": {
+    "input_tokens": 10410,
+    "output_tokens": 1000,
+    "cost_usd": 0.001541,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do logs for the exact lb-sandbox backend 127.0.0.1:8094 show around 04:17:28 UTC: clean stop lifecycle, crash, connection refusal, or health-check failure?",
+   "summary": "Inconclusive for the exact backend 127.0.0.1:8094 at 04:17:28 UTC: the targeted exact-address search returned no matching log lines, and the timestamp search shows only normal connection-closed INFO entries for other backends (:8093 and :8095). No exact-backend refusal, health-check failure, or crash is established by the available evidence. Lifecycle searches did find systemd Stopping/Started lines for nsbox-lb.service, but not specifically tied to 04:17:28; thus these do not establish a clean stop at the requested moment. The cluster-error scan surfaced recurring 'All backends unreachable' noise over its reported interval, not a timestamp-specific exact :8094 event.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1149",
+    "ev_1150",
+    "ev_1151",
+    "ev_1152"
+   ],
+   "usage": {
+    "input_tokens": 16164,
+    "output_tokens": 874,
+    "cost_usd": 0.002052,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any deploy, config, or operator action affecting lb-sandbox or backend 127.0.0.1:8094 still in effect at 04:17:28 UTC?",
+   "summary": "No deploy appears in the deploy listing, and the sandbox.conf pool change to ports 9991\u20139993 was reverted before 04:17:28 UTC; at that onset the config had been restored to 8093, 8094, 8095. The records provided do not establish whether another operator action affected lb-sandbox or backend 127.0.0.1:8094, so that part is inconclusive. [change kind=config service=lb-sandbox sha=44a42662 ts=1790481945 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=f371289b ts=1790482113 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1139",
+    "ev_1140",
+    "ev_1141"
+   ],
+   "usage": {
+    "input_tokens": 3204,
+    "output_tokens": 693,
+    "cost_usd": 0.000667,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Is there a relevant code defect in the lb-sandbox backend or health-check path that specifically explains backend 127.0.0.1:8094 going down at 04:17:28 UTC?",
+   "summary": "No relevant backend/health-check defect is established as the cause of 127.0.0.1:8094 going down at 04:17:28 UTC. The probe code can misclassify a connected HTTP backend returning a non-2xx response as unhealthy, but there is no evidence that this happened at that time or involved port 8094; therefore this is only a latent behavior, not the explained incident. The repository search found no occurrence of lb-sandbox, port 8094, or the timestamp. Tests could not be run because `make test` and `make` were rejected as not allow-listed. [code file=load-balancer/LoadBalancer.cpp smell=none tests=fail]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1146",
+    "ev_1147",
+    "ev_1148"
+   ],
+   "usage": {
+    "input_tokens": 36149,
+    "output_tokens": 748,
+    "cost_usd": 0.003989,
+    "llm_calls": 6,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "For lb-sandbox backend 127.0.0.1:8094, inspect service/process and listener lifecycle logs around the latest down interval (Unix 1790482636\u20131790482716, approximately 04:17:16\u201304:18:36 UTC): is the backend process or port 8094 stopped/refusing connections, and is there a clean stop/start or crash event?",
+   "summary": "Inconclusive for whether backend process/port 8094 stopped or refused connections during 1790482636\u20131790482716. The service logs show nsbox-lb.service Started at 1790482569 (before the interval) and traffic to ports 8093/8095 continues just after it, but available 8094 samples are mostly earlier and do not establish 8094 status inside the interval. No systemd Stopping/Stopped/Failed event was found for this interval in the available search; the searched service logs contain no separate backend-process lifecycle or explicit refusal evidence. Thus a clean stop/start or crash at the backend cannot be concluded. [log service=lb-sandbox level=info count=1 first_seen=1790482569 sig=\"Started nsbox-lb.service - Nightshift sandbox copy of the C++ load balancer (fault-injection target).\"] [log service=lb-sandbox level=info count=100 first_seen=1790482571 sig=\"Backend :8094 connection closed. Active: <n>\"] [log service=lb-sandbox level=info count=50 first_seen=1790482726 sig=\"Backend :8093/:8095 connection closed; no 8094 evidence in tail samples\"] [log service=lb-sandbox level=info count=0 first_seen=1790482636 sig=\"systemd lifecycle event in queried interval\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1160",
+    "ev_1161",
+    "ev_1162",
+    "ev_1163",
+    "ev_1164"
+   ],
+   "usage": {
+    "input_tokens": 24506,
+    "output_tokens": 1028,
+    "cost_usd": 0.002964,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "metrics",
+   "question": "For lb-sandbox backend 127.0.0.1:8094, obtain the finest available time series around 1790482636\u20131790482716 for backend_up/backend_healthy and any direct port/process availability signal; does backend availability fail before the LB marks it unhealthy?",
+   "summary": "In the sampled window, the per-instance backend_up probe for lb-sandbox instance 127.0.0.1:8094 changed from up to down between the last 1 at Unix 1790482639 and first 0 at 1790482645. The LB's backend_healthy series for backend 8094 is 1 at 1790482640 and 0 at 1790482644, so at available sampling precision the LB health flag fell before the probe series first records failure (or within the same roughly six-second sampling interval); this does not support a conclusion that observed backend availability failed before the LB marked it unhealthy. At the end of the window both are 0, while the LB service unit and admin port remain up. Direct port/process availability evidence for backend 8094 was not obtained; overall temporal ordering is inconclusive.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1156",
+    "ev_1157",
+    "ev_1158",
+    "ev_1159"
+   ],
+   "usage": {
+    "input_tokens": 15489,
+    "output_tokens": 1184,
+    "cost_usd": 0.002141,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Check records beyond sandbox.conf for operator/automation actions affecting the process or port 8094 during 1790482636\u20131790482716; was the backend intentionally stopped or otherwise changed?",
+   "summary": "Inconclusive on whether the backend process was intentionally stopped or otherwise changed: the available change records show no deploys, and only sandbox.conf pool changes, all reverted before the queried interval began. These records do not cover operator/automation process or port actions beyond that config, so they cannot establish whether port 8094's backend was stopped. [change kind=config service=sandbox sha=44a42662 ts=1790481945 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=sandbox sha=f371289b ts=1790482113 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert rollout\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1153",
+    "ev_1154",
+    "ev_1155"
+   ],
+   "usage": {
+    "input_tokens": 3206,
+    "output_tokens": 636,
+    "cost_usd": 0.000639,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

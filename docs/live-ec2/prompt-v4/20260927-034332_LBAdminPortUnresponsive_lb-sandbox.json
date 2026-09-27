@@ -1,0 +1,274 @@
+{
+ "alert": {
+  "fingerprint": "LBAdminPortUnresponsive-lb-sandbox-1790480490",
+  "name": "LBAdminPortUnresponsive",
+  "service": "lb-sandbox",
+  "severity": "warning",
+  "started_at": 1790480490.418971,
+  "labels": {
+   "alertname": "LBAdminPortUnresponsive",
+   "service": "lb-sandbox",
+   "severity": "warning"
+  },
+  "annotations": {
+   "summary": "LBAdminPortUnresponsive: admin/stats endpoint not answering probes",
+   "state_snapshot": "STATE SNAPSHOT at 03:42:58 UTC (window 30m; series that moved, newest information first):\n  CHANGED admin_port_up{service=lb-sandbox} now=0, 30m ago=1, moved at 03:41:28 UTC\n  CHANGED admin_probe_seconds{service=lb-sandbox} now=4.001, 30m ago=0.000433, moved at 03:41:28 UTC\n  CHANGED host_memory_used_ratio{service=host,instance=127.0.0.1:9100} now=0.1181, 30m ago=0.203, moved at 03:27:13 UTC\n  STEADY error_rate{service=lb}=0; error_rate{service=lb-sandbox}=0; p99_latency_seconds{service=lb}=0.000627; p99_latency_seconds{service=lb-sandbox}=0.0005648; upstream_healthy{service=lb}=3; upstream_healthy{service=lb-sandbox}=3; backend_up{service=lb,instance=127.0.0.1:8001}=1; backend_up{service=lb,instance=127.0.0.1:8002}=1; backend_up{service=lb,instance=127.0.0.1:8003}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8093}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8094}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8095}=1; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=lb-sandbox,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; admin_port_up{service=lb}=0; admin_probe_seconds{service=lb}=4.001; host_cpu_ratio{service=host}=0.0282; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2282"
+  }
+ },
+ "timings": {
+  "fired_at": 1790480490.418971,
+  "detected_at": 1790480578.8299654,
+  "reported_at": 1790480612.6415524,
+  "investigation_s": 33.77918887138367
+ },
+ "incident_id": "inc-LBAdminPortUnresponsive-lb-sandbox-1790480490",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The lb-sandbox stats listener on :8091 became unresponsive while nsbox-lb.service remained active; the best-supported mechanism is stats_loop's serial blocking client read without a timeout, although no runtime evidence proves a stalled client triggered it.",
+  "service": "lb-sandbox",
+  "category": "code_defect",
+  "confidence": 0.48,
+  "evidence": [
+   "ev_776",
+   "ev_786",
+   "ev_787",
+   "ev_778",
+   "ev_779",
+   "ev_782"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "A sandbox.conf change caused the admin listener failure.",
+    "evidence": [
+     "ev_769",
+     "ev_770",
+     "ev_771"
+    ]
+   },
+   {
+    "hypothesis": "Host CPU, memory, or disk contention caused the admin probe timeout.",
+    "evidence": [
+     "ev_777"
+    ]
+   },
+   {
+    "hypothesis": "The lb-sandbox process stopped or crashed.",
+    "evidence": [
+     "ev_776",
+     "ev_784"
+    ]
+   },
+   {
+    "hypothesis": "A deployed lb-sandbox build immediately triggered the failure.",
+    "evidence": [
+     "ev_768"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "The :8091 stats endpoint's serial blocking read without a timeout may have stalled subsequent requests; actual triggering client is unobserved.",
+    "service": "lb-sandbox",
+    "category": "code_defect",
+    "confidence": 0.48
+   },
+   {
+    "root_cause": "An unobserved listener-specific service failure caused the :8091 probe timeout while the process stayed active.",
+    "service": "lb-sandbox",
+    "category": "service_down",
+    "confidence": 0.2
+   }
+  ],
+  "proposed_action": {
+   "type": "none",
+   "target": "",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 129876,
+   "output_tokens": 7173,
+   "cost_usd": 0.016576,
+   "llm_calls": 29,
+   "tool_calls": 43,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "lb-sandbox",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 129876,
+  "output_tokens": 7173,
+  "cost_usd": 0.016576,
+  "llm_calls": 29,
+  "tool_calls": 43,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At 03:41:28 UTC, what exact listener/port state changed for lb-sandbox, and did host resource metrics show a contemporaneous contention or exhaustion signal?",
+   "summary": "At the timestamp corresponding to 03:41:28 UTC (1790480488), the recorded listener metric still showed admin_port_up=1; the change to down is first sampled at 1790480496 (about 03:41:36 UTC), with admin probe latency rising from roughly 0.0004\u20130.0005s to 4.003s at that same sample. Thus the samples do not establish a change precisely at 03:41:28, but indicate the admin listener became unavailable shortly afterward while the nsbox-lb.service active state remained 1. No contemporaneous host exhaustion signal is evident: CPU was low (last 0.0278, observed max 0.0789), memory usage had fallen from ~0.203 to ~0.118, and disk usage remained ~0.228. [metric name=admin_port_up service=lb-sandbox ratio=0 onset=1790480496] [metric name=admin_probe_seconds service=lb-sandbox ratio=~8000 onset=1790480496] [metric name=unit_active service=lb-sandbox ratio=1 onset=1790478786] [metric name=host_cpu_ratio service=host ratio=1.13 onset=1790479626] [metric name=host_memory_used_ratio service=host ratio=0.59 onset=1790479627] [metric name=host_disk_used_ratio service=host ratio=~1.00 onset=1790478787]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_775",
+    "ev_776",
+    "ev_777"
+   ],
+   "usage": {
+    "input_tokens": 7276,
+    "output_tokens": 1020,
+    "cost_usd": 0.001237,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do nsbox-lb.service journal lifecycle and admin-listener logs show around 03:41:28 UTC, including any clean stop or specific actor/action?",
+   "summary": "Inconclusive: no nsbox-lb error clusters or matching journal/admin-listener entries were returned by the available searches, so these results do not establish whether the service stopped cleanly or identify an actor/action around 03:41:28 UTC. [log service=nsbox-lb level=unknown count=0 first_seen=unknown sig=\"no error clusters returned\"] [log service=nsbox-lb level=unknown count=0 first_seen=unknown sig=\"search for 03:41:28, Stopping, and admin-listener returned no lines\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_772",
+    "ev_773",
+    "ev_774"
+   ],
+   "usage": {
+    "input_tokens": 2679,
+    "output_tokens": 415,
+    "cost_usd": 0.000476,
+    "llm_calls": 3,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any sandbox.conf or deployment change still in effect at 03:41:28 UTC that could affect lb-sandbox's admin listener on :8091?",
+   "summary": "No deployment change is evidenced for lb-sandbox in the queried period. sandbox.conf changed the backend pool from 8093\u20138095 to 9991\u20139993 at 03:30:32 UTC (sha 966d262e), but was reverted at 03:31:22 UTC (sha 04ebad2f), before the 03:41:28 UTC onset; it was therefore not still in effect then. A second identical pool change at 03:37:19 UTC (sha 27f30d26) was reverted at 03:39:55 UTC (sha 49a3ab3c), also before onset. These changed upstream backends, not the admin listener port; sandbox.conf shows port 8090, not :8091.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_768",
+    "ev_769",
+    "ev_770",
+    "ev_771"
+   ],
+   "usage": {
+    "input_tokens": 3266,
+    "output_tokens": 823,
+    "cost_usd": 0.000738,
+    "llm_calls": 2,
+    "tool_calls": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Is there an admin/stats-path code defect that could make :8091 stop answering probes while lb-sandbox stays active and serves data traffic, and what trigger would be required?",
+   "summary": "Yes\u2014there is a plausible, isolated stats/admin-path defect: stats_loop accepts a client and performs a blocking read before sending any response, with no timeout. A client that connects to :8091 but never sends data can stall that single-threaded stats loop, leaving :8091 unresponsive while the separate main listener continues serving traffic. The required trigger is such a stalled/slow client connection; the evidence contains no observation that this trigger occurred, so it is latent and not established as the cause. Tests could not run because Go is unavailable in the sandbox. [code file=load-balancer/LoadBalancer.cpp smell=blocking-read tests=fail]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_778",
+    "ev_779",
+    "ev_780"
+   ],
+   "usage": {
+    "input_tokens": 31913,
+    "output_tokens": 641,
+    "cost_usd": 0.003513,
+    "llm_calls": 5,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "At 03:41:28\u201303:41:40 UTC, do connection/access logs or process/thread diagnostics show a client connected to lb-sandbox :8091 and stalled without sending request bytes, or another event explaining the stats-loop hang?",
+   "summary": "Inconclusive: available lb-sandbox logs show repeated backend connection-closed messages around the incident and an earlier recurring all-backends-unreachable error, but do not confirm a client connecting to :8091 and stalling before sending request bytes, nor explain the stats-loop hang. Search results for 'Accepted', 'request', and 'thread' were empty. [log service=lb-sandbox level=info count=100 first_seen=1790480460 sig=\"Backend connection closed; Active count shown\"] [log service=lb-sandbox level=error count=648 first_seen=1790479836 sig=\"All backends unreachable \u2014 dropping connection\"] [log service=lb-sandbox level=info count=0 first_seen=0 sig=\"No matches for Accepted/request/thread\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_789",
+    "ev_790",
+    "ev_791"
+   ],
+   "usage": {
+    "input_tokens": 37817,
+    "output_tokens": 1384,
+    "cost_usd": 0.004474,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "metrics",
+   "question": "Across 03:41:20\u201303:41:45 UTC, what exact listener/process state is observed for lb-sandbox :8091 (including connection count if available), and did data-path health remain steady through the admin-port transition?",
+   "summary": "From 03:41:20 to 03:41:45 UTC, metrics show lb-sandbox's unit remained active, but they do not directly establish whether the listener/process bound to :8091 was listening; the available connection-count series are for backend ports 8093/8094/8095 and 9991/9992/9993, not :8091, and all sampled counts were zero. Admin health then transitioned down while data-path latency remained steady; error rate was elevated earlier in the queried interval but had returned to zero by the admin-port-down samples. Thus data-path p99 remained steady through the admin transition, but exact :8091 listener/connection state cannot be confirmed from these metrics.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_784",
+    "ev_785",
+    "ev_786",
+    "ev_787",
+    "ev_788"
+   ],
+   "usage": {
+    "input_tokens": 9948,
+    "output_tokens": 1097,
+    "cost_usd": 0.001544,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "code",
+   "question": "Can the stats_loop blocking-read path be confirmed to handle :8091 clients serially without timeout, and is there evidence in available runtime diagnostics that this specific path was triggered at 03:41:28 UTC?",
+   "summary": "The implementation confirms that stats_loop handles :8091 clients serially and can block without a client-read timeout: it accepts one client, performs a blocking read before returning to accept, and sets no read deadline/timeout on the accepted socket. This is a latent risk for the stats endpoint, but available evidence does not show this path was triggered at 03:41:28 UTC, so it cannot be identified as the cause of that timestamped symptom. I would add a bounded receive timeout or readiness-based read handling so an idle client cannot stall subsequent stats requests. Tests could not be run because the sandbox lacks Go.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_781",
+    "ev_782",
+    "ev_783"
+   ],
+   "usage": {
+    "input_tokens": 18645,
+    "output_tokens": 629,
+    "cost_usd": 0.002179,
+    "llm_calls": 4,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

@@ -1,0 +1,349 @@
+{
+ "alert": {
+  "fingerprint": "EndpointDown-nginx-1790489278",
+  "name": "EndpointDown",
+  "service": "nginx",
+  "severity": "critical",
+  "started_at": 1790489278.304267,
+  "labels": {
+   "alertname": "EndpointDown",
+   "instance": "http://127.0.0.1:8200/",
+   "job": "probe-http",
+   "port": "8200",
+   "probe": "http",
+   "service": "nginx",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "EndpointDown: an endpoint stopped answering its probe",
+   "state_snapshot": "STATE SNAPSHOT at 06:09:34 UTC (window 30m; series that moved, newest information first):\n  CHANGED endpoint_up{service=mariadb,instance=127.0.0.1:3306} now=1, 24m ago=0, moved at 06:09:19 UTC\n  CHANGED unit_active{service=mariadb,instance=127.0.0.1:9100,name=mariadb.service} now=1, 24m ago=0, moved at 06:09:19 UTC\n  CHANGED host_cpu_ratio{service=host} now=0.0578, 30m ago=0.03675, moved at 06:09:34 UTC\n  STEADY endpoint_up{service=lb,instance=127.0.0.1:8081}=0; endpoint_up{service=shop-api,instance=http://127.0.0.1:5000/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:80/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8001/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8002/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8003/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8080/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8090/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8091/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8093/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8094/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8095/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:8200/}=0; endpoint_latency_seconds{service=mariadb,instance=127.0.0.1:3306}=0.0001976; endpoint_latency_seconds{service=lb,instance=127.0.0.1:8081}=3.001; endpoint_latency_seconds{service=shop-api,instance=http://127.0.0.1:5000/}=0.001703; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:80/}=0.001855; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8001/}=0.0004802; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8002/}=0.0004758; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8003/}=0.00101; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8080/}=0.000564; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8090/}=0.000496; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8091/}=0.0005053; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8093/}=0.0009902; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8094/}=0.0003948; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8095/}=0.0004078; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:8200/}=0.00217; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=nginx,instance=127.0.0.1:9100,name=nginx.service}=1; unit_active{service=nsbox-lb,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; unit_active{service=shop-api,instance=127.0.0.1:9100,name=shop-api.service}=1; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1609; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2612; disk_used_ratio{service=nginx,instance=127.0.0.1:9100}=0.0826; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2342; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2612"
+  }
+ },
+ "timings": {
+  "fired_at": 1790489278.304267,
+  "detected_at": 1790489374.9612155,
+  "reported_at": 1790489434.3831391,
+  "investigation_s": 59.39638948440552
+ },
+ "incident_id": "inc-EndpointDown-nginx-1790489278",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The nginx :8200 endpoint repeatedly became unreachable while nginx.service and :80 stayed healthy; evidence localizes the failure to that endpoint but does not establish its exact mechanism or trigger.",
+  "service": "nginx",
+  "category": "unknown",
+  "confidence": 0.18,
+  "evidence": [
+   "ev_2085",
+   "ev_2086",
+   "ev_2087",
+   "ev_2092",
+   "ev_2093",
+   "ev_2105",
+   "ev_2106",
+   "ev_2107",
+   "ev_2080",
+   "ev_2102"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "A whole nginx service/process outage",
+    "evidence": [
+     "ev_2086",
+     "ev_2087",
+     "ev_2093",
+     "ev_2107"
+    ]
+   },
+   {
+    "hypothesis": "A demonstrated nginx :8200 deploy/config change",
+    "evidence": [
+     "ev_2078",
+     "ev_2096",
+     "ev_2097",
+     "ev_2100"
+    ]
+   },
+   {
+    "hypothesis": "The shop-api discount-factor deploys caused the nginx :8200 failure",
+    "evidence": [
+     "ev_2077",
+     "ev_2098",
+     "ev_2099"
+    ]
+   },
+   {
+    "hypothesis": "Load-balancer endpoint failure caused the nginx :8200 failure",
+    "evidence": [
+     "ev_2094"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Unresolved failure isolated to nginx :8200; listener, PHP-FPM/FastCGI backend, and probe behavior are not distinguished by available evidence.",
+    "service": "nginx",
+    "category": "unknown",
+    "confidence": 0.18
+   },
+   {
+    "root_cause": "Possible PHP-FPM/FastCGI backend availability or latency issue affecting PHP-backed requests on :8200; no trigger or runtime evidence confirms it.",
+    "service": "nginx",
+    "category": "unknown",
+    "confidence": 0.12
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "nginx/WordPress on-call",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 162116,
+   "output_tokens": 8413,
+   "cost_usd": 0.020417,
+   "llm_calls": 45,
+   "tool_calls": 56,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 3,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "nginx/WordPress on-call",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 162116,
+  "output_tokens": 8413,
+  "cost_usd": 0.020417,
+  "llm_calls": 45,
+  "tool_calls": 56,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "When did nginx endpoint_up for http://127.0.0.1:8200/ first become 0 relative to alert_started_at, and did nginx :80 or unit_active change then?",
+   "summary": "The nginx probe for http://127.0.0.1:8200/ first recorded endpoint_up=0 at Unix 1790487974, which is 70 seconds after the baseline anomaly start reported at 1790487904? No alert_started_at was supplied or observed in these metrics results, so timing relative to alert_started_at cannot be determined. This probe subsequently fluctuated, recovering at 1790488184 and failing again at 1790488244, then recovering at 1790488604 before failing at 1790489324; current value is 0 at 1790489384. Nginx :80 stayed up (ratio 1.0) and nginx unit_active stayed active (ratio 1.0) throughout the observed 30 minutes. Evidence does not establish alert_started_at, so overall status is inconclusive.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2085",
+    "ev_2086",
+    "ev_2087"
+   ],
+   "usage": {
+    "input_tokens": 12582,
+    "output_tokens": 883,
+    "cost_usd": 0.001699,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do nginx lifecycle and access/error logs show for the :8200 listener around the onset\u2014was its worker/listener stopped or did probes fail for another reason?",
+   "summary": "Inconclusive: cluster error scan found no new nginx error signatures in the requested -2h window, and the available nginx searches returned no lifecycle, :8200 access, or error samples. Therefore there is no evidence here to determine whether its worker/listener stopped or probes failed for another reason. [log service=nginx level=unknown count=0 first_seen=unknown sig=\"no matching cluster signatures or search results\"] (Evidence: call_1\u2013call_5.)",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2079",
+    "ev_2080",
+    "ev_2081"
+   ],
+   "usage": {
+    "input_tokens": 2725,
+    "output_tokens": 412,
+    "cost_usd": 0.000479,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any nginx config or deployment change still in effect at the onset that specifically altered the :8200 listener or its probe behavior?",
+   "summary": "Inconclusive: the available config-diff output is truncated and provides no readable commit metadata or nginx diff for the :8200 listener/probe; the listed recent deployments are shop-api feature changes, not evidence about nginx. Therefore I cannot determine whether a relevant change was still in effect at onset. No :8200 candidate can be confirmed from the evidence retrieved.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2077",
+    "ev_2078"
+   ],
+   "usage": {
+    "input_tokens": 3695,
+    "output_tokens": 394,
+    "cost_usd": 0.000566,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Does the current nginx configuration/source show a specific reason the :8200 endpoint can fail while :80 and nginx.service remain healthy?",
+   "summary": "The source shows a plausible specific failure point for requests to :8200: PHP requests handled by that server block are sent directly to `/run/php/php8.5-fpm.sock`, with a 10-second FastCGI read timeout. If that socket is unavailable or PHP-FPM is unhealthy, or PHP takes longer than 10 seconds, :8200 requests that execute PHP can fail while nginx itself remains running. The file does not show a separate :80 listener or incident/runtime evidence, so it cannot establish that this condition actually occurred or explain a specific observed symptom. Proposed fix: verify the FPM socket/service and timeout against the deployment, then correct the upstream or timeout as indicated by logs. Tests could not be run because `make test` was not allow-listed. [code file=nginx/wordpress.conf smell=upstream-availability tests=fail] [code file=nginx/wordpress.conf smell=fastcgi-timeout tests=fail]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2082",
+    "ev_2083",
+    "ev_2084"
+   ],
+   "usage": {
+    "input_tokens": 12487,
+    "output_tokens": 566,
+    "cost_usd": 0.001532,
+    "llm_calls": 3,
+    "tool_calls": 4,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "At the exact failures of nginx http://127.0.0.1:8200/ (including 1790489324), what did the listener/backend state and php-fpm endpoint/service state show, and did either change before the probe failure?",
+   "summary": "At the named failure time 1790489324, nginx probe target http://127.0.0.1:8200/ was still up (last sample at 1790489264=1; the next sample 1790489339=0), then it remained down at 1790489399. Across the observed 30-minute window this endpoint had its first failure by 1790487959 after being up at 1790487899, recovered by 1790488619, and failed again by 1790489339. Its latency was ~0.042\u20130.046s for most of the interval before falling to 0.0015s at 1790489339; nginx port 80 remained up, nginx.service stayed active, and all observed nsbox-lb probe endpoints remained up with near-baseline latency. shop-api endpoint and service remained up/active, so available evidence does not show a backend/service failure preceding the 8200 probe failure. Exact PHP-FPM endpoint/service state cannot be established because no PHP-FPM metric was returned/listed; no direct listener/backend-state metric was available. Consequently the evidence is insufficient to determine the requested listener/backend and PHP-FPM states definitively.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2091",
+    "ev_2092",
+    "ev_2093",
+    "ev_2094",
+    "ev_2095"
+   ],
+   "usage": {
+    "input_tokens": 18988,
+    "output_tokens": 1359,
+    "cost_usd": 0.002579,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "For nginx :8200 around 1790489324 and earlier failures, are there request/probe errors or php8.5-fpm socket/connect/timeout errors that identify the failing layer?",
+   "summary": "Inconclusive: the error-cluster query returned no clusters, and nginx searches for :8200, error-level entries, php8.5-fpm references, and systemd lifecycle entries returned no lines in the queried -2h window. This does not establish which layer failed, nor confirm socket/connect/timeout or request/probe errors. [log service=nginx level=unknown count=0 first_seen=unknown sig=\"no matching cluster or log lines\"] Evidence: call_1 through call_5. The queried interval was relative (-2h); no absolute timestamps are inferred.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2088",
+    "ev_2089",
+    "ev_2090"
+   ],
+   "usage": {
+    "input_tokens": 2747,
+    "output_tokens": 446,
+    "cost_usd": 0.000497,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Can you retrieve the actual nginx/wordpress.conf diff and determine whether any :8200 or probe change remained in effect at the first failure at 1790487974 and recurrence at 1790489324?",
+   "summary": "Inconclusive: I cannot provide the actual nginx/wordpress.conf diff or determine whether a :8200/probe change remained in effect at the first failure (1790487974) or recurrence (1790489324). The config-diff outputs were truncated before the relevant file hunk and commit metadata; a query for wordpress.conf returned no commits. No evidence of later revert/restore commits was available, so persistence at onset cannot be established. The recent deploys were three shop-api commits, not evidence for nginx/WordPress config or probe changes.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2096",
+    "ev_2097",
+    "ev_2098"
+   ],
+   "usage": {
+    "input_tokens": 27680,
+    "output_tokens": 822,
+    "cost_usd": 0.003179,
+    "llm_calls": 6,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "metrics",
+   "question": "What were the exact php8.5-fpm.service active state and /run/php/php8.5-fpm.sock availability (or equivalent PHP-FPM endpoint state) immediately before and during nginx :8200 first failure at 1790487974 and recurrence near 1790489324?",
+   "summary": "Metrics cannot establish the exact php8.5-fpm.service active state or /run/php/php8.5-fpm.sock presence: neither PHP-FPM unit nor socket metric is listed among the available known metrics. The nearest observable equivalent is nginx's HTTP probe on :8200, which was up at 1790487894 and down by 1790487964 around the first reported failure; it recovered by 1790488624, then was down again by 1790489284 and remained down at the latest sample (1790489414). nginx.service and the shop-api unit remained active throughout, and nginx port 80 stayed up. MariaDB activity and its :3306 probe also independently dropped around the first failure and again near the recurrence, so these metrics do not isolate PHP-FPM as the cause.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2104",
+    "ev_2105",
+    "ev_2106",
+    "ev_2107",
+    "ev_2108"
+   ],
+   "usage": {
+    "input_tokens": 23129,
+    "output_tokens": 808,
+    "cost_usd": 0.002717,
+    "llm_calls": 6,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "For nginx :8200 around 1790487899\u20131790487974 and 1790489264\u20131790489399, are there access/error or PHP-FPM logs showing probe status, upstream socket refusal/timeout, or listener failure?",
+   "summary": "Inconclusive. The available search returned no nginx-specific error clusters and no matching lines for \u201c8200\u201d, \u201cphp\u201d, or \u201csystemd\u201d in the searched -2d window; that does not establish whether access/error or PHP-FPM logs show probe status, upstream socket refusal/timeout, or listener failure in the two requested intervals. Other-service load-balancer errors were present but are not direct evidence about nginx:8200. [log service=nginx level=unknown count=0 first_seen=unknown sig=\"no matching nginx records returned\"] (call_2, call_4, call_5, call_6)",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2101",
+    "ev_2102",
+    "ev_2103"
+   ],
+   "usage": {
+    "input_tokens": 4347,
+    "output_tokens": 487,
+    "cost_usd": 0.000678,
+    "llm_calls": 3,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "stalled"
+  },
+  {
+   "agent": "changes",
+   "question": "Can you establish whether any nginx/wordpress.conf :8200 or probe change was applied and still in effect at 1790487974 or 1790489324, identifying the exact commit/config key and any later revert?",
+   "summary": "Inconclusive: available config-diff output is truncated before commit metadata and the relevant `nginx/wordpress.conf`/probe hunks, so I cannot identify an exact :8200/probe change, its key/value, or check whether a later commit reverted it by timestamps 1790487974 or 1790489324. The returned deploys are shop-api changes and do not establish a relevant nginx/WordPress or probe change. [change kind=deploy service=shop-api sha=8cba97a6 ts=1790484899 key=order-count-discount old=unknown new=unknown msg=\"feat: apply discount factor to order count on home page\"] [change kind=deploy service=shop-api sha=60740e12 ts=1790485758 key=order-count-discount old=unknown new=unknown msg=\"feat: apply discount factor to order count on home page\"] [change kind=deploy service=shop-api sha=04d9f3df ts=1790486599 key=order-count-discount old=unknown new=unknown msg=\"feat: apply discount factor to order count on home page\"] (Evidence: call_1, call_2, call_3, call_4.)",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2099",
+    "ev_2100"
+   ],
+   "usage": {
+    "input_tokens": 22135,
+    "output_tokens": 787,
+    "cost_usd": 0.002606,
+    "llm_calls": 5,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

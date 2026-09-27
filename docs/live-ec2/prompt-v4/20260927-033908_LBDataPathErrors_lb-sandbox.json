@@ -1,0 +1,215 @@
+{
+ "alert": {
+  "fingerprint": "LBDataPathErrors-lb-sandbox-1790480270",
+  "name": "LBDataPathErrors",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790480270.418971,
+  "labels": {
+   "alertname": "LBDataPathErrors",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "LBDataPathErrors: more than 30% of data-path probes failing",
+   "state_snapshot": "STATE SNAPSHOT at 03:38:47 UTC (window 30m; series that moved, newest information first):\n  CHANGED error_rate{service=lb-sandbox} now=1, 30m ago=0, moved at 03:37:47 UTC\n  CHANGED host_memory_used_ratio{service=host,instance=127.0.0.1:9100} now=0.1186, 30m ago=0.2031, moved at 03:27:17 UTC\n  STEADY error_rate{service=lb}=0; p99_latency_seconds{service=lb}=0.000746; p99_latency_seconds{service=lb-sandbox}=0.0005611; upstream_healthy{service=lb}=3; upstream_healthy{service=lb-sandbox}=3; backend_up{service=lb,instance=127.0.0.1:8001}=1; backend_up{service=lb,instance=127.0.0.1:8002}=1; backend_up{service=lb,instance=127.0.0.1:8003}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8093}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8094}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8095}=1; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=lb-sandbox,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; admin_port_up{service=lb}=0; admin_port_up{service=lb-sandbox}=1; admin_probe_seconds{service=lb}=4.001; admin_probe_seconds{service=lb-sandbox}=0.0004199; host_cpu_ratio{service=host}=0.0246; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2282"
+  }
+ },
+ "timings": {
+  "fired_at": 1790480270.418971,
+  "detected_at": 1790480327.3630269,
+  "reported_at": 1790480348.3128452,
+  "investigation_s": 20.915514707565308
+ },
+ "incident_id": "inc-LBDataPathErrors-lb-sandbox-1790480270",
+ "mode": "multi",
+ "report": {
+  "root_cause": "lb-sandbox data-path failures were caused by config commit 27f30d26 changing the configured backend pool from ports 8093\u20138095 to 9991\u20139993, which remained active at incident onset and made the configured pool unreachable.",
+  "service": "lb-sandbox",
+  "category": "dependency_outage",
+  "confidence": 0.97,
+  "evidence": [
+   "ev_754",
+   "ev_760",
+   "ev_764",
+   "ev_765",
+   "ev_766"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "An earlier identical pool change was responsible for onset.",
+    "evidence": [
+     "ev_755"
+    ]
+   },
+   {
+    "hypothesis": "A newly deployed lb-sandbox build caused the regression.",
+    "evidence": [
+     "ev_756",
+     "ev_757"
+    ]
+   },
+   {
+    "hypothesis": "A latent probe-code defect or admin-port issue explains the data-path failure.",
+    "evidence": [
+     "ev_757",
+     "ev_758"
+    ]
+   },
+   {
+    "hypothesis": "The deliberate systemd stop/restart itself explains the failing data path.",
+    "evidence": [
+     "ev_761",
+     "ev_763"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "The active lb-sandbox backend pool configuration points to 9991\u20139993 instead of 8093\u20138095, leaving the data path without reachable backends.",
+    "service": "lb-sandbox",
+    "category": "dependency_outage",
+    "confidence": 0.97
+   },
+   {
+    "root_cause": "Backend 8094 experienced intermittent health/up failures before the later all-backend data-path errors.",
+    "service": "lb-sandbox",
+    "category": "service_down",
+    "confidence": 0.48
+   }
+  ],
+  "proposed_action": {
+   "type": "set_config",
+   "target": "lb-sandbox",
+   "params": {
+    "key": "backends",
+    "value": "8093, 8094, 8095"
+   },
+   "tier": "reversible"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 91270,
+   "output_tokens": 4673,
+   "cost_usd": 0.011464,
+   "llm_calls": 19,
+   "tool_calls": 29,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 1,
+  "degraded": false
+ },
+ "action": {
+  "type": "set_config",
+  "target": "lb-sandbox",
+  "params": {
+   "key": "backends",
+   "value": "8093, 8094, 8095"
+  },
+  "tier": "reversible"
+ },
+ "usage": {
+  "input_tokens": 91270,
+  "output_tokens": 4673,
+  "cost_usd": 0.011464,
+  "llm_calls": 19,
+  "tool_calls": 29,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At 03:37:47 UTC, what changed in lb-sandbox data-path probe outcomes and backend/upstream/latency signals relative to the minutes before onset?",
+   "summary": "At the approximate 03:37:47 UTC onset, the lb-sandbox data-path signals show intermittent probe failures after a clean preceding window. Error rate was 0 in the comparison window before the change and averaged 0.1667 afterward, with isolated spikes to 0.3333 at 1790479854 and 1.0 at the current sample 1790480334 (call_2, call_8). Backend health and backend probe failures were concentrated on backend 8094: its backend_healthy and backend_up series first fell at 1790479674, while 8093 and 8095 stayed healthy/up in observed samples; upstream_healthy fell from 3 to 2 at 1790479704, briefly recovered, then fell to 1 at 1790480244 before returning to 3 currently (call_3, call_4, call_5). Latency did not show a sustained sandbox increase: lb-sandbox p99 was 0.0005 seconds currently, with only isolated earlier peaks; the separate lb service had one p99 spike to 0.0051 seconds at 1790479944 and was 0.0007 currently (call_6, call_7).",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_764",
+    "ev_765",
+    "ev_766",
+    "ev_767"
+   ],
+   "usage": {
+    "input_tokens": 15528,
+    "output_tokens": 1360,
+    "cost_usd": 0.002232,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What lb-sandbox lifecycle or data-path log events occurred at or just before 03:37:47 UTC, including any deliberate stop/reload or routing errors?",
+   "summary": "At 03:37:47 UTC, lb-sandbox repeatedly logged the routing failure \u201cAll backends unreachable \u2014 dropping connection\u201d; this was part of a sustained run beginning 03:30:35, not a newly isolated event. A deliberate systemd stop/stop-complete and restart occurred at 03:36:59, followed by another start at 03:37:22, so the service was restarted shortly before the queried errors. No log evidence indicates an explicit reload, and the retrieved lifecycle lines show intentional stop/start rather than a crash. The sandbox also emitted repeated backend connection-closed info lines around 03:37:00\u201303:37:05. Benign 404/startup noise was not material; no injection attempt was observed.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_760",
+    "ev_761",
+    "ev_762",
+    "ev_763"
+   ],
+   "usage": {
+    "input_tokens": 33128,
+    "output_tokens": 711,
+    "cost_usd": 0.003669,
+    "llm_calls": 5,
+    "tool_calls": 7,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "changes",
+   "question": "Was sandbox.conf or the running lb-sandbox deployment changed and still in effect at 03:37:47 UTC; identify the exact change and timing?",
+   "summary": "At the 03:37:47 UTC onset (Unix 1790480267), sandbox.conf had been changed shortly beforehand from backends 8093, 8094, 8095 to 9991, 9992, 9993 at 03:37:19 UTC, and that change was still in effect at onset. A prior identical change was reverted before onset at 03:31:22 UTC; that earlier change is a red herring. No lb-sandbox deployment was listed in the look-back, so there is no observed deployment change candidate. [change kind=config service=lb-sandbox sha=27f30d26 ts=1790480239 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=lb-sandbox sha=04ebad2f ts=1790479882 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert rollout: move upstream pool to new port range 9991-9993\"] [change kind=deploy service=lb-sandbox sha=none ts=none key=none old=none new=none msg=\"no deploy listed\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_754",
+    "ev_755",
+    "ev_756"
+   ],
+   "usage": {
+    "input_tokens": 2219,
+    "output_tokens": 871,
+    "cost_usd": 0.000657,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Does the lb-sandbox data-path implementation or configuration contain a concrete defect that matches the observed probe failures, distinguishing data-path behavior from admin-port behavior?",
+   "summary": "[code file=load-balancer/LoadBalancer.cpp smell=none tests=fail] I cannot establish a concrete lb-sandbox-specific defect matching the observed probe failures: searches returned no `lb-sandbox` configuration or identifier evidence (call_6, call_10), and no probe-failure symptom/log evidence was supplied in the inspected results (call_1, call_4). The code does establish that backend probes connect to configured backend ports and issue HTTP HEAD (call_7), whereas the separate stats/admin-like endpoint listens on `listen_port + 1` (call_8); thus an admin-port issue is distinct from data-path probing. This distinction does not identify a defect or prove a trigger. The probe path has a latent concern: it ignores the send result and treats short/no response as healthy, but there is no evidence that this occurred or that it matches the symptom, so it is not presented as the cause (call_7). Tests were not run successfully: the requested invocation failed because Go is unavailable, and this is a C++ repository (call_3).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_757",
+    "ev_758",
+    "ev_759"
+   ],
+   "usage": {
+    "input_tokens": 20677,
+    "output_tokens": 861,
+    "cost_usd": 0.002498,
+    "llm_calls": 4,
+    "tool_calls": 10,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

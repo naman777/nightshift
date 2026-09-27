@@ -1,0 +1,229 @@
+{
+ "alert": {
+  "fingerprint": "LBBackendUnhealthy+LBDataPathErrors+LBUnitDown-lb-sandbox-1790482420",
+  "name": "LBBackendUnhealthy+LBDataPathErrors+LBUnitDown",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790482420.418971,
+  "labels": {
+   "alertname": "LBBackendUnhealthy+LBDataPathErrors+LBUnitDown",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "LBBackendUnhealthy: fewer than 3 upstream backends accepting connections; LBDataPathErrors: more than 30% of data-path probes failing; LBUnitDown: systemd unit is not active",
+   "state_snapshot": "STATE SNAPSHOT at 04:14:39 UTC (window 30m; series that moved, newest information first):\n  CHANGED error_rate{service=lb-sandbox} now=1, 30m ago=0.3333, moved at 04:14:09 UTC\n  CHANGED upstream_healthy{service=lb-sandbox} now=0, 30m ago=2, moved at 04:06:09 UTC\n  CHANGED backend_up{service=lb-sandbox,instance=127.0.0.1:8093} now=0, 30m ago=1, moved at 04:13:39 UTC\n  CHANGED backend_up{service=lb-sandbox,instance=127.0.0.1:8095} now=0, 30m ago=1, moved at 04:13:39 UTC\n  CHANGED unit_active{service=lb-sandbox,instance=127.0.0.1:9100,name=nsbox-lb.service} now=0, 30m ago=1, moved at 04:13:54 UTC\n  CHANGED admin_port_up{service=lb-sandbox} now=0, 30m ago=1, moved at 04:13:39 UTC\n  CHANGED host_cpu_ratio{service=host} now=0.0206, 30m ago=0.0376, moved at 04:13:24 UTC\n  STEADY error_rate{service=lb}=0; p99_latency_seconds{service=lb}=0.0006311; p99_latency_seconds{service=lb-sandbox}=0.0003864; upstream_healthy{service=lb}=3; backend_up{service=lb,instance=127.0.0.1:8001}=1; backend_up{service=lb,instance=127.0.0.1:8002}=1; backend_up{service=lb,instance=127.0.0.1:8003}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8094}=0; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; admin_port_up{service=lb}=0; admin_probe_seconds{service=lb}=4.001; admin_probe_seconds{service=lb-sandbox}=0.0003347; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1652; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2296"
+  }
+ },
+ "timings": {
+  "fired_at": 1790482420.418971,
+  "detected_at": 1790482479.4332967,
+  "reported_at": 1790482524.1914861,
+  "investigation_s": 44.719197511672974
+ },
+ "incident_id": "inc-LBBackendUnhealthy+LBDataPathErrors+LBUnitDown-lb-sandbox-1790482420",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The lb-sandbox service, specifically the nsbox-lb.service instance using admin endpoint 127.0.0.1:9100, became inactive by 04:14:00 UTC; this service-down event best explains the simultaneous loss of backend probes, but the exact initiator or exit reason is not established.",
+  "service": "lb-sandbox",
+  "category": "service_down",
+  "confidence": 0.62,
+  "evidence": [
+   "ev_1105",
+   "ev_1106",
+   "ev_1107",
+   "ev_1112",
+   "ev_1098"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "A sandbox backend config rollout caused the incident",
+    "evidence": [
+     "ev_1095",
+     "ev_1096"
+    ]
+   },
+   {
+    "hypothesis": "Host resource contention/exhaustion caused the service and backends to fail",
+    "evidence": [
+     "ev_1103",
+     "ev_1104",
+     "ev_1109"
+    ]
+   },
+   {
+    "hypothesis": "An admin-listener code defect alone explains the whole-unit/data-path failure",
+    "evidence": [
+     "ev_1099",
+     "ev_1100"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "nsbox-lb.service on lb-sandbox became inactive at the incident boundary, with stop/crash initiator unconfirmed.",
+    "service": "lb-sandbox",
+    "category": "service_down",
+    "confidence": 0.62
+   },
+   {
+    "root_cause": "A main-listener bind/listen failure could terminate the lb-sandbox process, but there is no evidence this path triggered.",
+    "service": "lb-sandbox",
+    "category": "code_defect",
+    "confidence": 0.15
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "lb-sandbox owning/on-call team",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 101094,
+   "output_tokens": 6947,
+   "cost_usd": 0.013585,
+   "llm_calls": 24,
+   "tool_calls": 38,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "restart_replica",
+  "target": "lb-sandbox",
+  "params": {
+   "service": "lb-sandbox"
+  },
+  "tier": "reversible"
+ },
+ "usage": {
+  "input_tokens": 101094,
+  "output_tokens": 6947,
+  "cost_usd": 0.013585,
+  "llm_calls": 24,
+  "tool_calls": 38,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "logs",
+   "question": "What lifecycle or fault-injection logs immediately precede 04:13:54 UTC for nsbox-lb.service, including whether it was cleanly stopped and by whom/what?",
+   "summary": "Inconclusive: cluster error discovery found no new signatures, and the nsbox-lb.service queries returned no lifecycle, fault-injection, or tail entries in the searched -24h interval. Consequently, the available logs do not establish whether it was cleanly stopped or identify who/what stopped it before 04:13:54 UTC. [log service=nsbox-lb.service level=unknown count=0 first_seen=unknown sig=\"no matching log entries in queried -24h window\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1097",
+    "ev_1098"
+   ],
+   "usage": {
+    "input_tokens": 2952,
+    "output_tokens": 508,
+    "cost_usd": 0.00055,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any sandbox config or deploy change still active at 04:13:39\u201304:14:09 UTC, and what exact change/commit and timing?",
+   "summary": "No sandbox deploys are shown in the recent-deploy evidence. Sandbox config repeatedly changed the `backends` pool from `8093, 8094, 8095` to `9991, 9992, 9993`, but each listed rollout was reverted before the queried 04:13:39\u201304:14:09 UTC interval. The last rollout (sha 44a42662, 04:05:45 UTC) was reverted by sha f371289b at 04:08:33 UTC, so that change was not still active at onset. [change kind=config service=sandbox sha=44a42662 ts=1790481945 key=backends old=\"8093, 8094, 8095\" new=\"9991, 9992, 9993\" msg=\"rollout: move upstream pool to new port range 9991-9993\"] [change kind=config service=sandbox sha=f371289b ts=1790482113 key=backends old=\"9991, 9992, 9993\" new=\"8093, 8094, 8095\" msg=\"Revert \\\"rollout: move upstream pool to new port range 9991-9993\\\"\"]",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_1094",
+    "ev_1095",
+    "ev_1096"
+   ],
+   "usage": {
+    "input_tokens": 3194,
+    "output_tokens": 886,
+    "cost_usd": 0.000762,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Is there code evidence for a triggered defect that could stop the lb-sandbox unit at 04:13:54, rather than merely affect its admin listener?",
+   "summary": "Inconclusive: code shows stats/admin listener bind failures are explicitly nonfatal (warning, disable stats, return), while the main listener has separate fatal-to-service implications only as an observed logged early return, and systemd is configured to restart. There is no evidence in the available code/tool output that either failure was triggered at 04:13:54 or that the lb-sandbox unit stopped then. [code file=load-balancer/LoadBalancer.cpp smell=none tests=fail]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1099",
+    "ev_1100",
+    "ev_1101",
+    "ev_1102"
+   ],
+   "usage": {
+    "input_tokens": 21216,
+    "output_tokens": 809,
+    "cost_usd": 0.002527,
+    "llm_calls": 5,
+    "tool_calls": 9,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "What is the precise sequence of host CPU/memory/disk and lb-sandbox unit/backend/admin/data-path signals from 04:06 through 04:14 UTC, and is host contention plausible?",
+   "summary": "Partial sequence only. From 04:06\u201304:14 UTC, CPU remained low, memory and root disk were nearly flat; lb-sandbox unit was down at 04:06:00, up by 04:06:30, then down at 04:14:00. Backend probes 8093/8094/8095 were all down at 04:14:00; admin_port_up first went down at 04:12:30, briefly recovered at 04:13:30, then was down at 04:14:00. These host observations do not support contention as a likely explanation. Admin probe latency and data-path range signals were unavailable due to tool-budget exhaustion, preventing the complete requested signal sequence or ratios-vs-baseline assessment.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1103",
+    "ev_1104",
+    "ev_1105",
+    "ev_1106",
+    "ev_1107",
+    "ev_1108",
+    "ev_1109"
+   ],
+   "usage": {
+    "input_tokens": 14847,
+    "output_tokens": 2664,
+    "cost_usd": 0.002817,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "For nsbox-lb.service / lb-sandbox instance 127.0.0.1:9100, find exact journal/systemd lifecycle and manager/audit events around 04:13:30\u201304:14:15 UTC; determine whether it was cleanly stopped, crashed/killed, or failed, and identify the initiator or exit reason. Include evidence IDs and timestamps.",
+   "summary": "Inconclusive for the requested 04:13:30\u201304:14:15 UTC window: the available results do not establish the matching lifecycle event, manager/audit initiator, or exit reason. The only retrieved lifecycle sample explicitly shows a clean stop/deactivation at 2026-09-27 03:26:34 UTC (Unix 1790480394), followed by a start at the same second, which is outside the requested interval and cannot be used to classify the requested event. Searches for the specific UTC window were unsuccessful (ISO start format rejected; subsequent searches reported exhausted budget).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1110",
+    "ev_1111",
+    "ev_1112"
+   ],
+   "usage": {
+    "input_tokens": 24967,
+    "output_tokens": 929,
+    "cost_usd": 0.002961,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

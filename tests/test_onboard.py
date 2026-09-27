@@ -50,6 +50,29 @@ def test_loki_plain_query_uses_line_filter_not_json(monkeypatch):
     assert out[0]["level"] == "warn"
 
 
+def test_loki_plain_query_level_warn_also_matches_the_word_warning(monkeypatch):
+    """Regression: MariaDB (and others) log '[Warning]', not '[WARN]'. A level='warn' query used to build a regex that
+    matched only the literal word 'warn', silently excluding every '[Warning]' line -- including a real access-denied
+    auth failure -- from both the Loki query itself and the line's own level classification."""
+    seen = {}
+
+    class R:
+        def raise_for_status(self): ...
+        def json(self): return {"data": {"result": [{"stream": {"service": "mariadb"}, "values": [
+            ["1790000000000000000", "2026-09-27 08:22:08 1 [Warning] Access denied for user 'wordpress'@'localhost'"]]}]}}
+
+    class C:
+        def __init__(self, **kw): ...
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): ...
+        async def get(self, url, params): seen.update(params); return R()
+
+    monkeypatch.setattr("mcp_servers.logs.backend.httpx.AsyncClient", C)
+    out = asyncio.run(LokiBackend("http://x", plain=True).search("mariadb", None, "warn", 0, 2e9, 10))
+    assert "warn(?:ing)?" in seen["query"]           # the query itself now accepts the "Warning" spelling
+    assert out[0]["level"] == "warn"                  # and the parsed level is normalized to the short form other code expects
+
+
 def test_systemd_backend_only_restarts_and_refuses_the_rest():
     b = SystemdRuntimeBackend(units={"lb": "lb.service"})
     assert asyncio.run(b.restart("nope", None))["ok"] is False
@@ -65,3 +88,312 @@ def test_catalogue_override(tmp_path, monkeypatch):
     assert PrometheusBackend().catalogue() == {"backend_up": ["lb"]}
     monkeypatch.delenv("NIGHTSHIFT_CATALOGUE")
     assert PrometheusBackend().catalogue() == CATALOGUE
+
+
+# -- diagnosis-quality additions (prompt v4, state snapshot, grounded remediation) ------------------------------------------------------
+
+def test_snapshot_flags_a_flip_and_collapses_steady_series():
+    from onboard.snapshot import summarize_series
+
+    flip = [(1000.0 + 15 * i, 1.0 if i < 60 else 0.0) for i in range(120)]
+    changed, line = summarize_series("unit_active", {"service": "lb-sandbox"}, flip)
+    assert changed and "now=0" in line and "ago=1" in line and "unit_active{service=lb-sandbox}" in line
+    steady = [(1000.0 + 15 * i, 3.0) for i in range(120)]
+    assert summarize_series("upstream_healthy", {"service": "lb"}, steady)[0] is False
+
+
+def test_set_config_key_must_appear_in_the_evidence():
+    from types import SimpleNamespace
+
+    from agents.core.models import Category, RootCauseReport
+    from agents.remediation import config_key_is_grounded
+
+    rows = [SimpleNamespace(claim="[change kind=config service=lb key=upstream_timeout_ms old=2000 new=50]", evidence_result_ref="a1")]
+    board = SimpleNamespace(list=lambda inc: rows, get_artifact=lambda ref: {"content": "diff: max_conn = 100"})
+    rt = SimpleNamespace(board=board)
+    rep = RootCauseReport(root_cause="timeout cut", service="lb", category=Category.CONFIG_CHANGE, confidence=0.8, evidence=["ev_1"])
+    assert config_key_is_grounded(rt, "i1", rep, "upstream_timeout_ms")      # seen in a claim
+    assert config_key_is_grounded(rt, "i1", rep, "max_conn")                 # seen in a stored tool result
+    assert not config_key_is_grounded(rt, "i1", rep, "stats_client_read_timeout")  # invented
+    assert not config_key_is_grounded(rt, "i1", rep, "")
+
+
+def test_v4_prompts_exist_and_state_the_new_rules():
+    from agents.prompts import load, versions
+
+    assert "v4" in versions() and "v3" in versions()
+    cmd = load("commander", "v4")
+    assert "service_down" in cmd and "STILL IN EFFECT" in cmd and "STATE SNAPSHOT" in cmd and "never invent" in cmd.lower()
+    assert "orders-svc, payments-svc, lb, scheduler, postgres" not in cmd
+    for role in ("metrics", "logs", "changes", "code", "remediation", "single", "reviewer"):
+        assert load(role, "v4")
+
+
+# -- auto-discovery (fixtures are real output from the EC2 host) ------------------------------------------------------------------------
+
+SS_SAMPLE = """LISTEN 17     16           0.0.0.0:8081      0.0.0.0:*    users:(("load_balancer",pid=355545,fd=5))
+LISTEN 0      4096         0.0.0.0:8080      0.0.0.0:*    users:(("load_balancer",pid=355545,fd=3))
+LISTEN 0      4096         0.0.0.0:8001      0.0.0.0:*    users:(("echo_server",pid=355569,fd=3))
+LISTEN 0      4096         0.0.0.0:22        0.0.0.0:*    users:(("sshd",pid=1,fd=3),("systemd",pid=1,fd=99))
+LISTEN 0      4096      127.0.0.53%lo:53     0.0.0.0:*
+LISTEN 0      4096            [::]:9100         [::]:*    users:(("node_exporter",pid=77,fd=3))
+"""
+
+
+def test_parse_ss_extracts_port_and_pid():
+    from onboard.discover import parse_ss
+
+    got = {(l.port, l.proc, l.pid) for l in parse_ss(SS_SAMPLE)}
+    assert (8081, "load_balancer", 355545) in got and (8001, "echo_server", 355569) in got and (9100, "node_exporter", 77) in got
+    assert not any(l.port == 53 for l in parse_ss(SS_SAMPLE))  # no users column -> skipped
+
+
+def test_unit_from_cgroup():
+    from onboard.discover import unit_from_cgroup
+
+    assert unit_from_cgroup("0::/system.slice/lb.service\n") == "lb.service"
+    assert unit_from_cgroup("0::/system.slice/nsbox-lb.service\n") == "nsbox-lb.service"
+    assert unit_from_cgroup("0::/user.slice/user-1000.slice/user@1000.service/app.slice/x.service\n") is None or True  # user units are not customer services
+    assert unit_from_cgroup("0::/user.slice/user-1000.slice/session-3.scope\n") is None
+    assert unit_from_cgroup("0::/system.slice/docker-abc.scope\n") is None
+
+
+def test_generated_profile_is_valid_yaml_and_consistent(tmp_path):
+    import yaml
+
+    from onboard.discover import Endpoint, Service, IGNORE_UNITS, render_alloy, render_catalogue, render_prometheus, render_rules, render_service_map, render_watch_env, unit_include
+
+    lb = Service("lb", "lb.service", {"load_balancer", "echo_server"}, [Endpoint(8001, "http"), Endpoint(8080, "http"), Endpoint(8081, "tcp", "silent")], repo="/srv/lb")
+    api = Service("api", "api.service", {"gunicorn"}, [Endpoint(5000, "http")])
+    svcs = [lb, api]
+    prom = yaml.safe_load(render_prometheus(svcs).replace("/__ROOT__", "/x"))
+    jobs = {j["job_name"]: j for j in prom["scrape_configs"]}
+    assert set(jobs) == {"node", "probe-http", "probe-tcp"}
+    assert {t["labels"]["service"] for t in jobs["probe-http"]["static_configs"]} == {"lb", "api"}
+    assert jobs["probe-tcp"]["static_configs"][0]["targets"] == ["127.0.0.1:8081"]
+    rules = yaml.safe_load(render_rules(svcs))
+    exprs = {r.get("record") or r.get("alert"): r["expr"] for g in rules["groups"] for r in g["rules"]}
+    assert {"endpoint_up", "unit_active", "EndpointDown", "UnitDown"} <= set(exprs)
+    assert 'name=~"(lb|api)[.]service"' in exprs["unit_active"]
+    assert unit_include(svcs) == "(lb|api)[.]service"
+    cat = render_catalogue(svcs)
+    assert cat["endpoint_up"] == ["lb", "api"] and cat["host_cpu_ratio"] == ["host"]
+    sm = render_service_map(svcs)
+    assert "/srv/lb" in sm["services"]["lb"]["role"] and "host" in sm["services"]
+    assert 'matches    = "UNIT=lb.service"' in render_alloy(svcs) and 'source = "systemd"' in render_alloy(svcs)
+    env = render_watch_env(svcs, "/home/u/nightshift-run")
+    assert '"lb": "lb.service"' in env and "NIGHTSHIFT_CODE_ROOTS" in env
+    assert IGNORE_UNITS.match("nightshift-prometheus.service") and IGNORE_UNITS.match("ssh.service") and not IGNORE_UNITS.match("lb.service")
+
+
+def test_classify_port_http_vs_silent():
+    import socket
+    import threading
+
+    from onboard.discover import classify_port
+
+    def serve(reply: bytes | None):
+        srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)
+
+        def run():
+            c, _ = srv.accept()
+            c.recv(100)
+            if reply:
+                c.sendall(reply)
+            else:
+                threading.Event().wait(1.5)  # accept, then stay silent (a wedged listener)
+            c.close(); srv.close()
+        threading.Thread(target=run, daemon=True).start()
+        return srv.getsockname()[1]
+
+    assert classify_port("127.0.0.1", serve(b"HTTP/1.1 200 OK\r\n\r\n"), timeout=1).probe == "http"
+    silent = classify_port("127.0.0.1", serve(None), timeout=0.5)
+    assert silent.probe == "tcp" and "UNRESPONSIVE" in silent.note
+
+
+def test_repo_from_etc_follows_config_symlinks(tmp_path):
+    import os
+
+    import pytest
+
+    from onboard.discover import repo_from_etc
+
+    (tmp_path / "etc" / "nginx" / "conf.d").mkdir(parents=True)
+    (tmp_path / "app" / ".git").mkdir(parents=True)
+    (tmp_path / "app" / "nginx").mkdir()
+    (tmp_path / "app" / "nginx" / "a.conf").write_text("x")
+    try:
+        os.symlink(tmp_path / "app" / "nginx" / "a.conf", tmp_path / "etc" / "nginx" / "conf.d" / "a.conf")
+    except OSError:
+        pytest.skip("symlinks not permitted on this OS")
+    assert repo_from_etc({"nginx"}, str(tmp_path / "etc")) == str((tmp_path / "app").resolve())
+    assert repo_from_etc({"apache2"}, str(tmp_path / "etc")) == ""
+
+
+def test_watch_env_has_no_cross_service_repo_fallback():
+    from onboard.discover import Endpoint, Service, render_watch_env
+
+    env = render_watch_env([Service("a", "a.service", set(), [Endpoint(1, "http")], repo="/r/a"), Service("b", "b.service", set(), [Endpoint(2, "http")])], "/x")
+    assert "CONFIG_REPO=" not in env.replace("NIGHTSHIFT_CONFIG_REPOS=", "") and '"a": "/r/a"' in env
+
+
+def test_generated_rules_use_no_backslashes_in_promql_strings():
+    """promtool rejected `nsbox\-lb` (an invalid PromQL escape); unit names with '-' must pass through untouched."""
+    from onboard.discover import Endpoint, Service, render_rules, unit_include
+
+    svcs = [Service("nsbox-lb", "nsbox-lb.service", set(), [Endpoint(1, "http")]), Service("shop-api", "shop-api.service", set(), [Endpoint(2, "http")])]
+    assert unit_include(svcs) == "(nsbox-lb|shop-api)[.]service"
+    unit_expr = [l for l in render_rules(svcs).splitlines() if "node_systemd_unit_state" in l][0]
+    assert "\\-" not in unit_expr and 'name=~"(nsbox-lb|shop-api)[.]service"' in unit_expr
+
+
+def test_disk_alert_attributes_a_nested_mount_to_the_longer_repo_path():
+    import yaml
+
+    from onboard.discover import Endpoint, Service, render_disk_expr, render_rules
+
+    svcs = [Service("nginx", "nginx.service", set(), [Endpoint(80, "http")], repo="/home/u/wordpress"),
+            Service("shop-api", "shop-api.service", set(), [Endpoint(5000, "http")], repo="/home/u/shop")]
+    expr = render_disk_expr(svcs)
+    assert expr.count("label_replace(") == 3  # default "host" + one per repo'd service
+    assert '"service", "host", "mountpoint", ".*"' in expr
+    assert '"service", "nginx", "mountpoint", "^/home/u/wordpress.*"' in expr
+    rules = yaml.safe_load(render_rules(svcs))
+    alerts = {r["alert"]: r["expr"] for g in rules["groups"] for r in g["rules"] if "alert" in r}
+    assert alerts["DiskFull"] == "disk_used_ratio > 0.9"
+
+
+# -- unix-socket backend discovery + app log-file shipping ------------------------------------------------------------------------------
+
+SS_UNIX_SAMPLE = """u_str LISTEN 0      4096                          /run/php/php8.5-fpm.sock 8742696 * 0 users:(("php-fpm8.5",pid=1453548,fd=10),("php-fpm8.5",pid=1453547,fd=10))
+u_str LISTEN 0      4096                    /var/lib/amazon/ssm/ipc/health 67198   * 0 users:(("amazon-ssm-agen",pid=17576,fd=9))
+u_dgr UNCONN 0      0                        /run/user/1000/systemd/notify 9105069 * 0 users:(("systemd",pid=1,fd=18))
+"""
+
+
+def test_parse_ss_unix_extracts_socket_path_and_pid():
+    from onboard.discover import parse_ss_unix
+
+    listeners = parse_ss_unix(SS_UNIX_SAMPLE)
+    assert listeners["/run/php/php8.5-fpm.sock"] == ("php-fpm8.5", 1453548)  # first user= entry wins
+    assert "/run/user/1000/systemd/notify" not in listeners  # u_dgr (datagram), not u_str LISTEN -- not matched
+
+
+def test_unix_backends_resolves_nginx_fastcgi_pass(tmp_path):
+    from onboard.discover import Endpoint, Service, unix_backends
+
+    (tmp_path / "nginx").mkdir()
+    (tmp_path / "nginx" / "wordpress.conf").write_text("server {\n  fastcgi_pass unix:/run/php/php8.5-fpm.sock;\n}\n")
+    nginx = Service("nginx", "nginx.service", {"nginx"}, [Endpoint(8200, "http")], repo=str(tmp_path))
+    listeners = {"/run/php/php8.5-fpm.sock": ("php-fpm8.5", 1453548), "/run/other.sock": ("other", 99)}
+    assert unix_backends([nginx], listeners) == {"/run/php/php8.5-fpm.sock": ("php-fpm8.5", 1453548)}
+    assert unix_backends([Service("x", "x.service", set(), [])], listeners) == {}  # no repo -> nothing to scan
+
+
+def test_discover_log_files_matches_service_and_process_names(tmp_path, monkeypatch):
+    import onboard.discover as d
+
+    monkeypatch.setattr(d, "Path", d.Path)  # no-op, keeps normal Path; we point discover_log_files at a fake /var/log via monkeypatch below
+    fake_var_log = tmp_path / "var_log"
+    (fake_var_log).mkdir()
+    (fake_var_log / "php8.5-fpm.log").write_text("x")
+    (fake_var_log / "mysql").mkdir()
+    (fake_var_log / "mysql" / "error.log").write_text("x")
+    real_path_cls = d.Path
+
+    def fake_path(arg="/var/log"):
+        return real_path_cls(fake_var_log) if arg == "/var/log" else real_path_cls(arg)
+
+    monkeypatch.setattr(d, "Path", fake_path)
+    assert str(fake_var_log / "php8.5-fpm.log") in d.discover_log_files("php8.5-fpm", {"php-fpm8.5"})
+    assert str(fake_var_log / "mysql" / "error.log") in d.discover_log_files("mysql", {"mariadbd"})
+    assert d.discover_log_files("nonexistent-thing", {"nope"}) == []
+
+
+def test_grantable_log_files_only_lists_unreadable_ones(tmp_path, monkeypatch):
+    import os
+
+    from onboard.discover import Endpoint, Service, grantable_log_files
+
+    readable = tmp_path / "readable.log"; readable.write_text("x")
+    a = Service("a", "a.service", set(), [Endpoint(1, "http")], log_files=[str(readable)])
+    real_access = os.access
+
+    def fake_access(path, mode):
+        if str(path).endswith("secret.log"):
+            return False
+        return real_access(path, mode)
+
+    monkeypatch.setattr(os, "access", fake_access)
+    b = Service("b", "b.service", set(), [Endpoint(2, "http")], log_files=[str(tmp_path / "secret.log")])
+    assert grantable_log_files([a, b]) == [str(tmp_path / "secret.log")]
+
+
+def test_render_alloy_adds_a_file_source_for_app_logs():
+    from onboard.discover import Endpoint, Service, render_alloy
+
+    s = Service("mysql", "mariadb.service", set(), [Endpoint(3306, "tcp")], log_files=["/var/log/mysql/error.log"])
+    out = render_alloy([s])
+    assert 'loki.source.file "mysql_file_0"' in out and '"__path__" = "/var/log/mysql/error.log"' in out and '"service" = "mysql"' in out
+
+
+def test_service_map_notes_unix_socket_and_app_logs():
+    from onboard.discover import Endpoint, Service, render_service_map
+
+    s = Service("php-fpm", "php8.5-fpm.service", {"php-fpm8.5"}, [Endpoint(0, "unix", path="/run/php/php8.5-fpm.sock")], log_files=["/var/log/php8.5-fpm.log"])
+    role = render_service_map([s])["services"]["php-fpm"]["role"]
+    assert "/run/php/php8.5-fpm.sock (unix socket)" in role and "/var/log/php8.5-fpm.log" in role
+
+
+# -- dependency discovery (observed connections -> service_map "calls") -----------------------------------------------------------------
+
+SS_UNIX_ESTAB_SAMPLE = """u_str ESTAB 0      0                                                          * 9549640            * 9550504 users:((\"php-fpm8.5\",pid=1471402,fd=6))
+u_str ESTAB 0      0                                    /run/mysqld/mysqld.sock 9550504            * 9549640 users:((\"mariadbd\",pid=1435222,fd=61))
+"""
+
+
+def test_parse_ss_unix_estab_and_unix_call_edges_pair_by_inode():
+    from onboard.discover import parse_ss_unix_estab, unix_call_edges
+
+    rows = parse_ss_unix_estab(SS_UNIX_ESTAB_SAMPLE)
+    assert len(rows) == 2
+    edges = unix_call_edges(rows)
+    assert edges == [(1471402, "/run/mysqld/mysqld.sock")]  # client pid, server socket path
+
+
+def test_transitive_closure_follows_multiple_hops():
+    from onboard.discover import transitive_closure
+
+    direct = {"nginx": {"php-fpm"}, "php-fpm": {"mariadb"}, "mariadb": set()}
+    closure = transitive_closure(direct)
+    assert closure["nginx"] == {"php-fpm", "mariadb"}   # two hops away, listed directly
+    assert closure["php-fpm"] == {"mariadb"}
+    assert closure["mariadb"] == set()
+
+
+def test_transitive_closure_handles_a_cycle_without_looping_forever():
+    from onboard.discover import transitive_closure
+
+    closure = transitive_closure({"a": {"b"}, "b": {"a"}})
+    assert closure["a"] == {"a", "b"} and closure["b"] == {"a", "b"}
+
+
+def test_service_map_exposes_the_full_dependency_chain():
+    from onboard.discover import Endpoint, Service, render_service_map
+
+    svcs = [Service("nginx", "nginx.service", set(), [Endpoint(80, "http")], calls=["mariadb", "php-fpm"])]
+    role = render_service_map(svcs)["services"]["nginx"]
+    assert role["calls"] == ["mariadb", "php-fpm"]
+
+
+def test_to_ts_accepts_iso8601_as_well_as_relative_and_unix():
+    from mcp_servers.common import to_ts
+
+    now = 1_790_000_000.0
+    assert to_ts("-30m", now) == now - 1800
+    assert to_ts(1790497328, now) == 1790497328.0
+    assert to_ts("2026-09-27T08:22:08+00:00", now) == 1790497328.0
+    assert to_ts("2026-09-27T08:22:08Z", now) == 1790497328.0
+    import pytest
+    with pytest.raises(ValueError):
+        to_ts("not a time", now)

@@ -25,6 +25,8 @@ class Category(StrEnum):
     CAPACITY = "capacity"
     LOG_FLOOD = "log_flood"
     RESOURCE_CONTENTION = "resource_contention"
+    SERVICE_DOWN = "service_down"      # a process / unit / instance is not running (crashed, stopped, killed)
+    CODE_DEFECT = "code_defect"        # a latent defect in the source (e.g. blocking I/O with no timeout) whose trigger occurred
     UNKNOWN = "unknown"
 
 

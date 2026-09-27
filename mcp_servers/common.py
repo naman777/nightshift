@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import statistics
+from datetime import datetime, timezone
 from typing import Any
 
 _REL = re.compile(r"^-?(\d+(?:\.\d+)?)([smhd])$")
@@ -10,7 +11,9 @@ _UNIT = {"s": 1, "m": 60, "h": 3600, "d": 86400}
 
 
 def to_ts(value: Any, now: float, default: float | None = None) -> float:
-    """Accepts unix seconds, or relative like '-15m' / '15m' (meaning that long before `now`)."""
+    """Accepts unix seconds, relative like '-15m' / '15m' (meaning that long before `now`), or an ISO 8601 date/datetime
+    string -- models reach for absolute timestamps despite the docs saying to use relative ones, and rejecting that outright
+    (as a bare `float(s)` on a date string does) makes a whole tool call fail instead of just parsing it."""
     if value in (None, ""):
         return now if default is None else default
     if isinstance(value, (int, float)):
@@ -21,7 +24,15 @@ def to_ts(value: Any, now: float, default: float | None = None) -> float:
     m = _REL.match(s)
     if m:
         return now - float(m.group(1)) * _UNIT[m.group(2)]
-    return float(s)
+    try:
+        return float(s)
+    except ValueError:
+        pass
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).timestamp()
+    except ValueError:
+        raise ValueError(f"unrecognised time value {value!r}: use unix seconds, relative ('-30m'), or ISO 8601") from None
 
 
 def downsample(points: list[tuple[float, float]], n: int = 24) -> list[tuple[float, float]]:
