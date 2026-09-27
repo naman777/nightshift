@@ -1,0 +1,287 @@
+{
+ "alert": {
+  "fingerprint": "LBBackendUnhealthy-lb-sandbox-1790481780",
+  "name": "LBBackendUnhealthy",
+  "service": "lb-sandbox",
+  "severity": "critical",
+  "started_at": 1790481780.418971,
+  "labels": {
+   "alertname": "LBBackendUnhealthy",
+   "service": "lb-sandbox",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "LBBackendUnhealthy: fewer than 3 upstream backends accepting connections",
+   "state_snapshot": "STATE SNAPSHOT at 04:03:59 UTC (window 30m; series that moved, newest information first):\n  CHANGED host_memory_used_ratio{service=host,instance=127.0.0.1:9100} now=0.1647, 30m ago=0.1182, moved at 03:55:44 UTC\n  STEADY error_rate{service=lb}=0; error_rate{service=lb-sandbox}=0; p99_latency_seconds{service=lb}=0.0006541; p99_latency_seconds{service=lb-sandbox}=0.0005854; upstream_healthy{service=lb}=3; upstream_healthy{service=lb-sandbox}=2; backend_up{service=lb,instance=127.0.0.1:8001}=1; backend_up{service=lb,instance=127.0.0.1:8002}=1; backend_up{service=lb,instance=127.0.0.1:8003}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8093}=1; backend_up{service=lb-sandbox,instance=127.0.0.1:8094}=0; backend_up{service=lb-sandbox,instance=127.0.0.1:8095}=1; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=lb-sandbox,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_connections{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8093}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8094}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=8095}=1; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9991}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9992}=0; backend_healthy{service=lb-sandbox,instance=127.0.0.1:9120,backend=9993}=0; admin_port_up{service=lb}=0; admin_port_up{service=lb-sandbox}=1; admin_probe_seconds{service=lb}=4.001; admin_probe_seconds{service=lb-sandbox}=0.0004167; host_cpu_ratio{service=host}=0.0277; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2292"
+  }
+ },
+ "timings": {
+  "fired_at": 1790481780.418971,
+  "detected_at": 1790481839.1191473,
+  "reported_at": 1790481878.9421864,
+  "investigation_s": 39.78783965110779
+ },
+ "incident_id": "inc-LBBackendUnhealthy-lb-sandbox-1790481780",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The exact lb-sandbox backend 127.0.0.1:8094 became unavailable at alert onset while 8093 and 8095 remained available; this is an isolated backend service-down failure, with no evidence identifying its stop/crash trigger.",
+  "service": "lb-sandbox",
+  "category": "service_down",
+  "confidence": 0.74,
+  "evidence": [
+   "ev_1017",
+   "ev_1018",
+   "ev_1022",
+   "ev_1037",
+   "ev_1038",
+   "ev_1033"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "The sandbox backend-pool config change caused the onset; the last move removing 8094 (081d479f) was reverted by 81473653 before onset, and the observed config was restored. Runtime reload status is unconfirmed, so this is not entirely excluded.",
+    "evidence": [
+     "ev_1015",
+     "ev_1028",
+     "ev_1029",
+     "ev_1030"
+    ]
+   },
+   {
+    "hypothesis": "Host resource contention or exhaustion made the backend unavailable; CPU and disk remained low and memory rose only moderately, not to exhaustion.",
+    "evidence": [
+     "ev_1034",
+     "ev_1035",
+     "ev_1036"
+    ]
+   },
+   {
+    "hypothesis": "The LB service process itself was inactive at the exact backend failure; it was active at the neighboring samples. A separate earlier stop/restart interval was before alert onset.",
+    "evidence": [
+     "ev_1019",
+     "ev_1032",
+     "ev_1038"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Isolated service-down failure of lb-sandbox backend 127.0.0.1:8094; precise process-level trigger and actor are not established.",
+    "service": "lb-sandbox",
+    "category": "service_down",
+    "confidence": 0.74
+   },
+   {
+    "root_cause": "Runtime configuration application/reload issue involving restoration of the backend pool; repository config was restored before onset, but runtime state is unverified.",
+    "service": "lb-sandbox",
+    "category": "config_change",
+    "confidence": 0.18
+   },
+   {
+    "root_cause": "Host resource contention or exhaustion affecting backend 8094; observed resource levels argue against this.",
+    "service": "host",
+    "category": "resource_contention",
+    "confidence": 0.08
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "lb-sandbox owning team",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 127975,
+   "output_tokens": 9258,
+   "cost_usd": 0.017426,
+   "llm_calls": 30,
+   "tool_calls": 55,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "lb-sandbox owning team",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 127975,
+  "output_tokens": 9258,
+  "cost_usd": 0.017426,
+  "llm_calls": 30,
+  "tool_calls": 55,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "When did backend_up and backend_healthy for lb-sandbox backend 127.0.0.1:8094 first fall relative to alert start 1790481780, and did any other host/service metric move first?",
+   "summary": "For lb-sandbox backend 127.0.0.1:8094, backend_up first falls at 1790481780 (alert start), and backend_healthy also first falls at 1790481780, not earlier. In the preceding 30 minutes, unrelated series moved before the alert: lb-sandbox backend_up/unit_active had an anomaly beginning about 1790480767 (top anomaly start 1790480765), but exact per-instance evidence for that specific onset is insufficient in the sampled series; host memory began increasing around 1790481008 and lb p99 latency anomaly around 1790481008. Values at present: backend_up and backend_healthy are 0. Evidence does not establish another metric for this specific backend moving first.",
+   "status": "conclusive",
+   "evidence_ids": [
+    "ev_1017",
+    "ev_1018",
+    "ev_1019",
+    "ev_1020",
+    "ev_1021",
+    "ev_1022"
+   ],
+   "usage": {
+    "input_tokens": 15238,
+    "output_tokens": 1246,
+    "cost_usd": 0.002147,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do journald logs around the onset show for the exact lb-sandbox backend 127.0.0.1:8094 lifecycle or connection failures, including any deliberate stop action?",
+   "summary": "Journald shows repeated systemd stop/deactivate/start cycles for nsbox-lb.service (lb-sandbox), interspersed with sustained \u201cAll backends unreachable \u2014 dropping connection\u201d errors and warnings that backend :8094 was unreachable. The evidence supports deliberate unit stops, but does not expose an exact 127.0.0.1:8094 endpoint string or establish what initiated each stop; no Failed lifecycle line was observed. [log service=lb-sandbox level=error count=1187 first_seen=1790479836 sig=\"[<n>-<n>-<n> <n>:<n>:<n>] [ERROR] All backends unreachable \u2014 dropping connection.\"] [log service=lb-sandbox level=warn count=4 first_seen=1790479652 sig=\"[<n>-<n>-<n> <n>:<n>:<n>] [WARN ] Backend :<n> unreachable \u2014 trying next.\"] [log service=lb-sandbox level=info count=5 first_seen=1790479811 sig=\"Stopping nsbox-lb.service - Nightshift sandbox copy of the C++ load balancer (fault-injection target)...\"] [log service=lb-sandbox level=info count=5 first_seen=1790479811 sig=\"Stopped nsbox-lb.service - Nightshift sandbox copy of the C++ load balancer (fault-injection target).\"] [log service=lb-sandbox level=info count=11 first_seen=1790479811 sig=\"nsbox-lb.service: Deactivated successfully.\"] [log service=lb-sandbox level=info count=11 first_seen=1790479811 sig=\"Started nsbox-lb.service - Nightshift sandbox copy of the C++ load balancer (fault-injection target).\"] [log service=lb-sandbox level=info count=0 first_seen=0 sig=\"No exact 127.0.0.1:8094 match returned by search.\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1023",
+    "ev_1024",
+    "ev_1025",
+    "ev_1026",
+    "ev_1027"
+   ],
+   "usage": {
+    "input_tokens": 17797,
+    "output_tokens": 1602,
+    "cost_usd": 0.002581,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any lb-sandbox config or deployment change still in effect at the onset that specifically affected backend 8094 or its health check?",
+   "summary": "No lb-sandbox deployment was reported in the queried window (call_1). The config evidence shows three changes that temporarily removed backend 8094 from the pool, each shortly followed by a revert restoring 8093, 8094, 8095: sha 966d262e at 1790479832 reverted by 04ebad2f at 1790479882; sha 27f30d26 at 1790480239 reverted by 49a3ab3c at 1790480395; and sha 081d479f at 1790481091, with the matching revert sha 81473653 at 1790481262 (the final two diffs are present in call_2; their individual diff calls were unavailable due to budget exhaustion in call_7 and call_8). Thus none of these backend-pool changes was still in effect at the observed current time 1790481845, but the onset time was not provided, and I cannot determine whether the last change had been reverted before onset. No evidence specifically concerning a health-check change was returned. All config changes concern the whole backend pool, not backend 8094 alone.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1012",
+    "ev_1013",
+    "ev_1014",
+    "ev_1015",
+    "ev_1016"
+   ],
+   "usage": {
+    "input_tokens": 5833,
+    "output_tokens": 1350,
+    "cost_usd": 0.001259,
+    "llm_calls": 3,
+    "tool_calls": 6,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "code",
+   "question": "Does lb-sandbox backend health checking distinguish an unavailable backend process from a balancer/config defect, and is there a relevant defect that matches only backend 8094 becoming unhealthy?",
+   "summary": "[code file=load-balancer/LoadBalancer.cpp smell=none tests=fail] Health checking does distinguish a connection failure from HTTP response content at the probe level: failed connect yields unhealthy, while a connected backend with no/short HTTP response is treated as healthy; HTTP responses are considered healthy only when the status prefix is HTTP/1.x 2xx (calls call_7, call_8). The loop probes each configured backend independently and updates its corresponding health entry (call_8), so backend-specific failure is possible. But there is no evidence here that lb-sandbox is configured with backend 8094 or that its probe was triggered/failing, nor enough evidence to identify a relevant balancer/config defect that would uniquely make 8094 unhealthy. Therefore this is inconclusive and does not establish process unavailability versus a balancer/config defect as the explanation for the reported symptom. Tests could not run because Go is not installed (call_3); no source changes were made.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1009",
+    "ev_1010",
+    "ev_1011"
+   ],
+   "usage": {
+    "input_tokens": 23774,
+    "output_tokens": 848,
+    "cost_usd": 0.002801,
+    "llm_calls": 4,
+    "tool_calls": 10,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "At 1790481780 and immediately before/after, what do host/service logs show for the exact process listening on 127.0.0.1:8094\u2014did it stop/crash/refuse connections, and is there an operator or automation actor for any stop?",
+   "summary": "The timestamp 1790481780 falls after a recorded stop of nsbox-lb.service: systemd logs `Stopping` at 1790481552 and `Stopped` at 1790481553. The available evidence does not identify the process bound specifically to 127.0.0.1:8094, show its precise stop/crash/refusal around 1790481780, or name an operator/automation actor. Earlier logs show the load balancer reporting backend :8094 unreachable and later connection-closed messages, but the sampled period is not enough to establish the endpoint process\u2019s behavior at the requested instant. Inconclusive.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1031",
+    "ev_1032",
+    "ev_1033"
+   ],
+   "usage": {
+    "input_tokens": 19466,
+    "output_tokens": 726,
+    "cost_usd": 0.00231,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Was the lb-sandbox backends config restored by sha 81473653 effective/reloaded before 1790481780, and is there any change or operator action at or immediately before that onset affecting 8094?",
+   "summary": "The backends restoration in sha 81473653 occurred at 1790481262, before onset 1790481780, and no later config commit in the observed history changed it again before onset. The available evidence shows the config was restored in the repository, but does not establish that it was applied or reloaded by the running LB before onset. The immediately preceding 8094-affecting config change was 081d479f at 1790481091, which switched the pool from 8093\u20138095 to 9991\u20139993; 81473653 reverted it 1718 seconds? No: 518 seconds before onset, 171 seconds after that change. No deploy or operator reload/action evidence is present in these tools, so reload effectiveness and any separate operator action affecting 8094 are unconfirmed.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1028",
+    "ev_1029",
+    "ev_1030"
+   ],
+   "usage": {
+    "input_tokens": 8337,
+    "output_tokens": 818,
+    "cost_usd": 0.001243,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "Around 1790481780, did host CPU, memory, disk, or other resource metrics show exhaustion/contention capable of taking 127.0.0.1:8094 down, or was the issue isolated to that backend?",
+   "summary": "Around 1790481780, the evidence does not show host resource exhaustion capable of taking 127.0.0.1:8094 down: CPU was low (0.0294 at 1790481775; observed max 0.0926 during the 30-minute range) and root disk use remained about 22.9% (0.2292 current). Host memory use on instance 127.0.0.1:9100 rose from about 0.119 to 0.165, onset 1790480965.492, but stayed far below exhaustion; relative to the 0.1181 baseline from top anomalies it was about 1.39x. The backend-specific signal is stronger: backend_up for 127.0.0.1:8094 was down at 1790481775 and remains down at 1790481865, while neighboring 8093 and 8095 were up at 1790481775 and 8095 stayed up at current. Metrics alone show backend-isolated failure more likely than host contention, but do not establish the precise trigger or exact transition time between samples.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_1034",
+    "ev_1035",
+    "ev_1036",
+    "ev_1037",
+    "ev_1038",
+    "ev_1039",
+    "ev_1040",
+    "ev_1041"
+   ],
+   "usage": {
+    "input_tokens": 7544,
+    "output_tokens": 1354,
+    "cost_usd": 0.001431,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}
