@@ -184,8 +184,26 @@ def unit_include(services: list[Service]) -> str:
     return "(" + "|".join(s.unit.removesuffix(".service").replace(".", "[.]") for s in services) + ")[.]service"
 
 
+def _promql_path_regex(path: str) -> str:
+    """A path as a PromQL-string-safe regex prefix: only '.' is special in a real path, and it must become '[.]' rather than the
+    backslash escape re.escape() would use ('\\.'), because a backslash inside a PromQL string literal is itself an escape
+    character (the same trap as the unit-name regex in unit_include())."""
+    return path.replace(".", "[.]")
+
+
+def render_disk_expr(services: list[Service]) -> str:
+    ratio = '(1 - node_filesystem_avail_bytes{fstype!~"tmpfs|vfat|devtmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|vfat|devtmpfs|overlay"})'
+    expr = f'label_replace({ratio}, "service", "host", "mountpoint", ".*")'
+    # shortest repo path first, so a longer (more specific) one applied later overrides it for any mount nested under both
+    for s in sorted((s for s in services if s.repo), key=lambda s: len(s.repo)):
+        pat = _promql_path_regex(s.repo) + ".*"
+        expr = f'label_replace({expr}, "service", "{s.name}", "mountpoint", "^{pat}")'
+    return expr
+
+
 def render_rules(services: list[Service]) -> str:
     inc = unit_include(services)
+    disk_expr = render_disk_expr(services)
     return f"""groups:
   - name: nightshift-generated-recording
     rules:
@@ -205,8 +223,20 @@ def render_rules(services: list[Service]) -> str:
       - record: host_disk_used_ratio
         expr: 1 - node_filesystem_avail_bytes{{mountpoint="/"}} / node_filesystem_size_bytes{{mountpoint="/"}}
         labels: {{service: host}}
+      - record: disk_used_ratio
+        # every REAL mounted filesystem (root plus any data/uploads volume), not virtual ones (tmpfs /run, /boot, EFI) -- a
+        # dedicated volume filling up is invisible to endpoint probes and metrics-only checks, so it needs its own signal.
+        # A mount under a known service's repo/data path is attributed to that service (best match = longest prefix, checked
+        # longest-first so a subdirectory mount doesn't get attributed to a service whose path is merely a parent of it);
+        # anything else is "host". Chained label_replace, since PromQL has no direct "does this label start with X" outside regex anchors.
+        expr: {disk_expr}
   - name: nightshift-generated-alerts
     rules:
+      - alert: DiskFull
+        expr: disk_used_ratio > 0.9
+        for: 20s
+        labels: {{severity: critical}}
+        annotations: {{summary: "a mounted filesystem is over 90% full"}}
       - alert: EndpointDown
         expr: endpoint_up == 0
         for: 30s
@@ -247,7 +277,8 @@ def render_service_map(services: list[Service]) -> dict:
 def render_catalogue(services: list[Service]) -> dict:
     names = [s.name for s in services]
     return {"endpoint_up": names, "endpoint_latency_seconds": names, "unit_active": names,
-            "host_cpu_ratio": ["host"], "host_memory_used_ratio": ["host"], "host_disk_used_ratio": ["host"]}
+            "host_cpu_ratio": ["host"], "host_memory_used_ratio": ["host"], "host_disk_used_ratio": ["host"],
+            "disk_used_ratio": ["host", *(s.name for s in services if s.repo)]}
 
 
 def render_watch_env(services: list[Service], root: str) -> str:

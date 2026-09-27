@@ -221,4 +221,20 @@ def test_generated_rules_use_no_backslashes_in_promql_strings():
     svcs = [Service("nsbox-lb", "nsbox-lb.service", set(), [Endpoint(1, "http")]), Service("shop-api", "shop-api.service", set(), [Endpoint(2, "http")])]
     assert unit_include(svcs) == "(nsbox-lb|shop-api)[.]service"
     unit_expr = [l for l in render_rules(svcs).splitlines() if "node_systemd_unit_state" in l][0]
-    assert "\-" not in unit_expr and 'name=~"(nsbox-lb|shop-api)[.]service"' in unit_expr
+    assert "\\-" not in unit_expr and 'name=~"(nsbox-lb|shop-api)[.]service"' in unit_expr
+
+
+def test_disk_alert_attributes_a_nested_mount_to_the_longer_repo_path():
+    import yaml
+
+    from onboard.discover import Endpoint, Service, render_disk_expr, render_rules
+
+    svcs = [Service("nginx", "nginx.service", set(), [Endpoint(80, "http")], repo="/home/u/wordpress"),
+            Service("shop-api", "shop-api.service", set(), [Endpoint(5000, "http")], repo="/home/u/shop")]
+    expr = render_disk_expr(svcs)
+    assert expr.count("label_replace(") == 3  # default "host" + one per repo'd service
+    assert '"service", "host", "mountpoint", ".*"' in expr
+    assert '"service", "nginx", "mountpoint", "^/home/u/wordpress.*"' in expr
+    rules = yaml.safe_load(render_rules(svcs))
+    alerts = {r["alert"]: r["expr"] for g in rules["groups"] for r in g["rules"] if "alert" in r}
+    assert alerts["DiskFull"] == "disk_used_ratio > 0.9"

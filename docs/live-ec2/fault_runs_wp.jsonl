@@ -1,0 +1,8 @@
+{"fault":"db_down","round":1,"t_inject":1790490040,"alert_fired_after_s":40,"report_after_s":172,"alerts":"UnitDown","reports":"20260927-062323_EndpointDown+UnitDown_mariadb.json,20260927-062241_EndpointDown_nginx.json"}
+{"fault":"bad_db_creds","round":1,"t_inject":1790490281,"alert_fired_after_s":48,"report_after_s":123,"alerts":"EndpointDown","reports":"20260927-062644_EndpointDown_nginx.json"}
+{"fault":"fpm_starved","round":1,"t_inject":1790490469,"alert_fired_after_s":null,"report_after_s":null,"alerts":"","reports":""}
+{"fault":"disk_full","round":1,"t_inject":1790490731,"alert_fired_after_s":39,"report_after_s":115,"alerts":"DiskFull","reports":"20260927-063404_DiskFull_nginx.json"}
+{"fault":"db_down","round":2,"t_inject":1790490911,"alert_fired_after_s":39,"report_after_s":162,"alerts":"UnitDown","reports":"20260927-063739_EndpointDown+UnitDown_mariadb.json,20260927-063704_EndpointDown_nginx.json"}
+{"fault":"bad_db_creds","round":2,"t_inject":1790491139,"alert_fired_after_s":51,"report_after_s":120,"alerts":"EndpointDown","reports":"20260927-064057_EndpointDown_nginx.json"}
+{"fault":"fpm_starved","round":2,"t_inject":1790491324,"alert_fired_after_s":null,"report_after_s":null,"alerts":"","reports":""}
+{"fault":"disk_full","round":2,"t_inject":1790491586,"alert_fired_after_s":42,"report_after_s":127,"alerts":"DiskFull","reports":"20260927-064832_DiskFull_nginx.json"}
