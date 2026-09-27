@@ -33,6 +33,20 @@ def parse_action(args: dict) -> tuple[ProposedAction | None, str]:
     return ProposedAction(type=typ, target=str(args.get("target", "")), params=params, tier=ACTION_TIERS[typ]), ""
 
 
+def config_key_is_grounded(rt: AgentRuntime, incident_id: str, report: RootCauseReport, key: str) -> bool:
+    """A set_config proposal is only credible if the key shows up in something the investigation actually saw (a claim, the report, or a
+    stored tool result such as a config diff). Models invent plausible-looking keys (`stats_client_read_timeout`); those must not reach the approval queue."""
+    if not key:
+        return False
+    hay = [report.root_cause, *report.evidence, *report.claims]
+    for row in rt.board.list(incident_id):
+        hay.append(row.claim)
+        art = rt.board.get_artifact(row.evidence_result_ref) if row.evidence_result_ref else None
+        if art:
+            hay.append(str(art.get("content", "")))
+    return any(key in h for h in hay)
+
+
 async def propose(rt: AgentRuntime, alert: Alert, incident_id: str, report: RootCauseReport) -> ProposedAction:
     fallback = report.proposed_action or ProposedAction(type="escalate", target="on-call", tier=Tier.READ_ONLY)
     loop = AgentLoop("remediation", rt.llm, rt.commander_model, load("remediation", rt.prompt_version), None,
@@ -40,6 +54,9 @@ async def propose(rt: AgentRuntime, alert: Alert, incident_id: str, report: Root
                      final_schema=ACTION_SCHEMA, final_handler=parse_action)
     await loop.run("Choose the safest effective action.", f"Root-cause report:\n{report.model_dump_json(indent=1)}")
     action: ProposedAction = loop.output or fallback
+    if action.type == "set_config" and not config_key_is_grounded(rt, incident_id, report, str(action.params.get("key", ""))):
+        action = ProposedAction(type="escalate", target="on-call", tier=Tier.READ_ONLY,
+                                params={"reason": f"proposed set_config key {action.params.get('key')!r} appears nowhere in the evidence; not proposing an invented setting"})
     # The tier comes from the policy table, never from the model.
     return action.model_copy(update={"tier": ACTION_TIERS.get(action.type, Tier.DESTRUCTIVE)})
 

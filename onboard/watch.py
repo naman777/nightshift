@@ -25,6 +25,7 @@ import httpx
 
 from agents.core.models import Alert
 from agents.pipeline import LocalOrchestrator
+from onboard.snapshot import build_snapshot
 from orchestrator.runtime_factory import build_runtime
 
 PROM = os.environ.get("PROMETHEUS_URL", "http://127.0.0.1:9090")
@@ -94,11 +95,19 @@ def render_md(alert: Alert, res, timings: dict) -> str:
 
 
 async def investigate(a: dict, detected_at: float, mode: str) -> Path:
+    try:  # deterministic "what flipped and when" summary; the investigation still runs without it
+        snap = await build_snapshot(PROM, os.environ.get("NIGHTSHIFT_CATALOGUE"))
+        a = {**a, "annotations": {**a.get("annotations", {}), "state_snapshot": snap}}
+    except Exception as e:
+        print(f"snapshot failed: {type(e).__name__}: {e}", flush=True)
     alert = to_alert(a)
     # each service can have its own change history (e.g. the live repo vs. the sandbox's config repo)
     repos = json.loads(os.environ.get("NIGHTSHIFT_CONFIG_REPOS", "{}"))
     if alert.service in repos:
         os.environ["CONFIG_REPO"] = repos[alert.service]
+    roots = json.loads(os.environ.get("NIGHTSHIFT_CODE_ROOTS", "{}"))
+    if alert.service in roots:
+        os.environ["CODE_ROOT"] = roots[alert.service]
     rt, _policy = build_runtime(alert.labels, benchmark_mode=True)
     t0 = time.time()
     res = await LocalOrchestrator(rt).investigate(alert, mode)

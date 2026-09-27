@@ -1,0 +1,280 @@
+{
+ "alert": {
+  "fingerprint": "EndpointDown+UnitDown-mariadb-1790490058",
+  "name": "EndpointDown+UnitDown",
+  "service": "mariadb",
+  "severity": "critical",
+  "started_at": 1790490058.304267,
+  "labels": {
+   "alertname": "EndpointDown+UnitDown",
+   "instance": "127.0.0.1:3306",
+   "job": "probe-tcp",
+   "port": "3306",
+   "probe": "tcp",
+   "service": "mariadb",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "EndpointDown: an endpoint stopped answering its probe; UnitDown: systemd unit is not active",
+   "state_snapshot": "STATE SNAPSHOT at 06:22:41 UTC (window 30m; series that moved, newest information first):\n  CHANGED endpoint_up{service=mariadb,instance=127.0.0.1:3306} now=0, 30m ago=1, moved at 06:20:56 UTC\n  CHANGED unit_active{service=mariadb,instance=127.0.0.1:9100,name=mariadb.service} now=0, 30m ago=1, moved at 06:20:56 UTC\n  CHANGED host_cpu_ratio{service=host} now=0.2268, 30m ago=0.0363, moved at 06:22:11 UTC\n  STEADY endpoint_up{service=lb,instance=127.0.0.1:8081}=0; endpoint_up{service=shop-api,instance=http://127.0.0.1:5000/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:80/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8001/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8002/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8003/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8080/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8090/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8091/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8093/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8094/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8095/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:8200/}=0; endpoint_latency_seconds{service=mariadb,instance=127.0.0.1:3306}=0.0002028; endpoint_latency_seconds{service=lb,instance=127.0.0.1:8081}=3.001; endpoint_latency_seconds{service=shop-api,instance=http://127.0.0.1:5000/}=0.001641; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:80/}=0.001881; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8001/}=0.0004575; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8002/}=0.0005714; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8003/}=0.0004941; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8080/}=0.0004971; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8090/}=0.0004755; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8091/}=0.0003655; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8093/}=0.0004306; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8094/}=0.0004509; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8095/}=0.001038; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:8200/}=0.001555; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=nginx,instance=127.0.0.1:9100,name=nginx.service}=1; unit_active{service=nsbox-lb,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; unit_active{service=shop-api,instance=127.0.0.1:9100,name=shop-api.service}=1; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1784; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.262; disk_used_ratio{service=nginx,instance=127.0.0.1:9100}=0.0826; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2342; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.262"
+  }
+ },
+ "timings": {
+  "fired_at": 1790490058.304267,
+  "detected_at": 1790490161.9066215,
+  "reported_at": 1790490203.100162,
+  "investigation_s": 41.16152262687683
+ },
+ "incident_id": "inc-EndpointDown+UnitDown-mariadb-1790490058",
+ "mode": "multi",
+ "report": {
+  "root_cause": "MariaDB on 127.0.0.1:3306 / mariadb.service was cleanly shut down at 06:20:40\u201341 UTC, leaving the unit and endpoint down at the later observed outage; the initiator is unknown, and the shutdown\u2019s connection to the 06:20:56 state transition is not proven.",
+  "service": "mariadb",
+  "category": "service_down",
+  "confidence": 0.54,
+  "evidence": [
+   "ev_2206",
+   "ev_2207",
+   "ev_2193",
+   "ev_2194",
+   "ev_2201",
+   "ev_2209"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "Host resource contention or exhaustion caused MariaDB to stop.",
+    "evidence": [
+     "ev_2202",
+     "ev_2203",
+     "ev_2204",
+     "ev_2208"
+    ]
+   },
+   {
+    "hypothesis": "A MariaDB-specific deploy or verified config change caused the outage.",
+    "evidence": [
+     "ev_2184",
+     "ev_2185",
+     "ev_2200"
+    ]
+   },
+   {
+    "hypothesis": "A MariaDB crash is established as the mechanism.",
+    "evidence": [
+     "ev_2206",
+     "ev_2207",
+     "ev_2208"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "MariaDB service was cleanly stopped; exact actor/reason and whether this stop explains the final transition remain unknown.",
+    "service": "mariadb",
+    "category": "service_down",
+    "confidence": 0.54
+   },
+   {
+    "root_cause": "Host resource contention may have contributed, but CPU increase is not causal proof and pressure is not established.",
+    "service": "host",
+    "category": "resource_contention",
+    "confidence": 0.2
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "MariaDB/service operations owner",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 85579,
+   "output_tokens": 7007,
+   "cost_usd": 0.012061,
+   "llm_calls": 28,
+   "tool_calls": 43,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "restart_replica",
+  "target": "mariadb",
+  "params": {
+   "service": "mariadb"
+  },
+  "tier": "reversible"
+ },
+ "usage": {
+  "input_tokens": 85579,
+  "output_tokens": 7007,
+  "cost_usd": 0.012061,
+  "llm_calls": 28,
+  "tool_calls": 43,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "logs",
+   "question": "What mariadb.service and mariadbd journal lifecycle/error events occurred around 06:20:56 UTC, and do they show a clean deliberate stop versus crash/OOM?",
+   "summary": "Inconclusive: the cluster error scan surfaced unrelated load-balancer errors, and the targeted searches returned no matching entries for mariadb.service or mariadbd around 06:20:56 UTC. The available evidence therefore cannot establish whether MariaDB stopped cleanly or crashed/OOMed; absence from these targeted results is not proof that no lifecycle event occurred. [log service=nsbox-lb level=error count=1056 first_seen=1790460419 sig=\"[<n>-<n>-<n> <n>:<n>:<n>] [ERROR] All backends unreachable \u2014 dropping connection.\"] [log service=mariadb.service level=unknown count=0 first_seen=unknown sig=\"No matching entries returned by targeted searches.\"] [log service=mariadbd level=unknown count=0 first_seen=unknown sig=\"No matching entries returned by targeted searches.\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2197",
+    "ev_2198"
+   ],
+   "usage": {
+    "input_tokens": 5832,
+    "output_tokens": 592,
+    "cost_usd": 0.000878,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "metrics",
+   "question": "What host and MariaDB resource metrics changed before or at 06:20:56 UTC that could explain mariadb.service and endpoint_up both going down?",
+   "summary": "The strongest host-side change was elevated CPU utilization: host_cpu_ratio had a top-anomaly reported 4.05\u00d7 baseline (0.1936 vs 0.0478), onset 1790489958, and the queried series was still 0.2187 at the latest sample, 1790490172 (call_1, call_2). Memory showed a modest, transient rise from roughly 0.16 to a maximum 0.2529 at 1790489932, but was back to 0.1633 by the latest sample; onset reported 1790489392.68 (call_3). Root disk usage edged up only from 0.255 to 0.262, without a reported onset (call_4). MariaDB endpoint_up and unit_active both dropped together at sample 1790489302 and again at 1790490082; their current values at 1790490172 were 0.0, series instance 127.0.0.1:3306 for endpoint and mariadb.service on 127.0.0.1:9100 for unit (call_7, call_8). MariaDB TCP latency showed no sustained increase around those drops (last 0.0003 seconds; maximum 0.0007) (call_6). No MariaDB disk_used_ratio series was returned (call_5). Since the sampled host CPU rise is reported as starting after the first MariaDB down sample, and no specific MariaDB resource pressure was observed, these metrics do not establish a cause; findings are inconclusive.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2189",
+    "ev_2190",
+    "ev_2191",
+    "ev_2192",
+    "ev_2193",
+    "ev_2194",
+    "ev_2195",
+    "ev_2196"
+   ],
+   "usage": {
+    "input_tokens": 6747,
+    "output_tokens": 1300,
+    "cost_usd": 0.001325,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Which MariaDB-related commits or configuration changes were still in effect at 06:20:56 UTC, and did any precede the outage?",
+   "summary": "Inconclusive: the returned evidence does not identify any MariaDB-related commit or configuration change, nor provide the outage-onset timestamp needed to determine which changes preceded it. The deploy list contains unrelated shop-api changes; the config result is a very large WordPress-oriented diff and its visible portion has no MariaDB details. Therefore I cannot establish which MariaDB changes remained in effect at 06:20:56 UTC or whether any preceded the outage. [call_1, call_2]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2184",
+    "ev_2185"
+   ],
+   "usage": {
+    "input_tokens": 3703,
+    "output_tokens": 446,
+    "cost_usd": 0.000594,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "Is there evidence of a MariaDB code/config mechanism that could stop or crash the service at 06:20:56 UTC, rather than merely a latent risk?",
+   "summary": "No evidence in the inspected WordPress code establishes a MariaDB mechanism that stops or crashes the service specifically at 06:20:56 UTC. The MariaDB-related code found only identifies the database vendor/version for site-health reporting; no timestamped trigger or service-control action was observed. This is inconclusive about infrastructure/configuration outside this repository. [code file=wp-admin/includes/class-wp-site-health.php smell=none tests=fail]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2186",
+    "ev_2187",
+    "ev_2188"
+   ],
+   "usage": {
+    "input_tokens": 10159,
+    "output_tokens": 528,
+    "cost_usd": 0.00128,
+    "llm_calls": 4,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "For mariadb.service on the host, retrieve the exact systemd/journal lifecycle entries and invoking actor/reason for the transition to inactive at 06:20:56 UTC, plus any corresponding mariadbd exit, OOM-kill, or signal evidence; distinguish clean stop from crash.",
+   "summary": "The available logs show a clean MariaDB shutdown around 06:20:40\u201306:20:41 UTC, not a crash: mariadbd logged \u201cNormal shutdown\u201d and \u201cShutdown complete,\u201d while systemd reported \u201cStopping,\u201d \u201cDeactivated successfully,\u201d and \u201cStopped.\u201d However, I could not retrieve the requested transition specifically at 06:20:56 UTC or identify the actor/reason; mariadbd reports the initiator as \u201cunknown.\u201d OOM/signal evidence could not be established because searches for those signatures were blocked by tool-budget exhaustion. [log service=mariadb level=info count=3 first_seen=1790490040 sig=\"Stopping mariadb.service - MariaDB 11.8.6 database server...\"] [log service=mariadb level=info count=3 first_seen=1790490040 sig=\"/usr/sbin/mariadbd (initiated by: unknown): Normal shutdown\"] [log service=mariadb level=info count=3 first_seen=1790490040 sig=\"/usr/sbin/mariadbd: Shutdown complete\"] [log service=mariadb level=info count=21 first_seen=1790487750 sig=\"mariadb.service lifecycle entries\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2206",
+    "ev_2207",
+    "ev_2208",
+    "ev_2209"
+   ],
+   "usage": {
+    "input_tokens": 18111,
+    "output_tokens": 977,
+    "cost_usd": 0.0023,
+    "llm_calls": 5,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "metrics",
+   "question": "Compare host CPU, memory, disk, and MariaDB unit/endpoint state at fine resolution immediately before 06:20:56 UTC: did any host resource pressure begin before MariaDB went down, and was there another MariaDB up/down transition earlier in the window?",
+   "summary": "Metrics evidence shows MariaDB endpoint and unit both unavailable at the final samples, with an earlier brief down/up transition. CPU had increased before the 06:20:56 UTC failure; available evidence does not establish a resource-pressure cause. Memory showed a rise around that earlier window but stayed at modest observed values; host disk utilization was effectively steady. Fine-resolution follow-up calls were blocked by budget, so exact transitions beyond sampled timestamps and before/after ratios cannot be resolved.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2201",
+    "ev_2202",
+    "ev_2203",
+    "ev_2204",
+    "ev_2205"
+   ],
+   "usage": {
+    "input_tokens": 12639,
+    "output_tokens": 1362,
+    "cost_usd": 0.001945,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Inspect timestamped host/systemd/MariaDB config or automation changes around 06:20:56 UTC, including reverts/reloads, and determine whether any MariaDB-specific change was still active at the outage onset; provide exact key/sha and times if present.",
+   "summary": "Inconclusive on any MariaDB-specific host/systemd/config change at the outage onset (~06:20:56 UTC). The deploy listing contains only shop-api changes, and the config-diff results are dominated by a large WordPress addition; the returned evidence is truncated and does not expose commit timestamps, SHAs, or MariaDB/systemd diffs needed to verify candidates or later reverts/reloads. Therefore I cannot establish an exact MariaDB key/sha/time or whether a MariaDB change remained active. [Evidence: call_1, call_2, call_3]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2199",
+    "ev_2200"
+   ],
+   "usage": {
+    "input_tokens": 8612,
+    "output_tokens": 570,
+    "cost_usd": 0.001146,
+    "llm_calls": 3,
+    "tool_calls": 3,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}

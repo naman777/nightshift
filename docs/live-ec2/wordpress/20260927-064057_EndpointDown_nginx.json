@@ -1,0 +1,282 @@
+{
+ "alert": {
+  "fingerprint": "EndpointDown-nginx-1790491158",
+  "name": "EndpointDown",
+  "service": "nginx",
+  "severity": "critical",
+  "started_at": 1790491158.304267,
+  "labels": {
+   "alertname": "EndpointDown",
+   "instance": "http://127.0.0.1:8200/",
+   "job": "probe-http",
+   "port": "8200",
+   "probe": "http",
+   "service": "nginx",
+   "severity": "critical"
+  },
+  "annotations": {
+   "summary": "EndpointDown: an endpoint stopped answering its probe",
+   "state_snapshot": "STATE SNAPSHOT at 06:40:14 UTC (window 30m; series that moved, newest information first):\n  CHANGED endpoint_up{service=nginx,instance=http://127.0.0.1:8200/} now=0, 30m ago=1, moved at 06:39:14 UTC\n  CHANGED endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:8200/} now=0.0019, 30m ago=0.04448, moved at 06:39:14 UTC\n  STEADY endpoint_up{service=mariadb,instance=127.0.0.1:3306}=1; endpoint_up{service=lb,instance=127.0.0.1:8081}=0; endpoint_up{service=shop-api,instance=http://127.0.0.1:5000/}=1; endpoint_up{service=nginx,instance=http://127.0.0.1:80/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8001/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8002/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8003/}=1; endpoint_up{service=lb,instance=http://127.0.0.1:8080/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8090/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8091/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8093/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8094/}=1; endpoint_up{service=nsbox-lb,instance=http://127.0.0.1:8095/}=1; endpoint_latency_seconds{service=mariadb,instance=127.0.0.1:3306}=0.0002199; endpoint_latency_seconds{service=lb,instance=127.0.0.1:8081}=3.001; endpoint_latency_seconds{service=shop-api,instance=http://127.0.0.1:5000/}=0.001752; endpoint_latency_seconds{service=nginx,instance=http://127.0.0.1:80/}=0.001879; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8001/}=0.0005123; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8002/}=0.000432; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8003/}=0.0008787; endpoint_latency_seconds{service=lb,instance=http://127.0.0.1:8080/}=0.0005147; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8090/}=0.0005627; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8091/}=0.0004038; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8093/}=0.0006861; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8094/}=0.0004423; endpoint_latency_seconds{service=nsbox-lb,instance=http://127.0.0.1:8095/}=0.0004657; unit_active{service=lb,instance=127.0.0.1:9100,name=lb.service}=1; unit_active{service=mariadb,instance=127.0.0.1:9100,name=mariadb.service}=1; unit_active{service=nginx,instance=127.0.0.1:9100,name=nginx.service}=1; unit_active{service=nsbox-lb,instance=127.0.0.1:9100,name=nsbox-lb.service}=1; unit_active{service=shop-api,instance=127.0.0.1:9100,name=shop-api.service}=1; host_cpu_ratio{service=host}=0.0293; host_memory_used_ratio{service=host,instance=127.0.0.1:9100}=0.1757; host_disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2632; disk_used_ratio{service=nginx,instance=127.0.0.1:9100}=0.0826; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2342; disk_used_ratio{service=host,instance=127.0.0.1:9100}=0.2632"
+  }
+ },
+ "timings": {
+  "fired_at": 1790491158.304267,
+  "detected_at": 1790491214.6793275,
+  "reported_at": 1790491257.7600803,
+  "investigation_s": 43.05129814147949
+ },
+ "incident_id": "inc-EndpointDown-nginx-1790491158",
+ "mode": "multi",
+ "report": {
+  "root_cause": "The nginx listener at http://127.0.0.1:8200/ is the isolated failing component, with repeated availability and latency instability while nginx :80 remains healthy; evidence does not identify whether the mechanism is listener/service failure or a PHP-FPM/backend issue, and no responsible commit is established.",
+  "service": "nginx",
+  "category": "service_down",
+  "confidence": 0.27,
+  "evidence": [
+   "ev_2304",
+   "ev_2305",
+   "ev_2314",
+   "ev_2316",
+   "ev_2309",
+   "ev_2312"
+  ],
+  "ruled_out": [
+   {
+    "hypothesis": "A broad nginx process/service outage",
+    "evidence": [
+     "ev_2316",
+     "ev_2314"
+    ]
+   },
+   {
+    "hypothesis": "A proven recent nginx config change or deploy caused the incident",
+    "evidence": [
+     "ev_2312",
+     "ev_2313"
+    ]
+   },
+   {
+    "hypothesis": "Host-wide sustained CPU or memory pressure caused the endpoint instability",
+    "evidence": [
+     "ev_2315",
+     "ev_2316"
+    ]
+   },
+   {
+    "hypothesis": "The simultaneous-looking load-balancer backend connection-close messages caused nginx :8200 to fail",
+    "evidence": [
+     "ev_2308",
+     "ev_2318"
+    ]
+   }
+  ],
+  "ranked": [
+   {
+    "root_cause": "Nginx :8200 listener-specific service failure; mechanism and trigger unverified.",
+    "service": "nginx",
+    "category": "service_down",
+    "confidence": 0.27
+   },
+   {
+    "root_cause": "PHP-FPM/FastCGI dependency latency or availability issue affecting only WordPress on :8200; not directly evidenced.",
+    "service": "nginx",
+    "category": "dependency_latency",
+    "confidence": 0.15
+   },
+   {
+    "root_cause": "Nginx port 8200 configuration change; relevant config diff and timing unavailable.",
+    "service": "nginx",
+    "category": "config_change",
+    "confidence": 0.1
+   }
+  ],
+  "proposed_action": {
+   "type": "escalate",
+   "target": "nginx on-call",
+   "params": {},
+   "tier": "read_only"
+  },
+  "claims": [],
+  "usage": {
+   "input_tokens": 102052,
+   "output_tokens": 6238,
+   "cost_usd": 0.013324,
+   "llm_calls": 27,
+   "tool_calls": 40,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0
+  },
+  "rounds": 2,
+  "degraded": false
+ },
+ "action": {
+  "type": "escalate",
+  "target": "nginx on-call",
+  "params": {},
+  "tier": "read_only"
+ },
+ "usage": {
+  "input_tokens": 102052,
+  "output_tokens": 6238,
+  "cost_usd": 0.013324,
+  "llm_calls": 27,
+  "tool_calls": 40,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0
+ },
+ "findings": [
+  {
+   "agent": "metrics",
+   "question": "At 06:39:14 UTC, what changed in probe/host metrics for nginx port 8200 and related listeners that distinguishes a listener failure from general nginx or host resource trouble?",
+   "summary": "At the queried 30-minute window, nginx port 8200 is uniquely intermittent: its HTTP probe was up/down across samples while nginx port 80 and related listener probes on lb ports 8001\u20138003/8080 and nsbox-lb ports 8090/8091/8093\u20138095 remained up. The 8200 latency varied dramatically, including 0.346 s at 1790489963 and 0.1797\u20130.1991 s at 1790490533\u20131790490593, but the exact transition at 06:39:14 UTC cannot be established from this evidence; 8200 samples also returned up with high latency. Host CPU had a simultaneous transient rise to 0.6112\u20130.6146 beginning at sampled time 1790490533 (with a prior spike at 1790489963), so evidence supports distinguishing a port-specific probe failure from broad listener unavailability, but does not conclusively exclude host contribution. Memory stayed in a comparatively narrow range. [metric name=endpoint_up service=nginx ratio=0.5246 onset=1790489423] [metric name=endpoint_latency_seconds service=nginx ratio=unknown onset=1790489963] [metric name=endpoint_up service=lb ratio=1.0 onset=1790489423] [metric name=endpoint_up service=nsbox-lb ratio=1.0 onset=1790489423] [metric name=host_cpu_ratio service=host ratio=0.71 onset=1790490530] [metric name=host_memory_used_ratio service=host ratio=unknown onset=1790489423]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2304",
+    "ev_2305",
+    "ev_2306",
+    "ev_2307"
+   ],
+   "usage": {
+    "input_tokens": 12358,
+    "output_tokens": 1275,
+    "cost_usd": 0.001874,
+    "llm_calls": 3,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "logs",
+   "question": "What do nginx/system logs show at 06:39:14 UTC about port 8200 listener state or lifecycle, including whether anything deliberately stopped or reconfigured it?",
+   "summary": "At 06:39:14 UTC, nsbox-lb logged multiple backend connections (:8093, :8094, :8095) closing, mostly with zero active connections, and one :8093 close with one active connection. The available searches returned no evidence mentioning port 8200, nor nginx lifecycle/configuration evidence at that time. Systemd search results show repeated nsbox-lb Stopping/Started events across the broader log window, but the displayed events are not tied to 06:39:14 UTC, so they do not establish a deliberate stop or reconfiguration then. Thus the 8200 listener state and whether it was deliberately changed at the requested moment remain unconfirmed. [log service=nsbox-lb level=info count=7 first_seen=1790491155 sig=\"Backend connection closed at 06:39:14 UTC\"] [log service=unknown level=info count=0 first_seen=unknown sig=\"Search for 8200 returned no lines\"] [log service=nginx level=unknown count=0 first_seen=unknown sig=\"Search for nginx entries at 06:39:14 UTC returned no lines\"] [log service=lb-sandbox source=systemd level=info count=30 first_seen=1790458431 sig=\"Stopping nsbox-lb.service\"] [log service=lb-sandbox source=systemd level=info count=30 first_seen=1790457851 sig=\"Started nsbox-lb.service\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2308",
+    "ev_2309",
+    "ev_2310",
+    "ev_2311"
+   ],
+   "usage": {
+    "input_tokens": 15750,
+    "output_tokens": 853,
+    "cost_usd": 0.002001,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  },
+  {
+   "agent": "changes",
+   "question": "Was any nginx config or deploy change still in effect at 06:39:14 UTC that could specifically break the :8200 endpoint while :80 remains healthy?",
+   "summary": "Inconclusive: the deploy results show only shop-api releases, and the nginx-filtered config result contains a WordPress repository/import rather than a clearly identifiable nginx configuration change. The result does not expose complete candidate commit metadata or the nginx diff needed to establish whether any relevant change was active at 06:39:14 UTC; no specific port-8200-breaking change can be confirmed.",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2299",
+    "ev_2300"
+   ],
+   "usage": {
+    "input_tokens": 3713,
+    "output_tokens": 365,
+    "cost_usd": 0.000554,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "code",
+   "question": "What does the nginx configuration/source establish about how port 8200 is served, and is there a concrete mechanism that could make only that endpoint stop answering?",
+   "summary": "[code file=nginx/wordpress.conf smell=fastcgi_timeout tests=fail] Nginx defines a server listening on port 8200 and serves WordPress from `/home/ubuntu/wordpress`; `/` uses `try_files` with an `index.php` fallback, and PHP requests are sent to `/run/php/php8.5-fpm.sock` (call_4). The explicit `fastcgi_read_timeout 10s` is a concrete way requests on this port that reach slow PHP execution could fail/stop responding after the timeout; it could affect this endpoint but does not establish the timeout occurred, so trigger=unknown. This is a plausible selective endpoint mechanism, not evidence it caused the reported symptom pattern. [code file=nginx/wordpress.conf smell=none tests=fail] The config does not show a separate proxy/upstream for port 8200 or establish that nginx itself stopped listening; there is no runtime evidence of listener, PHP-FPM state, or timeout logs. The attempted test command `all` was rejected as not allow-listed, and `pytest` could not run because Python is unavailable (call_3, call_5).",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2301",
+    "ev_2302",
+    "ev_2303"
+   ],
+   "usage": {
+    "input_tokens": 17950,
+    "output_tokens": 566,
+    "cost_usd": 0.002078,
+    "llm_calls": 4,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "logs",
+   "question": "At 06:39:14 UTC, what exact runtime state or lifecycle event is recorded for nginx listener :8200 and its PHP-FPM socket/process (including any stop/reload, bind failure, or upstream timeout)?",
+   "summary": "Inconclusive for the specifically requested 06:39:14 UTC nginx :8200/PHP-FPM state: the available searches returned no `8200`, `php`, or `systemd` matches, and the 06:39 search surfaced unrelated load-balancer backend connection-close lines (ports 8093/8094), not evidence of nginx/PHP-FPM lifecycle, bind failure, or timeout. [log service=nginx level=unknown count=0 first_seen=unknown sig=\"no matching 8200 log lines\"] [log service=php-fpm level=unknown count=0 first_seen=unknown sig=\"no matching php log lines\"] [log service=systemd level=unknown count=0 first_seen=unknown sig=\"no matching systemd log lines\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2317",
+    "ev_2318",
+    "ev_2319"
+   ],
+   "usage": {
+    "input_tokens": 8640,
+    "output_tokens": 510,
+    "cost_usd": 0.001119,
+    "llm_calls": 3,
+    "tool_calls": 5,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "changes",
+   "question": "Identify the exact nginx/wordpress.conf change (SHA and timestamp) and determine whether it was active at 06:39:14 UTC; report the relevant diff affecting port 8200 or PHP routing.",
+   "summary": "Inconclusive: the nginx/wordpress.conf result is a truncated, oversized initial repository/config entry and does not expose the file\u2019s relevant diff, SHA, timestamp, or commit metadata. No evidence here establishes whether a port 8200/PHP-routing change was active at 06:39:14 UTC. The deploy listing is for unrelated shop-api changes. [change kind=config service=unknown sha=unknown ts=unknown key=nginx/wordpress.conf old=unknown new=unknown msg=\"diff unavailable in truncated result\"]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2312",
+    "ev_2313"
+   ],
+   "usage": {
+    "input_tokens": 3735,
+    "output_tokens": 379,
+    "cost_usd": 0.000563,
+    "llm_calls": 2,
+    "tool_calls": 2,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "submitted"
+  },
+  {
+   "agent": "metrics",
+   "question": "At and immediately before 06:39:14 UTC, did host CPU or any nginx/PHP-FPM resource or endpoint metric change in a way that temporally explains the nginx :8200 probe going down, while :80 remained up?",
+   "summary": "Inconclusive on causation: the observed 06:39:14 UTC neighborhood shows :8200 repeatedly transitioning between up and down while :80 stays up, but this tool set did not return evidence for PHP-FPM resources or a comparison window. The only host CPU anomaly was a brief rise near the relevant time, and CPU was not persistently high; available metrics do not establish that it caused the probe failure. [metric name=endpoint_up service=nginx ratio=0.5455 onset=1790490071] [metric name=host_cpu_ratio service=host ratio=5.37 onset=1790490521]",
+   "status": "inconclusive",
+   "evidence_ids": [
+    "ev_2314",
+    "ev_2315",
+    "ev_2316"
+   ],
+   "usage": {
+    "input_tokens": 12749,
+    "output_tokens": 1181,
+    "cost_usd": 0.001865,
+    "llm_calls": 4,
+    "tool_calls": 8,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0
+   },
+   "stop_reason": "budget"
+  }
+ ],
+ "llm": {
+  "provider": "openai",
+  "commander": "gpt-6-luna",
+  "specialist": "gpt-6-luna",
+  "prompt": "v4"
+ }
+}
