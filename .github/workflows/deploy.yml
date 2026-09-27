@@ -1,0 +1,37 @@
+name: Deploy demo to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up deploy key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      # The remote authorized_keys entry for this key only accepts an
+      # "rsync --server" invocation or "bash ~/nightshift-run/deploy.sh" -
+      # see deploy_wrapper.sh on the host. Nothing else can run with this key.
+      - name: Sync source (excludes secrets, venv, build caches)
+        run: |
+          rsync -az --delete \
+            --exclude='.env' --exclude='.git' --exclude='.run' --exclude='.pytest_cache' \
+            --exclude='venv' --exclude='node_modules' --exclude='__pycache__' --exclude='*.pyc' \
+            --exclude='nightshift.egg-info' --exclude='.next' --exclude='interview-prep' \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:~/nightshift-run/nightshift/"
+
+      - name: Build and restart services
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "bash /home/ubuntu/nightshift-run/deploy.sh"
