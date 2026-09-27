@@ -28,7 +28,7 @@ jobs:
             --exclude='venv' --exclude='node_modules' --exclude='__pycache__' --exclude='*.pyc' \
             --exclude='nightshift.egg-info' --exclude='.next' --exclude='interview-prep' \
             -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
-            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:~/nightshift-run/nightshift/"
+            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/${{ secrets.DEPLOY_USER }}/nightshift-run/nightshift/"
 
       - name: Build and restart services
         run: |
