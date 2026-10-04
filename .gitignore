@@ -15,7 +15,6 @@ target/deploys.jsonl
 nightshift-demo.db
 bench/results/real-llm/runs/
 .run/
-CLAUDE.md
 # Private interview prep (do not push)
 interview-prep/
 
