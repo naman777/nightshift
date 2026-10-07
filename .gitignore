@@ -21,3 +21,4 @@ interview-prep/
 # external checkouts of the real Foreman / C++ load balancer (see external/README.md)
 external/*/
 !external/patches/
+/deploy

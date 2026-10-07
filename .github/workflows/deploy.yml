@@ -1,37 +1,41 @@
-name: Deploy demo to EC2
+name: Deploy demo
 
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: nightshift-demo
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up deploy key
+      - name: Configure deploy key and pinned host key
+        env:
+          NIGHTSHIFT_DEPLOY_SSH_KEY: ${{ secrets.NIGHTSHIFT_DEPLOY_SSH_KEY }}
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$NIGHTSHIFT_DEPLOY_SSH_KEY" > "$HOME/.ssh/nightshift_deploy"
+          chmod 600 "$HOME/.ssh/nightshift_deploy"
+          cp .github/demo_known_hosts "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
 
-      # The remote authorized_keys entry for this key only accepts an
-      # "rsync --server" invocation or "bash ~/nightshift-run/deploy.sh" -
-      # see deploy_wrapper.sh on the host. Nothing else can run with this key.
-      - name: Sync source (excludes secrets, venv, build caches)
+      # The host's authorized_keys entry for this key is pinned to ops/ci-deploy.sh, which takes the commit SHA,
+      # checks it is still the tip of main, builds, restarts and rolls back on failure. Nothing else can run with it.
+      - name: Deploy this commit
         run: |
-          rsync -az --delete \
-            --exclude='.env' --exclude='.git' --exclude='.run' --exclude='.pytest_cache' \
-            --exclude='venv' --exclude='node_modules' --exclude='__pycache__' --exclude='*.pyc' \
-            --exclude='nightshift.egg-info' --exclude='.next' --exclude='interview-prep' \
-            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
-            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/${{ secrets.DEPLOY_USER }}/nightshift-run/nightshift/"
-
-      - name: Build and restart services
-        run: |
-          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "bash /home/ubuntu/nightshift-run/deploy.sh"
+          ssh -i "$HOME/.ssh/nightshift_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 \
+            nkundra_be23@34.180.44.15 "$GITHUB_SHA"
