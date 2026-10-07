@@ -125,6 +125,20 @@ How to read this (same simulated worlds, scoring and benchmark mode as the offli
   Under `v3` the two tie on accuracy (held-out 96% vs 96%) and multi-agent is better on remediation (87% vs 73%), but it still costs about 5x more and takes 4-5x longer. A multi-agent accuracy advantage is not demonstrated.
 * **`v3`** tells the commander to commit to the best-supported mechanism instead of hedging with `unknown` (dev: single 96%, multi 88%; held-out: single 96%, multi 96%). It was written from dev failures, but I had already seen `v2` held-out failures, so the `v3` held-out numbers are lightly contaminated and are not a clean generalisation result.
 * Held constant across every real run: **0% unsafe actions and 100% evidence grounding**.
+* **Time to diagnosis (real wall time, whole investigation, excluding human approval):** single agent 11-17 s (median about 14 s); multi-agent 32-64 s (median about 58 s; held-out `v3`: 58 s).
+
+### Crash-and-resume, measured
+
+`tests/test_temporal.py::test_worker_crash_mid_incident_resumes_without_repeating_llm_calls` kills the worker inside `converge_activity` and lets a second worker take over (real Temporal test server, LLM steps counted from the persisted step log):
+
+| Run | LLM steps |
+| --- | --- |
+| Uninterrupted reference run | 18 |
+| At the moment of the kill (specialists and plan done) | 16 |
+| After the second worker resumes and finishes | 18 |
+| **Repeated LLM calls** | **0** |
+
+The resumed run executes only the 2 steps that had not happened yet. Scope: this counts persisted activity-level LLM steps with the offline policy, for a single kill point (inside converge). It does not cover a crash during an in-flight provider call, which Temporal would retry.
 * One model, one prompt family, at most 3 repeats: enough to see large effects, not small ones.
 * Reproduce (swap `v2` for `v3` or `v1` to compare): `python -m bench.real_llm --model gpt-6-luna --split heldout --config single,multi --repeats 3 --prompt-version v2`, then `python -m bench.real_report --write`. Needs `OPENAI_API_KEY` in `.env`; a full held-out run costs well under a dollar at gpt-6-luna prices ($0.10 in / $0.50 out per 1M tokens).
 
