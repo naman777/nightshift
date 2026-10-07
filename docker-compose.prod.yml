@@ -1,0 +1,51 @@
+# The public demo (https://nightshift.naman.sbs): the gateway on simulated backends plus the dashboard, the same thing
+# `python start.py` runs locally. Deployed by ops/ci-deploy.sh; see ops/README.md.
+#
+# It shares a VM with other projects, so:
+#   * nothing is published on the host: the VM's existing Caddy (the Foreman stack) terminates TLS and reaches the
+#     dashboard over that stack's Docker network;
+#   * service names carry a `nightshift-` prefix, because a service's name becomes a DNS alias on every network it joins
+#     and a plain `dashboard` would shadow Foreman's.
+name: nightshift
+
+services:
+  nightshift-gateway:
+    build: {context: ., dockerfile: Dockerfile.agents}
+    command: ["uvicorn", "gateway.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]
+    env_file: [{path: .env.production, required: false}]   # optional OPENAI_API_KEY enables the dashboard's "real LLM" option
+    environment:
+      NIGHTSHIFT_BACKEND: sim
+      NIGHTSHIFT_API_TOKEN: "${NIGHTSHIFT_API_TOKEN:?set NIGHTSHIFT_API_TOKEN}"
+      NIGHTSHIFT_DB_URL: sqlite:////data/nightshift-demo.db
+    volumes: ["gateway_data:/data", "./target:/app/target:ro"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 1g
+    restart: unless-stopped
+
+  nightshift-dashboard:
+    build: {context: ./dashboard}
+    environment:
+      GATEWAY_INTERNAL_URL: http://nightshift-gateway:8000
+      NIGHTSHIFT_API_TOKEN: "${NIGHTSHIFT_API_TOKEN:?set NIGHTSHIFT_API_TOKEN}"
+      HOSTNAME: 0.0.0.0   # the standalone Next server binds to $HOSTNAME, which Docker sets to the container id
+    depends_on: {nightshift-gateway: {condition: service_healthy}}
+    networks: [default, edge]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+
+volumes:
+  gateway_data:
+
+networks:
+  edge:
+    name: foreman-production_default
+    external: true

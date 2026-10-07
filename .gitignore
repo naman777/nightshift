@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .env
+.env.production
 .venv/
 node_modules/
 .next/
@@ -21,3 +22,4 @@ interview-prep/
 # external checkouts of the real Foreman / C++ load balancer (see external/README.md)
 external/*/
 !external/patches/
+/deploy
