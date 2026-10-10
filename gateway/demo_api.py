@@ -5,15 +5,20 @@ Nothing here is reachable without the gateway token (mutating call) except the r
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import secrets
+import time
 from functools import lru_cache
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from agents.core.db import Database
 from bench.scenario import Scenario, build_world, load_all, load_hard
+
+CLIENT_HEADER = "x-nightshift-client-ip"
 
 FAULTS = {
     "bad_config_push": ("Bad config push", "A config value was changed and traffic started failing."),
@@ -73,16 +78,61 @@ def ground_truth(scenario_id: str) -> dict | None:
             "correct_remediations": gt.correct_remediations, "unsafe_actions": gt.unsafe_actions}
 
 
-def build_router(get_runner, require_token) -> APIRouter:
+class LLMQuota:
+    """Caps real-model launches on a public demo, where every run spends the host's API key.
+
+    NIGHTSHIFT_DEMO_LLM_PER_VISITOR and NIGHTSHIFT_DEMO_LLM_PER_DAY are runs per UTC day; unset or 0 means no cap (local use).
+    Counts live in the database so a redeploy does not reset them. Visitors are stored as a hash of their address, never the address.
+    """
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    @staticmethod
+    def caps() -> tuple[int, int]:
+        return int(os.environ.get("NIGHTSHIFT_DEMO_LLM_PER_VISITOR") or 0), int(os.environ.get("NIGHTSHIFT_DEMO_LLM_PER_DAY") or 0)
+
+    @staticmethod
+    def client(request: Request) -> str:
+        # The dashboard proxy is the only caller that holds the gateway token, and it sets this header from the address its own proxy saw.
+        ip = request.headers.get(CLIENT_HEADER) or (request.client.host if request.client else "unknown")
+        return hashlib.sha256(ip.encode()).hexdigest()[:16]
+
+    def _used(self, client: str) -> tuple[int, int]:
+        day = time.strftime("%Y-%m-%d", time.gmtime())
+        mine = self.db.execute("SELECT COUNT(*) AS n FROM demo_llm_runs WHERE day = ? AND client = ?", (day, client))[0]["n"]
+        return mine, self.db.execute("SELECT COUNT(*) AS n FROM demo_llm_runs WHERE day = ?", (day,))[0]["n"]
+
+    def status(self, client: str) -> dict | None:
+        per_visitor, per_day = self.caps()
+        if not (per_visitor or per_day):
+            return None
+        mine, everyone = self._used(client)
+        left = [cap - used for cap, used in ((per_visitor, mine), (per_day, everyone)) if cap]
+        return {"per_visitor": per_visitor, "per_day": per_day, "remaining": max(0, min(left))}
+
+    def take(self, client: str) -> None:
+        """Count one run, or raise 429. Check and insert have no await between them, so concurrent launches cannot both pass."""
+        per_visitor, per_day = self.caps()
+        mine, everyone = self._used(client)
+        if per_day and everyone >= per_day:
+            raise HTTPException(429, "Today's real-model runs for this demo are used up (resets 00:00 UTC). The offline policy still works.")
+        if per_visitor and mine >= per_visitor:
+            raise HTTPException(429, f"Real-model limit reached: {per_visitor} runs per visitor per day (resets 00:00 UTC). The offline policy still works.")
+        self.db.insert("demo_llm_runs", {"day": time.strftime("%Y-%m-%d", time.gmtime()), "client": client, "ts": time.time()})
+
+
+def build_router(get_runner, require_token, db: Database) -> APIRouter:
     r = APIRouter(prefix="/demo")
+    quota = LLMQuota(db)
 
     @r.get("/config")
-    async def config() -> dict:
+    async def config(request: Request) -> dict:
         model = os.environ.get("NIGHTSHIFT_DEMO_MODEL", "gpt-6-luna")
         return {"providers": [
             {"id": "mock", "label": "Offline reference policy", "note": "Free, instant, deterministic. Not a language model.", "available": True},
             {"id": "openai", "label": f"Real LLM ({model})", "note": "Calls the OpenAI API; costs a few cents per incident.",
-             "available": bool(os.environ.get("OPENAI_API_KEY")), "model": model}]}
+             "available": bool(os.environ.get("OPENAI_API_KEY")), "model": model, "limit": quota.status(quota.client(request))}]}
 
     @r.get("/scenarios")
     async def scenarios() -> list[dict]:
@@ -101,6 +151,8 @@ def build_router(get_runner, require_token) -> APIRouter:
             raise HTTPException(400, "provider must be mock or openai")
         if body.provider == "openai" and not os.environ.get("OPENAI_API_KEY"):
             raise HTTPException(400, "OPENAI_API_KEY is not set on the gateway")
+        if body.provider == "openai":
+            quota.take(quota.client(request))
         s = entry[0]
         _world.cache_clear()  # every launch starts from a clean simulated world (an earlier approve must not leak into it)
         labels = {"alertname": s.expected_alert, "service": "orders-svc", "scenario": s.id, "mode": body.mode, "llm_provider": body.provider}

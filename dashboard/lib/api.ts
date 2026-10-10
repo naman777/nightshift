@@ -43,7 +43,8 @@ export type Scenario = {
   id: string; fault: string; title: string; blurb: string; alert: string; difficulty: 'standard' | 'tricky' | 'hard';
   tags: string[]; split: string; injection: boolean;
 };
-export type Provider = { id: 'mock' | 'openai'; label: string; note: string; available: boolean; model?: string };
+export type Provider = { id: 'mock' | 'openai'; label: string; note: string; available: boolean; model?: string;
+  limit?: { per_visitor: number; per_day: number; remaining: number } | null };
 export type DemoConfig = { providers: Provider[] };
 
 export async function launch(body: { scenario: string; mode: string; provider: string; pace: boolean }): Promise<{ incident_id: string }> {
