@@ -23,6 +23,8 @@ git clone https://github.com/naman777/nightshift.git /opt/nightshift
 cd /opt/nightshift
 (umask 077; echo "NIGHTSHIFT_API_TOKEN=$(openssl rand -hex 32)" > .env.production)
 # optional, enables the "real LLM" option for every visitor (it spends your key): echo OPENAI_API_KEY=... >> .env.production
+# real-model runs are capped at 5 per visitor and 200 in total per UTC day; to change:
+#   echo NIGHTSHIFT_DEMO_LLM_PER_VISITOR=3 >> .env.production; echo NIGHTSHIFT_DEMO_LLM_PER_DAY=100 >> .env.production
 bash ops/ci-deploy.sh "$(git rev-parse origin/main)"
 ```
 

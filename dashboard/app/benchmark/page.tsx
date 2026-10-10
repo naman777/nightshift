@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { Highlight, PageHead, Segmented } from '@/components/ui';
 import { BenchConfig, BenchSummary, getJSON } from '@/lib/api';
 import { usePoll } from '@/lib/usePoll';
 
@@ -24,46 +25,46 @@ export default function Benchmark() {
   const summary: BenchSummary | undefined = split ? data?.splits?.[split] : data ?? undefined;
   const cfgs = Object.entries(summary?.configs ?? {}) as [string, BenchConfig][];
   return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-semibold tracking-tight">Benchmark</h1><p className="mt-1 text-sm text-slate-400">Accuracy of each configuration across the 50 simulated incidents. Held-out scenarios are never tuned against.</p></div>
-      {summary?.policy && <p className="text-sm text-amber-300/80">{summary.policy}</p>}
-      {available.length > 1 && (
-        <div className="flex gap-2">
-          {available.map(([k, label]) => (
-            <button key={k} onClick={() => setPicked(k)}
-              className={`px-3 py-1 rounded text-sm ${k === split ? 'bg-indigo-500' : 'bg-white/5 hover:bg-white/10'}`}>{label}</button>
-          ))}
-        </div>
-      )}
-      {cfgs.length === 0 && <p className="text-slate-400">No results yet. Run <code>make bench</code>.</p>}
-      <div className="space-y-2">
-        {cfgs.map(([name, c]) => (
-          <div key={name} className="flex items-center gap-3 text-sm">
-            <div className="w-72 text-slate-300">{LABEL[name] ?? name}</div>
-            <div className="flex-1 bg-white/5 rounded h-5 overflow-hidden">
-              <div className={name.startsWith('naive') ? 'bg-slate-500 h-5' : 'bg-indigo-400 h-5'} style={{ width: `${c.root_cause_accuracy * 100}%` }} />
-            </div>
-            <div className="w-12 text-right">{pct(c.root_cause_accuracy)}</div>
-          </div>
-        ))}
+    <div className="space-y-8">
+      <PageHead title="Benchmark">
+        Accuracy of each configuration across the 50 simulated incidents. <Highlight>Held-out scenarios</Highlight> are never tuned against.
+      </PageHead>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        {summary?.policy ? <p className="text-sm tone-warn">Produced by: {summary.policy}</p> : <span />}
+        {available.length > 1 && split && <Segmented label="Scenario split" value={split} onChange={setPicked} options={available.map(([k, label]) => ({ value: k, label }))} />}
       </div>
+      {data && cfgs.length === 0 && <p className="text-muted-foreground sm:text-center">No results yet. Run <code>make bench</code>.</p>}
+      {cfgs.length > 0 && (
+        <section className="card space-y-3 p-5">
+          <h2 className="font-montserrat text-base font-semibold">Root-cause accuracy</h2>
+          {cfgs.map(([name, c]) => (
+            <div key={name} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-sm sm:grid-cols-[18rem_1fr_3rem]">
+              <div className="text-muted-foreground">{LABEL[name] ?? name}</div>
+              <div className="col-span-2 row-start-2 h-2 overflow-hidden rounded-full bg-black/[0.08] sm:col-span-1 sm:row-start-auto dark:bg-white/10">
+                <div className={`h-full rounded-full ${name.startsWith('naive') ? 'bg-neutral-400 dark:bg-neutral-600' : 'bg-primary'}`} style={{ width: `${c.root_cause_accuracy * 100}%` }} />
+              </div>
+              <div className="text-right font-montserrat font-semibold tabular-nums">{pct(c.root_cause_accuracy)}</div>
+            </div>
+          ))}
+        </section>
+      )}
       {cfgs.length > 0 && (
         <div className="card overflow-x-auto"><table className="w-full text-sm">
-          <thead className="text-left text-xs text-slate-500">
-            <tr>{HEADERS.map((h) => <th key={h} className="p-2">{h}</th>)}</tr>
+          <thead className="text-left text-xs text-muted-foreground">
+            <tr>{HEADERS.map((h) => <th key={h} className="whitespace-nowrap p-3 font-medium">{h}</th>)}</tr>
           </thead>
-          <tbody>
+          <tbody className="tabular-nums">
             {cfgs.map(([name, c]) => (
-              <tr key={name} className="border-t border-white/5">
-                <td className="p-2">{LABEL[name] ?? name}</td>
-                <td className="p-2">{pct(c.root_cause_accuracy)} ±{Math.round(c.accuracy_std * 100)}</td>
-                <td className="p-2">{pct(c.top3_accuracy)}</td>
-                <td className="p-2">{pct(c.remediation_quality)}</td>
-                <td className="p-2">{pct(c.unsafe_action_rate)}</td>
-                <td className="p-2">{pct(c.evidence_grounding)}</td>
-                <td className="p-2">{pct(c.red_herring_accuracy)}</td>
-                <td className="p-2">${c.cost_usd.mean.toFixed(3)}</td>
-                <td className="p-2">{c.modeled_time_s.p50.toFixed(1)}s / {c.modeled_time_s.p95.toFixed(1)}s</td>
+              <tr key={name} className="border-t">
+                <td className="whitespace-nowrap p-3 font-medium">{LABEL[name] ?? name}</td>
+                <td className="whitespace-nowrap p-3">{pct(c.root_cause_accuracy)} ±{Math.round(c.accuracy_std * 100)}</td>
+                <td className="p-3">{pct(c.top3_accuracy)}</td>
+                <td className="p-3">{pct(c.remediation_quality)}</td>
+                <td className="p-3">{pct(c.unsafe_action_rate)}</td>
+                <td className="p-3">{pct(c.evidence_grounding)}</td>
+                <td className="p-3">{pct(c.red_herring_accuracy)}</td>
+                <td className="p-3">${c.cost_usd.mean.toFixed(3)}</td>
+                <td className="whitespace-nowrap p-3">{c.modeled_time_s.p50.toFixed(1)}s / {c.modeled_time_s.p95.toFixed(1)}s</td>
               </tr>
             ))}
           </tbody>

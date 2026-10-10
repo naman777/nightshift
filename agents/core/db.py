@@ -27,6 +27,8 @@ SCHEMA = [
     """CREATE TABLE IF NOT EXISTS steps (
         seq INTEGER PRIMARY KEY AUTOINCREMENT, incident_id TEXT, agent TEXT, kind TEXT,
         name TEXT, detail TEXT, duration_ms INTEGER, ts REAL)""",
+    """CREATE TABLE IF NOT EXISTS demo_llm_runs (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, client TEXT, ts REAL)""",
 ]
 
 PG_FIXUPS = {"INTEGER PRIMARY KEY AUTOINCREMENT": "SERIAL PRIMARY KEY", "REAL": "DOUBLE PRECISION"}

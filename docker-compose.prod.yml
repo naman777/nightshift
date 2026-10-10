@@ -15,6 +15,9 @@ services:
     env_file: [{path: .env.production, required: false}]   # optional OPENAI_API_KEY enables the dashboard's "real LLM" option
     environment:
       NIGHTSHIFT_BACKEND: sim
+      # Real-model runs per UTC day (they spend OPENAI_API_KEY): per visitor address, and for the whole demo. Override in .env.production.
+      NIGHTSHIFT_DEMO_LLM_PER_VISITOR: "${NIGHTSHIFT_DEMO_LLM_PER_VISITOR:-5}"
+      NIGHTSHIFT_DEMO_LLM_PER_DAY: "${NIGHTSHIFT_DEMO_LLM_PER_DAY:-200}"
       NIGHTSHIFT_API_TOKEN: "${NIGHTSHIFT_API_TOKEN:?set NIGHTSHIFT_API_TOKEN}"
       NIGHTSHIFT_DB_URL: sqlite:////data/nightshift-demo.db
     volumes: ["gateway_data:/data", "./target:/app/target:ro"]

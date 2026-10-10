@@ -2,18 +2,82 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
-body { background: #0a0d13; color: #e6e9ef; font-feature-settings: 'cv11', 'ss01'; -webkit-font-smoothing: antialiased; }
-::selection { background: rgba(129, 140, 248, 0.35); }
+/* ChaiUI tokens (the chaicode.com look). Dark is the default: <html class="dark"> unless the visitor chose light. */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.48 0 0);
+  --faint: oklch(0.58 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.87 0 0);
+  --ring: oklch(0.708 0 0);
+  --brand: oklch(66.6% 0.179 58.318);
+  --highlight: oklch(0.476 0.114 61.907);
+  --card-edge: rgb(120 53 15 / 0.15);
+  --card-edge-hover: rgb(120 53 15 / 0.25);
+  --card-fill: rgb(255 255 255 / 0.7);
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --faint: oklch(0.6 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --brand: oklch(75% 0.183 55.934);
+  --highlight: oklch(0.954 0.038 75.164);
+  --card-edge: rgb(255 247 237 / 0.15);
+  --card-edge-hover: rgb(255 247 237 / 0.3);
+  --card-fill: rgb(0 0 0 / 0.1);
+  color-scheme: dark;
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background font-sans text-foreground antialiased; }
+  ::selection { background: color-mix(in oklab, var(--highlight) 30%, transparent); }
+  code { @apply font-mono text-[0.92em]; }
+}
 
 @layer components {
-  .card { @apply rounded-xl border border-white/10 bg-white/[0.03]; }
-  .label { @apply text-[11px] font-medium uppercase tracking-wider text-slate-500; }
-  .chip { @apply inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium; }
-  .btn { @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40; }
-  .btn-primary { @apply btn bg-indigo-500 text-white hover:bg-indigo-400; }
-  .btn-ghost { @apply btn border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10; }
+  /* The highlight phrase: one per paragraph. */
+  .highlight { @apply font-montserrat font-medium capitalize tracking-tight text-highlight; }
+
+  /* The warm hairline card: no shadow, faint fill, a little blur. */
+  .card { border-radius: calc(var(--radius) + 4px); border: 1px solid var(--card-edge); background: var(--card-fill); backdrop-filter: blur(4px); transition: border-color 300ms, opacity 300ms; }
+  .card:hover { border-color: var(--card-edge-hover); }
+  /* A chosen card or option: the cream accent as a thin edge, never a fill. */
+  .is-picked.is-picked, .is-picked.is-picked:hover { border-color: color-mix(in oklab, var(--highlight) 65%, transparent); }
+
+  .label { @apply text-xs font-medium text-muted-foreground; }
+  .chip { @apply inline-flex items-center gap-1 whitespace-nowrap rounded border border-gray-200 px-2 py-0.5 text-[11px] leading-4 text-gray-500 dark:border-gray-700 dark:text-gray-400; }
+
+  /* Meaning is carried by text colour or a thin outline, never a filled pill. */
+  .tone-ok { @apply text-green-700 dark:text-green-400; }
+  .tone-warn { @apply text-yellow-700 dark:text-yellow-400; }
+  .tone-bad { @apply text-red-700 dark:text-red-400; }
+  .tone-special { @apply text-purple-700 dark:text-purple-400; }
+  .chip.tone-ok, .chip.tone-warn, .chip.tone-bad, .chip.tone-special { border-color: color-mix(in srgb, currentColor 30%, transparent); }
+
+  .btn { @apply inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap px-4 text-sm font-medium outline-none transition-colors duration-200 focus-visible:ring-[3px] focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50; }
+  /* Solid: the one main action on a screen. Outline sits beside it with the mirrored corners. */
+  .btn-solid { @apply btn bg-neutral-900 text-white hover:bg-black dark:bg-white dark:text-black dark:hover:bg-neutral-200; border-radius: 0 var(--radius) 0 var(--radius); }
+  .btn-outline { @apply btn border border-neutral-200 bg-transparent text-foreground hover:bg-neutral-100 dark:border-white/10 dark:hover:bg-black/90; border-radius: var(--radius) 0 var(--radius) 0; }
+  .btn-soft { @apply btn h-8 rounded-md bg-primary px-3 font-semibold text-primary-foreground hover:opacity-90; }
+
+  .field { @apply h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none placeholder:text-faint focus-visible:ring-[3px] focus-visible:ring-ring; }
 }
 
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.rise { animation: rise 0.35s ease-out both; }
+.rise { animation: rise 0.3s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .rise { animation: none; } }

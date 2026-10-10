@@ -72,7 +72,7 @@ def create_app(db: Database | None = None, runner: IncidentRunner | None = None,
 
     from gateway.demo_api import build_router, ground_truth
 
-    app.include_router(build_router(lambda: app.state.runner, require_token))
+    app.include_router(build_router(lambda: app.state.runner, require_token, db))
 
     @app.get("/healthz")
     async def healthz() -> dict:

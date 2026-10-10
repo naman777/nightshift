@@ -175,3 +175,47 @@ async def test_gateway_fails_closed_without_credentials(stack, monkeypatch):
 
 def test_slack_signature_rejects_garbage_timestamp():
     assert verify_slack_signature("s", "abc", b"", "") is False
+
+
+class CountingRunner:
+    def __init__(self):
+        self.started = []
+
+    async def start(self, alert, mode="multi"):
+        self.started.append(alert)
+        return f"inc-{len(self.started)}", True
+
+
+async def test_demo_real_llm_launches_are_capped_per_visitor_and_per_day(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("NIGHTSHIFT_DEMO_LLM_PER_VISITOR", "2")
+    monkeypatch.setenv("NIGHTSHIFT_DEMO_LLM_PER_DAY", "3")
+    db, runner = Database.memory(), CountingRunner()
+    app = create_app(db=db, runner=runner)
+    real = {"scenario": SCENARIO, "provider": "openai"}
+    alice, bob, carol = ({"X-Nightshift-Client-IP": ip} for ip in ("203.0.113.1", "203.0.113.2", "203.0.113.3"))
+
+    async def left(who):
+        return next(p for p in (await c.get("/demo/config", headers=who)).json()["providers"] if p["id"] == "openai")["limit"]["remaining"]
+
+    async with client(app) as c:
+        assert await left(alice) == 2
+        assert [(await c.post("/demo/launch", json=real, headers=alice)).status_code for _ in range(3)] == [200, 200, 429]
+        assert await left(alice) == 0 and await left(bob) == 1                      # bob is only bounded by the daily total now
+        assert (await c.post("/demo/launch", json={"scenario": SCENARIO}, headers=alice)).status_code == 200  # offline policy is never capped
+        assert (await c.post("/demo/launch", json=real, headers=bob)).status_code == 200
+        blocked = await c.post("/demo/launch", json=real, headers=carol)             # daily total reached before carol ran anything
+        assert blocked.status_code == 429 and "used up" in blocked.json()["detail"]
+    assert sum(a.labels["llm_provider"] == "openai" for a in runner.started) == 3
+    assert "203.0.113" not in json.dumps(db.execute("SELECT * FROM demo_llm_runs"))  # addresses are stored hashed
+    assert create_app(db=db, runner=CountingRunner()) and len(db.execute("SELECT * FROM demo_llm_runs")) == 3  # survives a restart
+
+
+async def test_demo_real_llm_is_uncapped_when_no_limit_is_configured(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.delenv("NIGHTSHIFT_DEMO_LLM_PER_VISITOR", raising=False)
+    monkeypatch.delenv("NIGHTSHIFT_DEMO_LLM_PER_DAY", raising=False)
+    app = create_app(db=Database.memory(), runner=CountingRunner())
+    async with client(app) as c:
+        assert (await c.get("/demo/config")).json()["providers"][1]["limit"] is None
+        assert [(await c.post("/demo/launch", json={"scenario": SCENARIO, "provider": "openai"})).status_code for _ in range(4)] == [200] * 4

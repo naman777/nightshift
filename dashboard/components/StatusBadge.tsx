@@ -1,10 +1,13 @@
+import { LiveDot } from '@/components/ui';
+
+// Status is text and a thin outline, never a filled pill. Purple is kept for the one special case: handed to a human.
 const STYLE: Record<string, [string, string]> = {
-  investigating: ['bg-sky-500/15 text-sky-300', 'Investigating'], diagnosed: ['bg-indigo-500/15 text-indigo-300', 'Diagnosed'],
-  awaiting_approval: ['bg-amber-500/15 text-amber-300', 'Needs your approval'], resolved: ['bg-emerald-500/15 text-emerald-300', 'Resolved'],
-  rejected: ['bg-slate-500/20 text-slate-300', 'Rejected'], blocked: ['bg-red-500/15 text-red-300', 'Blocked'], escalated: ['bg-purple-500/15 text-purple-300', 'Escalated'],
+  investigating: ['!text-foreground', 'Investigating'], diagnosed: ['!text-foreground', 'Diagnosed'],
+  awaiting_approval: ['tone-warn', 'Needs your approval'], resolved: ['tone-ok', 'Resolved'],
+  rejected: ['', 'Rejected'], blocked: ['tone-bad', 'Blocked'], escalated: ['tone-special', 'Escalated'],
 };
 
 export default function StatusBadge({ status }: { status: string }) {
-  const [cls, label] = STYLE[status] ?? ['bg-slate-700 text-slate-200', status.replace('_', ' ')];
-  return <span className={`chip ${cls}`}>{label}</span>;
+  const [cls, label] = STYLE[status] ?? ['', status.replace('_', ' ')];
+  return <span className={`chip ${cls}`}>{status === 'investigating' && <LiveDot />}{label}</span>;
 }
