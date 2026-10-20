@@ -57,4 +57,4 @@ fi
 
 "${compose[@]}" ps
 docker image prune -f >/dev/null   # dangling layers from the previous build only
-echo "Deployed $revision to https://nightshift.naman.sbs"
+echo "Deployed $revision to https://nightshift.namankundra.com"

@@ -1,6 +1,6 @@
 # Demo deployment
 
-The public demo (https://nightshift.naman.sbs, https://nightshift.namankundra.com) is `docker-compose.prod.yml`: the
+The public demo (https://nightshift.namankundra.com) is `docker-compose.prod.yml`: the
 gateway on simulated backends plus the dashboard, i.e. what `python start.py` runs locally.
 
 It lives in `/opt/nightshift` on a VM shared with other projects:
